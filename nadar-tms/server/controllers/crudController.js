@@ -19,7 +19,7 @@ const TABLES = {
     order: 'name',
   },
   routes: {
-    cols: ['route_code', 'route_name', 'origin', 'destination', 'total_distance', 'institution_id'],
+    cols: ['route_code', 'route_name', 'origin', 'destination', 'total_distance', 'institution_id', 'shift'],
     order: 'route_code',
   },
   stops: {

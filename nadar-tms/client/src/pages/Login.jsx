@@ -56,7 +56,7 @@ export default function Login() {
           </button>
         </form>
         <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-dim)', marginTop: 20 }}>
-          Demo: admin@nadartms.in / deva
+          Demo: admin@nadartms.in / password123
         </p>
       </div>
     </div>

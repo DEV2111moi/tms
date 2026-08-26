@@ -13,6 +13,9 @@ export default function RoutesStops() {
   const [editingStop, setEditingStop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [instFilter, setInstFilter] = useState('');
+  const [shiftFilter, setShiftFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [allStops, setAllStops] = useState([]);
   const toast = useToast();
   const { user } = useAuth();
   const canEdit = user?.role === 'admin';
@@ -25,9 +28,14 @@ export default function RoutesStops() {
     });
   };
 
+  const reloadStops = () => {
+    api.listRes('stops').then(d => setAllStops(d.items || [])).catch(() => {});
+  };
+
   useEffect(() => {
     api.refs().then(r => setRefs(r)).catch(() => {});
     loadRoutes(user?.role === 'institution' ? user.institution_id : '');
+    reloadStops();
   }, []);
 
   const handleInstChange = (v) => {
@@ -67,6 +75,7 @@ export default function RoutesStops() {
     const d = await api.listRes('stops', { route_id: editingStop.route_id });
     const sorted = (d.items || []).sort((a, b) => a.sequence - b.sequence);
     setStopsByRoute(prev => ({ ...prev, [editingStop.route_id]: sorted }));
+    reloadStops();
   };
 
   const handleDelStop = async (stop) => {
@@ -76,12 +85,28 @@ export default function RoutesStops() {
     const d = await api.listRes('stops', { route_id: stop.route_id });
     const sorted = (d.items || []).sort((a, b) => a.sequence - b.sequence);
     setStopsByRoute(prev => ({ ...prev, [stop.route_id]: sorted }));
+    reloadStops();
   };
 
   const instLabel = (id) => {
     const inst = refs.institutions?.find(i => i.id == id);
     return inst ? (inst.short_name || inst.name) : 'Unassigned';
   };
+
+  const getMatchingStop = (routeId, term) => {
+    if (!term) return null;
+    const match = allStops.find(st => st.route_id === routeId && (st.stop_name || '').toLowerCase().includes(term.toLowerCase()));
+    return match ? match.stop_name : null;
+  };
+
+  const filteredRoutes = routes.filter(r => {
+    if (shiftFilter && r.shift !== shiftFilter) return false;
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    const matchRoute = (r.route_code || '').toLowerCase().includes(term) || (r.route_name || '').toLowerCase().includes(term);
+    const matchStop = allStops.some(st => st.route_id === r.id && (st.stop_name || '').toLowerCase().includes(term));
+    return matchRoute || matchStop;
+  });
 
   if (loading) return <div className="loading-center"><div className="spinner" /> Loading...</div>;
 
@@ -91,7 +116,8 @@ export default function RoutesStops() {
     { key: 'origin', label: 'Origin', required: true },
     { key: 'destination', label: 'Destination', required: true },
     { key: 'total_distance', label: 'Distance (km)', type: 'number' },
-    { key: 'institution_id', label: 'Institution', type: 'instref' }
+    { key: 'institution_id', label: 'Institution', type: 'instref' },
+    { key: 'shift', label: 'Shift', type: 'select', options: ['morning1', 'morning2', 'evening1', 'evening2'], required: true }
   ];
 
   const STOP_FIELDS = [
@@ -109,17 +135,29 @@ export default function RoutesStops() {
           <div className="page-title">Routes & Stops</div>
           <div className="page-sub">{routes.length} route(s)</div>
         </div>
-        {canEdit && <button className="btn btn-sm btn-primary" onClick={() => setEditingRoute({})}>+ Add Route</button>}
+        {canEdit && <button className="btn btn-sm btn-primary" onClick={() => setEditingRoute({ shift: 'morning1' })}>+ Add Route</button>}
       </div>
       <div className="page-body">
-        {(refs.institutions?.length > 0 && user?.role !== 'institution') && (
-          <select className="fselect" value={instFilter} onChange={e => handleInstChange(e.target.value)} style={{ maxWidth: 280, marginBottom: 20 }}>
-            <option value="">All institutions</option>
-            {refs.institutions.map(i => <option key={i.id} value={i.id}>{i.short_name || i.name}</option>)}
-          </select>
-        )}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+          {(refs.institutions?.length > 0 && user?.role !== 'institution') && (
+            <select className="fselect" value={instFilter} onChange={e => handleInstChange(e.target.value)} style={{ maxWidth: 220 }}>
+              <option value="">All institutions</option>
+              {refs.institutions.map(i => <option key={i.id} value={i.id}>{i.short_name || i.name}</option>)}
+            </select>
+          )}
 
-        {routes.map(r => {
+          <select className="fselect" value={shiftFilter} onChange={e => setShiftFilter(e.target.value)} style={{ maxWidth: 180 }}>
+            <option value="">All shifts</option>
+            <option value="morning1">Morning 1</option>
+            <option value="morning2">Morning 2</option>
+            <option value="evening1">Evening 1</option>
+            <option value="evening2">Evening 2</option>
+          </select>
+
+          <input className="finput" type="text" placeholder="🔍 Search route code, name, or stop name..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ flex: 1, minWidth: 260 }} />
+        </div>
+
+        {filteredRoutes.map(r => {
           const stops = stopsByRoute[r.id] || [];
           const isOpen = expandedRoute === r.id;
           return (
@@ -130,8 +168,13 @@ export default function RoutesStops() {
                     {r.route_code} · {r.route_name}
                   </div>
                   <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-                    {r.origin} → {r.destination} · {r.total_distance || 0} km · <b style={{ color: 'var(--navy)' }}>{instLabel(r.institution_id)}</b>
+                    {r.origin} → {r.destination} · {r.total_distance || 0} km · <b style={{ color: 'var(--navy)' }}>{instLabel(r.institution_id)}</b> · <span className="tag tag--ok" style={{ padding: '2px 8px', fontSize: 11, textTransform: 'uppercase' }}>{r.shift || 'morning1'}</span>
                   </div>
+                  {getMatchingStop(r.id, searchTerm) && (
+                    <div style={{ fontSize: 12, color: 'var(--marigold)', marginTop: 6, fontWeight: 600 }}>
+                      📍 Matched Stop: {getMatchingStop(r.id, searchTerm)}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button className="btn btn-sm btn-outline" onClick={() => toggleStops(r.id)}>
@@ -191,7 +234,7 @@ export default function RoutesStops() {
           );
         })}
 
-        {routes.length === 0 && (
+        {filteredRoutes.length === 0 && (
           <div className="empty">
             <div className="empty-icon">🛣️</div>
             <p>No routes found.</p>

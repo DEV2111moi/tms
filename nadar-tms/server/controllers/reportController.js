@@ -132,3 +132,32 @@ exports.driverTrips = async (req, res) => {
       byDriver: byDriver.map(d => ({ ...d, trips: Number(d.trips), completed: Number(d.completed), km: Number(d.km || 0), days: Number(d.days) })) });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not build the driver trips report.' }); }
 };
+
+// GET /api/reports/routes-stops
+exports.routesStops = async (req, res) => {
+  const inst = req.query.institutionId || null;
+  try {
+    const routes = await query(
+      `SELECT r.id, r.route_code, r.route_name, r.origin, r.destination, r.total_distance, r.shift,
+              COALESCE(i.short_name, 'Unassigned') AS institution,
+              (SELECT COUNT(*) FROM stops s WHERE s.route_id = r.id) AS total_stops
+       FROM routes r
+       LEFT JOIN institutions i ON i.id = r.institution_id
+       WHERE (? IS NULL OR r.institution_id = ?)
+       ORDER BY r.route_code`, [inst, inst]);
+    
+    const stops = await query(
+      `SELECT s.id, s.route_id, s.stop_name, s.sequence, s.scheduled_time,
+              r.route_code, r.route_name, COALESCE(i.short_name, 'Unassigned') AS institution
+       FROM stops s
+       JOIN routes r ON r.id = s.route_id
+       LEFT JOIN institutions i ON i.id = r.institution_id
+       WHERE (? IS NULL OR r.institution_id = ?)
+       ORDER BY r.route_code, s.sequence`, [inst, inst]);
+    
+    res.json({ routes, stops });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not build the routes & stops report.' });
+  }
+};

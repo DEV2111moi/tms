@@ -9,7 +9,7 @@ export default function Attendance() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [shift, setShift] = useState('morning');
+  const [shift, setShift] = useState('morning1');
   const [routeId, setRouteId] = useState('');
   const [routes, setRoutes] = useState([]);
   const [trip, setTrip] = useState(null);
@@ -149,8 +149,10 @@ export default function Attendance() {
         <div className="blind-eyebrow">Active Session</div>
         <div className="blind-row">
           <select className="fselect" value={shift} onChange={e => setShift(e.target.value)} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', width: 'auto', padding: '6px 12px', fontFamily: 'Oswald', fontWeight: 600, fontSize: 18 }}>
-            <option value="morning" style={{ color: '#000' }}>☀️ Morning Shift</option>
-            <option value="evening" style={{ color: '#000' }}>🌙 Evening Shift</option>
+            <option value="morning1" style={{ color: '#000' }}>☀️ Morning 1</option>
+            <option value="morning2" style={{ color: '#000' }}>☀️ Morning 2</option>
+            <option value="evening1" style={{ color: '#000' }}>🌙 Evening 1</option>
+            <option value="evening2" style={{ color: '#000' }}>🌙 Evening 2</option>
           </select>
           {routes.length > 1 && (
             <select className="fselect" value={routeId} onChange={e => setRouteId(e.target.value)} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', width: 'auto', padding: '6px 12px' }}>

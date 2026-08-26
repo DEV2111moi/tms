@@ -4,9 +4,18 @@ import { useToast } from '../../components/UI/Toast';
 import { useAuth } from '../../context/AuthContext';
 import DataTable from '../../components/UI/DataTable';
 
+const SHIFT_MAP = {
+  morning: '☀️ Morning',
+  evening: '🌙 Evening',
+  morning1: '☀️ Morning 1',
+  morning2: '☀️ Morning 2',
+  evening1: '🌙 Evening 1',
+  evening2: '🌙 Evening 2'
+};
+
 const COLUMNS = [
   { key: 'route_code', label: 'Route', render: (val, item) => <b>{val} · {item.route_name}</b> },
-  { key: 'shift', label: 'Shift', render: (val) => val === 'morning' ? '☀️ Morning' : '🌙 Evening' },
+  { key: 'shift', label: 'Shift', render: (val) => SHIFT_MAP[val] || val },
   { key: 'registration_number', label: 'Bus', mono: true },
   { key: 'driver_name', label: 'Driver' },
   { key: 'incharge_name', label: 'Bus Incharge' },
@@ -106,9 +115,11 @@ export default function Assignments() {
             <label className="flabel">
               <span>Apply to *</span>
               <select className="fselect" value={form.shift} required onChange={e => setForm(prev => ({ ...prev, shift: e.target.value }))}>
-                <option value="both">Both sessions (morning + evening)</option>
-                <option value="morning">Morning only</option>
-                <option value="evening">Evening only</option>
+                <option value="both">Both sessions (morning 1 + evening 1)</option>
+                <option value="morning1">Morning 1</option>
+                <option value="morning2">Morning 2</option>
+                <option value="evening1">Evening 1</option>
+                <option value="evening2">Evening 2</option>
               </select>
             </label>
 

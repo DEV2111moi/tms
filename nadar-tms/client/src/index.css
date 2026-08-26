@@ -680,3 +680,83 @@ textarea.finput { resize: vertical; min-height: 60px; }
   color: var(--text-dim);
   font-size: 14px;
 }
+
+/* ---- Print Board Styling ---- */
+.routes-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+.route-board-card {
+  border: 1.5px solid #000;
+  background: #fff;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.route-board-header {
+  border-bottom: 1.5px solid #000;
+  text-align: center;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 8px 6px;
+  background: #f0f0f0;
+  color: #000;
+  letter-spacing: 0.3px;
+}
+.route-board-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.route-board-table th, .route-board-table td {
+  border: 1.5px solid #000;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: #000;
+}
+.route-board-table th {
+  background: #fcfcfc;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* @media print modifications */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .sidebar, .hide-on-print, button, select, input, .nav {
+    display: none !important;
+  }
+  .main-area {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
+  }
+  .console {
+    display: block !important;
+  }
+  .page-body {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .routes-board-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 15px !important;
+  }
+  .route-board-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .print-board-container {
+    border: none !important;
+    padding: 0 !important;
+  }
+}
+

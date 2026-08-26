@@ -68,6 +68,7 @@ router.get('/reports/fuel-usage', authenticate, requireRole('admin', 'executive'
 router.get('/reports/distance', authenticate, requireRole('admin', 'executive'), rep.distance);
 router.get('/reports/maintenance', authenticate, requireRole('admin', 'executive'), rep.maintenance);
 router.get('/reports/driver-trips', authenticate, requireRole('admin', 'executive'), rep.driverTrips);
+router.get('/reports/routes-stops', authenticate, requireRole('admin', 'executive'), rep.routesStops);
 router.post('/fuel', authenticate, requireRole('admin'), driver.addFuel);
 router.post('/upload', authenticate, requireRole('admin', 'institution'), upload.upload);
 router.get('/notifications', authenticate, notifs.list);

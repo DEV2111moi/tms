@@ -4,7 +4,7 @@ const { query } = require('../db/pool');
 exports.todayTrip = async (req, res) => {
   try {
     const role = req.user.role;
-    const shift = req.query.shift === 'evening' ? 'evening' : 'morning';
+    const shift = req.query.shift || 'morning';
     let a, myRoutes = [];
     if (role === 'incharge') {
       myRoutes = await query(`SELECT a.route_id AS id, r.route_code, r.route_name FROM assignments a
@@ -49,7 +49,7 @@ exports.roster = async (req, res) => {
        FROM trips t JOIN routes r ON r.id = t.route_id WHERE t.id = ?`, [tripId]);
     if (!trips.length) return res.status(404).json({ error: 'Trip not found.' });
     const { route_id: routeId, shift, origin, destination } = trips[0];
-    const evening = shift === 'evening';
+    const evening = String(shift || '').toLowerCase().startsWith('evening');
 
     const stops = await query(
       `SELECT id, stop_name, sequence, scheduled_time FROM stops WHERE route_id = ? ORDER BY sequence ${evening ? 'DESC' : 'ASC'}`,

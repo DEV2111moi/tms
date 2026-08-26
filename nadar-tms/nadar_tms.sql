@@ -30,7 +30,7 @@ SET time_zone = "+00:00";
 CREATE TABLE `assignments` (
   `id` int(11) NOT NULL,
   `route_id` int(11) NOT NULL,
-  `shift` enum('morning','evening') NOT NULL,
+  `shift` varchar(20) NOT NULL,
   `bus_id` int(11) DEFAULT NULL,
   `driver_id` int(11) DEFAULT NULL,
   `incharge_id` int(11) DEFAULT NULL
@@ -785,7 +785,7 @@ CREATE TABLE `trips` (
   `driver_id` int(11) DEFAULT NULL,
   `incharge_id` int(11) DEFAULT NULL,
   `trip_date` date NOT NULL,
-  `shift` enum('morning','evening') DEFAULT 'morning',
+  `shift` varchar(20) DEFAULT 'morning',
   `status` enum('scheduled','running','completed') DEFAULT 'scheduled',
   `idle_alert_sent` tinyint(1) DEFAULT 0,
   `last_eta_stop_id` int(11) DEFAULT NULL

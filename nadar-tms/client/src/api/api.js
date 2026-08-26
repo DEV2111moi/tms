@@ -58,6 +58,7 @@ const api = {
   repDistance: (from, to, inst) => call(`/reports/distance?from=${from}&to=${to}${inst ? `&institutionId=${inst}` : ''}`),
   repMaint: (from, to, inst) => call(`/reports/maintenance?from=${from}&to=${to}${inst ? `&institutionId=${inst}` : ''}`),
   repDriverTrips: (from, to) => call(`/reports/driver-trips?from=${from}&to=${to}`),
+  repRoutesStops: (inst) => call(`/reports/routes-stops${inst ? `?institutionId=${inst}` : ''}`),
   fuelReport: () => call('/reports/fuel'),
   busFuel: (busId) => call(`/fuel/bus/${busId}`),
 
