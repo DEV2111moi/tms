@@ -37,3 +37,5 @@ nadar-tms/server/.env
 package-lock.json
 **/package-lock.json
 
+# SQL files
+*.sql
