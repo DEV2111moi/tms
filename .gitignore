@@ -39,3 +39,5 @@ package-lock.json
 
 # SQL files
 *.sql
+nadar-tms/nadar_tms.sql
+nadar_tms (1).sql
