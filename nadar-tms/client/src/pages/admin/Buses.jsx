@@ -51,6 +51,7 @@ export default function Buses() {
   const [loading, setLoading] = useState(true);
   const [refs, setRefs] = useState({});
   const [instFilter, setInstFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const toast = useToast();
   const { user } = useAuth();
   const canEdit = user?.role === 'admin';
@@ -69,22 +70,43 @@ export default function Buses() {
   const handleSave = async (data, id) => { await api.saveRes('buses', data, id); toast(id ? 'Saved' : 'Added'); load(instFilter); };
   const handleDel = async (item) => { if (!confirm('Delete this bus?')) return; await api.delRes('buses', item.id); toast('Deleted'); load(instFilter); };
 
+  const filteredItems = items.filter(item => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+    return (
+      (item.registration_number || '').toLowerCase().includes(query) ||
+      (item.bus_model || '').toLowerCase().includes(query) ||
+      (item.bus_name || '').toLowerCase().includes(query) ||
+      (item.bus_code || '').toLowerCase().includes(query)
+    );
+  });
+
   if (loading) return <div className="loading-center"><div className="spinner" /> Loading...</div>;
 
   return (
     <>
       <div className="page-head">
-        <div><div className="page-title">Buses</div><div className="page-sub">{items.length} bus(es)</div></div>
+        <div><div className="page-title">Buses</div><div className="page-sub">{filteredItems.length} bus(es)</div></div>
         {canEdit && <button className="btn btn-sm btn-primary" onClick={() => setEditing({})}>+ Add Bus</button>}
       </div>
       <div className="page-body">
-        {(refs.institutions?.length > 0 && user?.role !== 'institution') && (
-          <select className="fselect" value={instFilter} onChange={e => handleInstChange(e.target.value)} style={{ maxWidth: 280, marginBottom: 14 }}>
-            <option value="">All institutions</option>
-            {refs.institutions.map(i => <option key={i.id} value={i.id}>{i.short_name || i.name}</option>)}
-          </select>
-        )}
-        <DataTable columns={COLUMNS} data={items} onEdit={canEdit ? setEditing : undefined} onDelete={canEdit ? handleDel : undefined} emptyIcon="🚌" emptyText="No buses yet." />
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+          <input
+            type="text"
+            className="fselect"
+            placeholder="🔍 Search registration, model, name..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ maxWidth: 300 }}
+          />
+          {(refs.institutions?.length > 0 && user?.role !== 'institution') && (
+            <select className="fselect" value={instFilter} onChange={e => handleInstChange(e.target.value)} style={{ maxWidth: 280 }}>
+              <option value="">All institutions</option>
+              {refs.institutions.map(i => <option key={i.id} value={i.id}>{i.short_name || i.name}</option>)}
+            </select>
+          )}
+        </div>
+        <DataTable columns={COLUMNS} data={filteredItems} onEdit={canEdit ? setEditing : undefined} onDelete={canEdit ? handleDel : undefined} emptyIcon="🚌" emptyText="No buses found." />
       </div>
       {editing !== null && <FormModal title="Bus" fields={FIELDS} initial={editing} onSave={handleSave} onClose={() => setEditing(null)} refs={refs} />}
     </>

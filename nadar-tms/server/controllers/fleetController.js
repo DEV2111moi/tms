@@ -38,7 +38,7 @@ exports.assign = async (req, res) => {
   const { route_id, bus_id, driver_id, incharge_id } = req.body || {};
   const shift = req.body && req.body.shift;
   if (!route_id) return res.status(400).json({ error: 'Choose a route.' });
-  const shifts = (!shift || shift === 'both') ? ['morning', 'evening'] : [shift];
+  const shifts = (!shift || shift === 'both') ? ['morning1', 'evening1'] : [shift];
   const inchargeOnly = req.user.role === 'institution';
   try {
     for (const sh of shifts) {
@@ -63,6 +63,15 @@ exports.assign = async (req, res) => {
       await query('INSERT INTO notifications (message, route_id, institution_id, incharge_id) VALUES (?,?,?,?)',
         [msg.slice(0, 255), route_id, r.institution_id || null, incharge_id || null]);
     } catch (e) { console.error('notify failed', e); }
+    
+    // Automatically trigger calculation & insertion of any missing assignment trips immediately
+    try {
+      const { autoLogTrips } = require('./reportController');
+      autoLogTrips().catch(err => console.error('Async autoLogTrips error:', err));
+    } catch (err) {
+      console.error('Failed to run autoLogTrips:', err);
+    }
+
     res.json({ ok: true, shifts });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not save the assignment.' }); }
 };
@@ -72,10 +81,12 @@ exports.assignments = async (req, res) => {
   try {
     const rows = await query(`
       SELECT a.id, a.route_id, a.shift, a.bus_id, a.driver_id, a.incharge_id,
-             r.route_code, r.route_name, b.registration_number,
-             d.name AS driver_name, u.name AS incharge_name
+             r.route_code, r.route_name, r.total_distance, b.registration_number,
+             d.name AS driver_name, u.name AS incharge_name,
+             COALESCE(i.short_name, '—') AS institution_name
       FROM assignments a
       JOIN routes r ON r.id = a.route_id
+      LEFT JOIN institutions i ON i.id = r.institution_id
       LEFT JOIN buses b   ON b.id = a.bus_id
       LEFT JOIN drivers d ON d.id = a.driver_id
       LEFT JOIN users u   ON u.id = a.incharge_id

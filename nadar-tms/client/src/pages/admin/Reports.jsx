@@ -169,6 +169,26 @@ export default function Reports() {
               )
             )}
           </div>
+          {st.type === 'distance' && (
+            <div style={{
+              marginTop: '16px',
+              padding: '12px 16px',
+              borderRadius: '6px',
+              background: 'var(--paper-2)',
+              borderLeft: '4px solid var(--amber)',
+              fontSize: '13px',
+              color: 'var(--text-dim)',
+              lineHeight: '1.5',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>💡</span>
+              <span>
+                <b>Note:</b> Today's trips are automatically logged as soon as each shift passes its scheduled completion time (e.g., 9:00 AM for morning shift). Trips for past days are logged immediately.
+              </span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
             <button className="btn btn-sm btn-outline" onClick={handleCsv} disabled={!result}>Export CSV</button>
             <button className="btn btn-sm btn-outline" onClick={handlePrint} disabled={!result}>Print</button>
@@ -369,15 +389,17 @@ function DistanceReportView({ data }) {
           </tbody>
         </table>
       </div>
-      <div className="section-h">By Bus</div>
+      <div className="section-h">By Bus & Driver</div>
       <div className="table-wrap">
         <table className="tbl">
-          <thead><tr><th>Bus</th><th>Institution</th><th>Trips</th><th>Distance</th></tr></thead>
+          <thead><tr><th>Bus</th><th>Institution</th><th>Route</th><th>Driver</th><th>Trips</th><th>Distance</th></tr></thead>
           <tbody>
             {data.byBus.map((b, i) => (
               <tr key={i}>
                 <td className="mono"><b>{b.registration_number}</b></td>
                 <td>{b.institution || '—'}</td>
+                <td>{b.route_code !== '—' ? <b>{b.route_code} <span className="muted">· {b.route_name}</span></b> : '—'}</td>
+                <td><b>{b.driver_name || '—'}</b></td>
                 <td className="mono">{b.trips}</td>
                 <td className="mono">{b.km.toLocaleString('en-IN')} km</td>
               </tr>

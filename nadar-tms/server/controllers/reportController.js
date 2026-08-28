@@ -62,22 +62,157 @@ exports.fuel = async (req, res) => {
 };
 
 // GET /api/reports/distance
+async function autoLogTrips() {
+  try {
+    // Check and log for the last 3 days, from oldest (offset 2) to newest (offset 0)
+    for (let offset = 2; offset >= 0; offset--) {
+      const d = new Date();
+      d.setDate(d.getDate() - offset);
+      const tzOffset = d.getTimezoneOffset() * 60000;
+      const targetDateStr = new Date(d.getTime() - tzOffset).toISOString().slice(0, 10);
+
+      // Get all assignments with route details
+      const assignments = await query(`
+        SELECT a.bus_id, a.driver_id, a.route_id, a.shift,
+               r.route_code, r.route_name, r.total_distance, r.origin, r.destination
+        FROM assignments a
+        JOIN routes r ON r.id = a.route_id
+        WHERE a.bus_id IS NOT NULL AND a.driver_id IS NOT NULL
+      `);
+
+      for (const assign of assignments) {
+        // Find scheduled start and end times based on route stops
+        const stopsInfo = await query(`
+          SELECT MIN(scheduled_time) AS start_t, MAX(scheduled_time) AS end_t
+          FROM stops
+          WHERE route_id = ?
+        `, [assign.route_id]);
+
+        const start_t = (stopsInfo[0] && stopsInfo[0].start_t) || '07:30:00';
+        const end_t = (stopsInfo[0] && stopsInfo[0].end_t) || '09:00:00';
+
+        // If checking for today, ensure the current time is past the scheduled end time
+        if (offset === 0) {
+          const now = new Date();
+          const nowStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(11, 19); // local time e.g. "09:30:00"
+          if (nowStr < end_t) {
+            continue; // Skip because the shift hasn't finished yet today
+          }
+        }
+
+        // Check if trip log already exists for this bus, date, and shift
+        const existing = await query(`
+          SELECT id FROM trip_logs
+          WHERE bus_id = ? AND log_date = ? AND shift = ?
+          LIMIT 1
+        `, [assign.bus_id, targetDateStr, assign.shift]);
+
+        if (existing.length === 0) {
+          // Look up if this driver has a linked user_id in the users table
+          const driverUser = await query(`
+            SELECT user_id FROM drivers WHERE id = ?
+          `, [assign.driver_id]);
+          const linkedUserId = (driverUser[0] && driverUser[0].user_id) || null;
+
+          // Determine start_km: last logged end_km for this bus, or current bus odometer
+          const lastTrip = await query(`
+            SELECT end_km FROM trip_logs
+            WHERE bus_id = ? AND end_km IS NOT NULL
+            ORDER BY log_date DESC, end_time DESC, id DESC
+            LIMIT 1
+          `, [assign.bus_id]);
+
+          let start_km = 0;
+          if (lastTrip.length > 0 && lastTrip[0].end_km != null) {
+            start_km = Number(lastTrip[0].end_km);
+          } else {
+            const busOdom = await query(`
+              SELECT current_odometer_km FROM buses WHERE id = ?
+            `, [assign.bus_id]);
+            start_km = Number((busOdom[0] && busOdom[0].current_odometer_km) || 0);
+          }
+
+          const dist = Number(assign.total_distance || 0);
+          const end_km = start_km + dist;
+
+          // Insert trip log
+          await query(`
+            INSERT INTO trip_logs 
+            (bus_id, driver_id, log_date, shift, start_time, start_km, end_time, end_km, start_stop, end_stop)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            assign.bus_id,
+            linkedUserId,
+            targetDateStr,
+            assign.shift,
+            `${targetDateStr} ${start_t}`,
+            start_km,
+            `${targetDateStr} ${end_t}`,
+            end_km,
+            assign.origin || 'Start',
+            assign.destination || 'End'
+          ]);
+
+          // Update bus odometer in buses table
+          await query(`
+            UPDATE buses
+            SET current_odometer_km = ?
+            WHERE id = ?
+          `, [end_km, assign.bus_id]);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('autoLogTrips error:', err);
+  }
+}
+
+// GET /api/reports/distance
 exports.distance = async (req, res) => {
   const { from, to, inst } = range(req);
   try {
-    const cond = `tl.end_km IS NOT NULL AND tl.start_km IS NOT NULL AND tl.log_date BETWEEN ? AND ? AND (? IS NULL OR b.institution_id = ?)`;
+    // Automatically trigger calculation & insertion of any missing assignment trips
+    await autoLogTrips();
+
+    const cond = `tl.end_km IS NOT NULL AND tl.start_km IS NOT NULL AND tl.log_date BETWEEN ? AND ? AND (? IS NULL OR r.institution_id = ?)`;
     const days = await query(
       `SELECT tl.log_date AS date, SUM(tl.end_km - tl.start_km) AS km, COUNT(*) AS trips
-       FROM trip_logs tl JOIN buses b ON b.id = tl.bus_id WHERE ${cond}
+       FROM trip_logs tl 
+       JOIN buses b ON b.id = tl.bus_id 
+       LEFT JOIN assignments a ON a.bus_id = tl.bus_id AND a.shift = tl.shift
+       LEFT JOIN routes r ON r.id = a.route_id
+       WHERE ${cond}
        GROUP BY tl.log_date ORDER BY tl.log_date`, [from, to, inst, inst]);
+    
     const byBus = await query(
-      `SELECT b.registration_number, i.short_name AS institution, COUNT(tl.id) AS trips, SUM(tl.end_km - tl.start_km) AS km
-       FROM trip_logs tl JOIN buses b ON b.id = tl.bus_id LEFT JOIN institutions i ON i.id = b.institution_id WHERE ${cond}
-       GROUP BY b.id, b.registration_number, i.short_name ORDER BY km DESC`, [from, to, inst, inst]);
+      `SELECT b.registration_number, 
+              COALESCE(i.short_name, '—') AS institution,
+              COALESCE(r.route_code, '—') AS route_code,
+              COALESCE(r.route_name, '—') AS route_name,
+              COALESCE(dr.name, u.name, '—') AS driver_name,
+              COUNT(tl.id) AS trips,
+              SUM(tl.end_km - tl.start_km) AS km
+       FROM trip_logs tl
+       JOIN buses b ON b.id = tl.bus_id
+       LEFT JOIN assignments a ON a.bus_id = tl.bus_id AND a.shift = tl.shift
+       LEFT JOIN routes r ON r.id = a.route_id
+       LEFT JOIN institutions i ON i.id = r.institution_id
+       LEFT JOIN users u ON u.id = tl.driver_id
+       LEFT JOIN drivers dr ON dr.id = a.driver_id
+       WHERE ${cond}
+       GROUP BY b.id, b.registration_number, i.id, i.short_name, r.id, r.route_code, r.route_name, dr.name, u.name
+       ORDER BY km DESC`, [from, to, inst, inst]);
+
     const byInstitution = await query(
       `SELECT COALESCE(i.short_name,'Unassigned') AS institution, COUNT(tl.id) AS trips, SUM(tl.end_km - tl.start_km) AS km
-       FROM trip_logs tl JOIN buses b ON b.id = tl.bus_id LEFT JOIN institutions i ON i.id = b.institution_id WHERE ${cond}
+       FROM trip_logs tl 
+       JOIN buses b ON b.id = tl.bus_id 
+       LEFT JOIN assignments a ON a.bus_id = tl.bus_id AND a.shift = tl.shift
+       LEFT JOIN routes r ON r.id = a.route_id
+       LEFT JOIN institutions i ON i.id = r.institution_id 
+       WHERE ${cond}
        GROUP BY i.short_name ORDER BY km DESC`, [from, to, inst, inst]);
+    
     const num = (a) => a.map((r) => ({ ...r, km: Number(r.km || 0), trips: Number(r.trips || 0) }));
     res.json({ from, to, days: num(days), byBus: num(byBus), byInstitution: num(byInstitution) });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not build the distance report.' }); }
@@ -161,3 +296,5 @@ exports.routesStops = async (req, res) => {
     res.status(500).json({ error: 'Could not build the routes & stops report.' });
   }
 };
+
+exports.autoLogTrips = autoLogTrips;
