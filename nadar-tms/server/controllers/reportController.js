@@ -190,6 +190,17 @@ exports.distance = async (req, res) => {
               COALESCE(r.route_code, '—') AS route_code,
               COALESCE(r.route_name, '—') AS route_name,
               COALESCE(dr.name, u.name, '—') AS driver_name,
+              
+              -- Trip 1 (Morning)
+              SUM(CASE WHEN tl.shift IN ('morning', 'morning1', 'morning2') THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning_km,
+              MAX(CASE WHEN tl.shift IN ('morning', 'morning1', 'morning2') THEN tl.start_stop END) AS morning_start,
+              MAX(CASE WHEN tl.shift IN ('morning', 'morning1', 'morning2') THEN tl.end_stop END) AS morning_end,
+              
+              -- Trip 2 (Evening)
+              SUM(CASE WHEN tl.shift IN ('evening', 'evening1', 'evening2') THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening_km,
+              MAX(CASE WHEN tl.shift IN ('evening', 'evening1', 'evening2') THEN tl.start_stop END) AS evening_start,
+              MAX(CASE WHEN tl.shift IN ('evening', 'evening1', 'evening2') THEN tl.end_stop END) AS evening_end,
+
               COUNT(tl.id) AS trips,
               SUM(tl.end_km - tl.start_km) AS km
        FROM trip_logs tl
@@ -213,7 +224,13 @@ exports.distance = async (req, res) => {
        WHERE ${cond}
        GROUP BY i.short_name ORDER BY km DESC`, [from, to, inst, inst]);
     
-    const num = (a) => a.map((r) => ({ ...r, km: Number(r.km || 0), trips: Number(r.trips || 0) }));
+    const num = (a) => a.map((r) => ({ 
+      ...r, 
+      km: Number(r.km || 0), 
+      trips: Number(r.trips || 0),
+      morning_km: Number(r.morning_km || 0),
+      evening_km: Number(r.evening_km || 0)
+    }));
     res.json({ from, to, days: num(days), byBus: num(byBus), byInstitution: num(byInstitution) });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not build the distance report.' }); }
 };

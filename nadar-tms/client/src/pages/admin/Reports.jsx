@@ -392,18 +392,58 @@ function DistanceReportView({ data }) {
       <div className="section-h">By Bus & Driver</div>
       <div className="table-wrap">
         <table className="tbl">
-          <thead><tr><th>Bus</th><th>Institution</th><th>Route</th><th>Driver</th><th>Trips</th><th>Distance</th></tr></thead>
+          <thead><tr><th>Bus</th><th>Institution</th><th>Route</th><th>Driver</th><th>Trip 1 (Morning)</th><th>Trip 2 (Evening)</th><th>Total KM</th></tr></thead>
           <tbody>
-            {data.byBus.map((b, i) => (
-              <tr key={i}>
-                <td className="mono"><b>{b.registration_number}</b></td>
-                <td>{b.institution || '—'}</td>
-                <td>{b.route_code !== '—' ? <b>{b.route_code} <span className="muted">· {b.route_name}</span></b> : '—'}</td>
-                <td><b>{b.driver_name || '—'}</b></td>
-                <td className="mono">{b.trips}</td>
-                <td className="mono">{b.km.toLocaleString('en-IN')} km</td>
-              </tr>
-            ))}
+            {data.byBus.map((b, i) => {
+              const hasOtherMorningDriver = data.byBus.some(other => 
+                other.route_code === b.route_code && 
+                other.driver_name !== b.driver_name && 
+                other.morning_km > 0
+              );
+              const hasOtherEveningDriver = data.byBus.some(other => 
+                other.route_code === b.route_code && 
+                other.driver_name !== b.driver_name && 
+                other.evening_km > 0
+              );
+
+              return (
+                <tr key={i}>
+                  <td className="mono"><b>{b.registration_number}</b></td>
+                  <td>{b.institution || '—'}</td>
+                  <td>{b.route_code !== '—' ? <b>{b.route_code} <span className="muted">· {b.route_name}</span></b> : '—'}</td>
+                  <td><b>{b.driver_name || '—'}</b></td>
+                  <td>
+                    {b.morning_km > 0 ? (
+                      <>
+                        <span className="mono">{b.morning_km.toLocaleString('en-IN')} km</span>
+                        {b.morning_start && b.morning_end && (
+                          <div className="muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                            {b.morning_start} ➔ {b.morning_end}
+                          </div>
+                        )}
+                      </>
+                    ) : hasOtherMorningDriver ? (
+                      <span style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: '11px' }}>(DIFFERENT DRIVER)</span>
+                    ) : '—'}
+                  </td>
+                  <td>
+                    {b.evening_km > 0 ? (
+                      <>
+                        <span className="mono">{b.evening_km.toLocaleString('en-IN')} km</span>
+                        {b.evening_start && b.evening_end && (
+                          <div className="muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                            {b.evening_start} ➔ {b.evening_end}
+                          </div>
+                        )}
+                      </>
+                    ) : hasOtherEveningDriver ? (
+                      <span style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: '11px' }}>(DIFFERENT DRIVER)</span>
+                    ) : '—'}
+                  </td>
+                  <td className="mono"><b>{b.km.toLocaleString('en-IN')} km</b></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

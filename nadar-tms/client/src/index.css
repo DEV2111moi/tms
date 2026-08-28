@@ -758,5 +758,19 @@ textarea.finput { resize: vertical; min-height: 60px; }
     border: none !important;
     padding: 0 !important;
   }
+  .tbl {
+    width: 100% !important;
+    font-size: 10px !important;
+    border-collapse: collapse !important;
+  }
+  .tbl th, .tbl td {
+    padding: 4px 6px !important;
+    font-size: 10px !important;
+  }
+  .tbl th {
+    background-color: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }
 
