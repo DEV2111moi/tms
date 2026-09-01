@@ -199,6 +199,7 @@ export default function Assignments() {
   });
   const [sameForBoth, setSameForBoth] = useState(true);
   const [instFilter, setInstFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const toast = useToast();
   const { user } = useAuth();
@@ -258,17 +259,74 @@ export default function Assignments() {
   };
 
   const handleEdit = (item) => {
-    setForm({
-      route_id: item.route_id,
-      shift: item.shift,
-      bus_id: item.bus_id || '',
-      driver_id: item.driver_id || '',
-      evening_bus_id: '',
-      evening_driver_id: '',
-      incharge_id: item.incharge_id || ''
-    });
-    setSameForBoth(true);
+    const routeAssignments = items.filter(a => a.route_id === item.route_id);
+    const morningAssign = routeAssignments.find(a => a.shift === 'morning1' || a.shift === 'morning');
+    const eveningAssign = routeAssignments.find(a => a.shift === 'evening1' || a.shift === 'evening');
+
+    if (morningAssign && eveningAssign && (morningAssign.bus_id !== eveningAssign.bus_id || morningAssign.driver_id !== eveningAssign.driver_id)) {
+      setForm({
+        route_id: item.route_id,
+        shift: 'both',
+        bus_id: morningAssign.bus_id || '',
+        driver_id: morningAssign.driver_id || '',
+        evening_bus_id: eveningAssign.bus_id || '',
+        evening_driver_id: eveningAssign.driver_id || '',
+        incharge_id: item.incharge_id || ''
+      });
+      setSameForBoth(false);
+    } else {
+      setForm({
+        route_id: item.route_id,
+        shift: item.shift,
+        bus_id: item.bus_id || '',
+        driver_id: item.driver_id || '',
+        evening_bus_id: '',
+        evening_driver_id: '',
+        incharge_id: item.incharge_id || ''
+      });
+      setSameForBoth(true);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleRouteChange = (val) => {
+    if (!val) {
+      setForm(prev => ({ ...prev, route_id: '', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '' }));
+      return;
+    }
+    const existing = items.filter(a => String(a.route_id) === String(val));
+    if (existing.length > 0) {
+      const morning = existing.find(a => a.shift === 'morning1' || a.shift === 'morning');
+      const evening = existing.find(a => a.shift === 'evening1' || a.shift === 'evening');
+      if (morning && evening && (morning.bus_id !== evening.bus_id || morning.driver_id !== evening.driver_id)) {
+        setSameForBoth(false);
+        setForm(prev => ({
+          ...prev,
+          route_id: val,
+          shift: 'both',
+          bus_id: morning.bus_id || '',
+          driver_id: morning.driver_id || '',
+          evening_bus_id: evening.bus_id || '',
+          evening_driver_id: evening.driver_id || '',
+          incharge_id: morning.incharge_id || evening.incharge_id || prev.incharge_id
+        }));
+      } else {
+        const first = existing[0];
+        setSameForBoth(true);
+        setForm(prev => ({
+          ...prev,
+          route_id: val,
+          shift: existing.length > 1 ? 'both' : (first.shift || 'both'),
+          bus_id: first.bus_id || '',
+          driver_id: first.driver_id || '',
+          evening_bus_id: '',
+          evening_driver_id: '',
+          incharge_id: first.incharge_id || prev.incharge_id
+        }));
+      }
+    } else {
+      setForm(prev => ({ ...prev, route_id: val }));
+    }
   };
 
   if (loading) return <div className="loading-center"><div className="spinner" /> Loading...</div>;
@@ -283,10 +341,32 @@ export default function Assignments() {
   const filteredRoutes = routes.filter(r => !curInst || r.institution_id == curInst);
   const filteredIncharges = incharges.filter(u => !curInst || u.institution_id == curInst);
 
-  const routeOptions = filteredRoutes.map(r => ({ value: r.id, label: `${r.route_code} — ${r.route_name}` }));
+  const routeOptions = filteredRoutes.map(r => {
+    const assigned = items.filter(a => a.route_id === r.id);
+    const driverNames = [...new Set(assigned.map(a => a.driver_name).filter(Boolean))].join(', ');
+    return {
+      value: r.id,
+      label: `${r.route_code} — ${r.route_name}${driverNames ? ` · 👤 ${driverNames}` : ''}`
+    };
+  });
   const busOptions = buses.map(b => ({ value: b.id, label: b.registration_number }));
   const driverOptions = drivers.map(d => ({ value: d.id, label: d.name }));
   const inchargeOptions = filteredIncharges.map(u => ({ value: u.id, label: u.name }));
+
+  const filteredItems = items.filter(item => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (item.route_code || '').toLowerCase().includes(q) ||
+      (item.route_name || '').toLowerCase().includes(q) ||
+      (item.driver_name || '').toLowerCase().includes(q) ||
+      (item.registration_number || '').toLowerCase().includes(q) ||
+      (item.institution_name || '').toLowerCase().includes(q) ||
+      (item.incharge_name || '').toLowerCase().includes(q) ||
+      (item.shift || '').toLowerCase().includes(q) ||
+      (SHIFT_MAP[item.shift] || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <>
@@ -316,8 +396,8 @@ export default function Assignments() {
               label="Route *"
               value={form.route_id}
               options={routeOptions}
-              onChange={val => setForm(prev => ({ ...prev, route_id: val }))}
-              placeholder="🔍 Search route code or name..."
+              onChange={handleRouteChange}
+              placeholder="🔍 Search route code, name, or driver..."
               emptyText="Choose route"
             />
 
@@ -428,8 +508,51 @@ export default function Assignments() {
           </div>
         </form>
 
-        <div className="section-h">Current assignments</div>
-        <DataTable columns={COLUMNS} data={items} onEdit={handleEdit} emptyIcon="🔗" emptyText="No assignments set up." />
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          flexWrap: 'wrap', 
+          gap: 12, 
+          marginTop: 28, 
+          marginBottom: 14 
+        }}>
+          <div className="section-h" style={{ margin: 0 }}>
+            Current assignments ({filteredItems.length})
+          </div>
+          <div style={{ position: 'relative', width: '100%', maxWidth: 360 }}>
+            <input
+              type="text"
+              className="fselect"
+              placeholder="🔍 Search route, driver, bus..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ width: '100%', paddingRight: searchQuery ? 30 : 12, borderRadius: 6, background: '#fff' }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-dim)',
+                  fontSize: 14,
+                  padding: 2
+                }}
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+        <DataTable columns={COLUMNS} data={filteredItems} onEdit={handleEdit} emptyIcon="🔗" emptyText={searchQuery ? 'No matching assignments found.' : 'No assignments set up.'} />
       </div>
     </>
   );

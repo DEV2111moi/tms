@@ -77,7 +77,7 @@ async function autoLogTrips() {
                r.route_code, r.route_name, r.total_distance, r.origin, r.destination
         FROM assignments a
         JOIN routes r ON r.id = a.route_id
-        WHERE a.bus_id IS NOT NULL AND a.driver_id IS NOT NULL
+        WHERE a.bus_id IS NOT NULL
       `);
 
       for (const assign of assignments) {
@@ -89,30 +89,52 @@ async function autoLogTrips() {
         `, [assign.route_id]);
 
         const start_t = (stopsInfo[0] && stopsInfo[0].start_t) || '07:30:00';
-        const end_t = (stopsInfo[0] && stopsInfo[0].end_t) || '09:00:00';
+        const end_t = (stopsInfo[0] && stopsInfo[0].end_t) || null;
 
-        // If checking for today, ensure the current time is past the scheduled end time
+        // Sensible shift cutoff: morning shifts finish by 09:30 AM, evening shifts by 06:00 PM
+        const isMorning = String(assign.shift || '').startsWith('morning');
+        const defaultEnd = isMorning ? '09:30:00' : '18:00:00';
+        const effectiveEnd = (isMorning && end_t && end_t > '12:00:00') ? defaultEnd : (end_t || defaultEnd);
+
+        // If checking for today, ensure current time is past the shift's end time
         if (offset === 0) {
           const now = new Date();
-          const nowStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(11, 19); // local time e.g. "09:30:00"
-          if (nowStr < end_t) {
+          const nowStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(11, 19);
+          if (nowStr < effectiveEnd) {
             continue; // Skip because the shift hasn't finished yet today
           }
         }
 
         // Check if trip log already exists for this bus, date, and shift
         const existing = await query(`
-          SELECT id FROM trip_logs
+          SELECT id, start_km, end_km FROM trip_logs
           WHERE bus_id = ? AND log_date = ? AND shift = ?
           LIMIT 1
         `, [assign.bus_id, targetDateStr, assign.shift]);
 
-        if (existing.length === 0) {
-          // Look up if this driver has a linked user_id in the users table
+        if (existing.length > 0) {
+          // If the existing log was saved with 0 distance (start_km === end_km), but the route now has distance, update it!
+          const dist = Number(assign.total_distance || 0);
+          if (dist > 0 && Number(existing[0].start_km) === Number(existing[0].end_km)) {
+            const newEnd = Number(existing[0].start_km) + dist;
+            await query(`
+              UPDATE trip_logs
+              SET end_km = ?,
+                  start_stop = CASE WHEN start_stop IS NULL OR start_stop = 'Start' THEN ? ELSE start_stop END,
+                  end_stop = CASE WHEN end_stop IS NULL OR end_stop = 'End' THEN ? ELSE end_stop END
+              WHERE id = ?
+            `, [newEnd, assign.origin || 'Start', assign.destination || 'End', existing[0].id]);
+          }
+          continue;
+        }
+
+        let linkedUserId = null;
+        if (assign.driver_id) {
           const driverUser = await query(`
             SELECT user_id FROM drivers WHERE id = ?
           `, [assign.driver_id]);
-          const linkedUserId = (driverUser[0] && driverUser[0].user_id) || null;
+          linkedUserId = (driverUser[0] && driverUser[0].user_id) || null;
+        }
 
           // Determine start_km: last logged end_km for this bus, or current bus odometer
           const lastTrip = await query(`
@@ -159,7 +181,6 @@ async function autoLogTrips() {
             SET current_odometer_km = ?
             WHERE id = ?
           `, [end_km, assign.bus_id]);
-        }
       }
     }
   } catch (err) {
@@ -191,15 +212,25 @@ exports.distance = async (req, res) => {
               COALESCE(r.route_name, '—') AS route_name,
               COALESCE(dr.name, u.name, '—') AS driver_name,
               
-              -- Trip 1 (Morning)
-              SUM(CASE WHEN tl.shift IN ('morning', 'morning1', 'morning2') THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning_km,
-              MAX(CASE WHEN tl.shift IN ('morning', 'morning1', 'morning2') THEN tl.start_stop END) AS morning_start,
-              MAX(CASE WHEN tl.shift IN ('morning', 'morning1', 'morning2') THEN tl.end_stop END) AS morning_end,
+              -- Morning 1
+              SUM(CASE WHEN tl.shift IN ('morning1', 'morning') THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning1_km,
+              MAX(CASE WHEN tl.shift IN ('morning1', 'morning') THEN tl.start_stop END) AS morning1_start,
+              MAX(CASE WHEN tl.shift IN ('morning1', 'morning') THEN tl.end_stop END) AS morning1_end,
               
-              -- Trip 2 (Evening)
-              SUM(CASE WHEN tl.shift IN ('evening', 'evening1', 'evening2') THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening_km,
-              MAX(CASE WHEN tl.shift IN ('evening', 'evening1', 'evening2') THEN tl.start_stop END) AS evening_start,
-              MAX(CASE WHEN tl.shift IN ('evening', 'evening1', 'evening2') THEN tl.end_stop END) AS evening_end,
+              -- Morning 2
+              SUM(CASE WHEN tl.shift = 'morning2' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning2_km,
+              MAX(CASE WHEN tl.shift = 'morning2' THEN tl.start_stop END) AS morning2_start,
+              MAX(CASE WHEN tl.shift = 'morning2' THEN tl.end_stop END) AS morning2_end,
+              
+              -- Evening 1
+              SUM(CASE WHEN tl.shift IN ('evening1', 'evening') THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening1_km,
+              MAX(CASE WHEN tl.shift IN ('evening1', 'evening') THEN tl.start_stop END) AS evening1_start,
+              MAX(CASE WHEN tl.shift IN ('evening1', 'evening') THEN tl.end_stop END) AS evening1_end,
+              
+              -- Evening 2
+              SUM(CASE WHEN tl.shift = 'evening2' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening2_km,
+              MAX(CASE WHEN tl.shift = 'evening2' THEN tl.start_stop END) AS evening2_start,
+              MAX(CASE WHEN tl.shift = 'evening2' THEN tl.end_stop END) AS evening2_end,
 
               COUNT(tl.id) AS trips,
               SUM(tl.end_km - tl.start_km) AS km
@@ -228,8 +259,10 @@ exports.distance = async (req, res) => {
       ...r, 
       km: Number(r.km || 0), 
       trips: Number(r.trips || 0),
-      morning_km: Number(r.morning_km || 0),
-      evening_km: Number(r.evening_km || 0)
+      morning1_km: Number(r.morning1_km || 0),
+      morning2_km: Number(r.morning2_km || 0),
+      evening1_km: Number(r.evening1_km || 0),
+      evening2_km: Number(r.evening2_km || 0)
     }));
     res.json({ from, to, days: num(days), byBus: num(byBus), byInstitution: num(byInstitution) });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not build the distance report.' }); }
