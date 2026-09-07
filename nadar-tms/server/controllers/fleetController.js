@@ -145,7 +145,7 @@ exports.refs = async (req, res) => {
   try {
     const [routes, buses, drivers, incharges, institutions] = await Promise.all([
       query('SELECT id, route_code, route_name, institution_id FROM routes ORDER BY route_code'),
-      query('SELECT id, registration_number FROM buses ORDER BY registration_number'),
+      query('SELECT id, registration_number, institution_id FROM buses ORDER BY registration_number'),
       query('SELECT id, name FROM drivers ORDER BY name'),
       query("SELECT id, name, institution_id FROM users WHERE role='incharge' ORDER BY name"),
       query('SELECT id, code, name, short_name FROM institutions ORDER BY name'),

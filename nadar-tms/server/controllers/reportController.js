@@ -4,7 +4,8 @@ const range = (req) => {
   const to = req.query.to || new Date().toISOString().slice(0, 10);
   const from = req.query.from || to;
   const inst = req.query.institutionId || null;
-  return { from, to, inst };
+  const busId = req.query.busId || null;
+  return { from, to, inst, busId };
 };
 
 // GET /api/reports/absentees
@@ -160,10 +161,11 @@ async function autoLogTrips() {
           // Insert trip log
           await query(`
             INSERT INTO trip_logs 
-            (bus_id, driver_id, log_date, shift, start_time, start_km, end_time, end_km, start_stop, end_stop)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (bus_id, route_id, driver_id, log_date, shift, start_time, start_km, end_time, end_km, start_stop, end_stop)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `, [
             assign.bus_id,
+            assign.route_id,
             linkedUserId,
             targetDateStr,
             assign.shift,
@@ -190,23 +192,25 @@ async function autoLogTrips() {
 
 // GET /api/reports/distance
 exports.distance = async (req, res) => {
-  const { from, to, inst } = range(req);
+  const { from, to, inst, busId } = range(req);
   try {
     // Automatically trigger calculation & insertion of any missing assignment trips
     await autoLogTrips();
 
-    const cond = `tl.end_km IS NOT NULL AND tl.start_km IS NOT NULL AND tl.log_date BETWEEN ? AND ? AND (? IS NULL OR r.institution_id = ?)`;
+    const cond = `tl.end_km IS NOT NULL AND tl.start_km IS NOT NULL AND tl.log_date BETWEEN ? AND ? AND (? IS NULL OR r.institution_id = ? OR b.institution_id = ?) AND (? IS NULL OR b.id = ?)`;
+    const params = [from, to, inst, inst, inst, busId, busId];
+
     const days = await query(
-      `SELECT tl.log_date AS date, SUM(tl.end_km - tl.start_km) AS km, COUNT(*) AS trips
+      `SELECT tl.log_date AS date, SUM(tl.end_km - tl.start_km) AS km, COUNT(tl.id) AS trips
        FROM trip_logs tl 
        JOIN buses b ON b.id = tl.bus_id 
-       LEFT JOIN assignments a ON a.bus_id = tl.bus_id AND a.shift = tl.shift
-       LEFT JOIN routes r ON r.id = a.route_id
+       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift LIMIT 1))
        WHERE ${cond}
-       GROUP BY tl.log_date ORDER BY tl.log_date`, [from, to, inst, inst]);
+       GROUP BY tl.log_date ORDER BY tl.log_date`, params);
     
     const byBus = await query(
-      `SELECT b.registration_number, 
+      `SELECT b.id AS bus_id,
+              b.registration_number, 
               COALESCE(i.short_name, '—') AS institution,
               COALESCE(r.route_code, '—') AS route_code,
               COALESCE(r.route_name, '—') AS route_name,
@@ -236,24 +240,22 @@ exports.distance = async (req, res) => {
               SUM(tl.end_km - tl.start_km) AS km
        FROM trip_logs tl
        JOIN buses b ON b.id = tl.bus_id
-       LEFT JOIN assignments a ON a.bus_id = tl.bus_id AND a.shift = tl.shift
-       LEFT JOIN routes r ON r.id = a.route_id
-       LEFT JOIN institutions i ON i.id = r.institution_id
+       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift LIMIT 1))
+       LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b.institution_id)
        LEFT JOIN users u ON u.id = tl.driver_id
-       LEFT JOIN drivers dr ON dr.id = a.driver_id
+       LEFT JOIN drivers dr ON dr.id = (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND (tl.route_id IS NULL OR a3.route_id = tl.route_id) LIMIT 1)
        WHERE ${cond}
        GROUP BY b.id, b.registration_number, i.id, i.short_name, r.id, r.route_code, r.route_name, dr.name, u.name
-       ORDER BY km DESC`, [from, to, inst, inst]);
+       ORDER BY km DESC`, params);
 
     const byInstitution = await query(
       `SELECT COALESCE(i.short_name,'Unassigned') AS institution, COUNT(tl.id) AS trips, SUM(tl.end_km - tl.start_km) AS km
        FROM trip_logs tl 
        JOIN buses b ON b.id = tl.bus_id 
-       LEFT JOIN assignments a ON a.bus_id = tl.bus_id AND a.shift = tl.shift
-       LEFT JOIN routes r ON r.id = a.route_id
-       LEFT JOIN institutions i ON i.id = r.institution_id 
+       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift LIMIT 1))
+       LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b.institution_id)
        WHERE ${cond}
-       GROUP BY i.short_name ORDER BY km DESC`, [from, to, inst, inst]);
+       GROUP BY i.short_name ORDER BY km DESC`, params);
     
     const num = (a) => a.map((r) => ({ 
       ...r, 
@@ -267,6 +269,111 @@ exports.distance = async (req, res) => {
     res.json({ from, to, days: num(days), byBus: num(byBus), byInstitution: num(byInstitution) });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not build the distance report.' }); }
 };
+
+// GET /api/reports/bus-wise
+exports.busWise = async (req, res) => {
+  const { from, to, inst, busId } = range(req);
+  try {
+    await autoLogTrips();
+
+    const cond = `tl.end_km IS NOT NULL AND tl.start_km IS NOT NULL 
+      AND tl.log_date BETWEEN ? AND ? 
+      AND (? IS NULL OR r.institution_id = ? OR b.institution_id = ?)
+      AND (? IS NULL OR b.id = ?)`;
+    const params = [from, to, inst, inst, inst, busId, busId];
+
+    const buses = await query(`
+      SELECT b.id AS bus_id,
+             b.registration_number,
+             COALESCE(GROUP_CONCAT(DISTINCT i.short_name ORDER BY i.short_name SEPARATOR ', '), '—') AS institution,
+             COUNT(tl.id) AS total_trips,
+             SUM(tl.end_km - tl.start_km) AS total_km,
+             
+             -- Morning 1
+             SUM(CASE WHEN tl.shift IN ('morning1', 'morning') THEN 1 ELSE 0 END) AS morning1_trips,
+             SUM(CASE WHEN tl.shift IN ('morning1', 'morning') THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning1_km,
+             
+             -- Morning 2
+             SUM(CASE WHEN tl.shift = 'morning2' THEN 1 ELSE 0 END) AS morning2_trips,
+             SUM(CASE WHEN tl.shift = 'morning2' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning2_km,
+             
+             -- Evening 1
+             SUM(CASE WHEN tl.shift IN ('evening1', 'evening') THEN 1 ELSE 0 END) AS evening1_trips,
+             SUM(CASE WHEN tl.shift IN ('evening1', 'evening') THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening1_km,
+             
+             -- Evening 2
+             SUM(CASE WHEN tl.shift = 'evening2' THEN 1 ELSE 0 END) AS evening2_trips,
+             SUM(CASE WHEN tl.shift = 'evening2' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening2_km,
+             
+             COALESCE(GROUP_CONCAT(DISTINCT r.route_code ORDER BY r.route_code SEPARATOR ', '), '—') AS routes,
+             COALESCE(GROUP_CONCAT(DISTINCT COALESCE(dr.name, u.name) ORDER BY COALESCE(dr.name, u.name) SEPARATOR ', '), '—') AS drivers
+      FROM trip_logs tl
+      JOIN buses b ON b.id = tl.bus_id
+      LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift LIMIT 1))
+      LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b.institution_id)
+      LEFT JOIN users u ON u.id = tl.driver_id
+      LEFT JOIN drivers dr ON dr.id = (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND (tl.route_id IS NULL OR a3.route_id = tl.route_id) LIMIT 1)
+      WHERE ${cond}
+      GROUP BY b.id, b.registration_number
+      ORDER BY total_km DESC, total_trips DESC
+    `, params);
+
+    const trips = await query(`
+      SELECT tl.id,
+             tl.bus_id,
+             b.registration_number,
+             tl.log_date AS date,
+             tl.shift,
+             tl.start_km,
+             tl.end_km,
+             (tl.end_km - tl.start_km) AS km,
+             tl.start_stop,
+             tl.end_stop,
+             tl.start_time,
+             tl.end_time,
+             COALESCE(i.short_name, '—') AS institution,
+             COALESCE(r.route_code, '—') AS route_code,
+             COALESCE(r.route_name, '—') AS route_name,
+             COALESCE(dr.name, u.name, '—') AS driver_name
+      FROM trip_logs tl
+      JOIN buses b ON b.id = tl.bus_id
+      LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift LIMIT 1))
+      LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b.institution_id)
+      LEFT JOIN users u ON u.id = tl.driver_id
+      LEFT JOIN drivers dr ON dr.id = (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND (tl.route_id IS NULL OR a3.route_id = tl.route_id) LIMIT 1)
+      WHERE ${cond}
+      ORDER BY tl.log_date DESC, tl.id DESC
+    `, params);
+
+    res.json({
+      from,
+      to,
+      buses: buses.map(b => ({
+        ...b,
+        total_trips: Number(b.total_trips || 0),
+        total_km: Number(b.total_km || 0),
+        morning1_trips: Number(b.morning1_trips || 0),
+        morning1_km: Number(b.morning1_km || 0),
+        morning2_trips: Number(b.morning2_trips || 0),
+        morning2_km: Number(b.morning2_km || 0),
+        evening1_trips: Number(b.evening1_trips || 0),
+        evening1_km: Number(b.evening1_km || 0),
+        evening2_trips: Number(b.evening2_trips || 0),
+        evening2_km: Number(b.evening2_km || 0),
+      })),
+      trips: trips.map(t => ({
+        ...t,
+        km: Number(t.km || 0),
+        start_km: Number(t.start_km || 0),
+        end_km: Number(t.end_km || 0)
+      }))
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not build the bus-wise report.' });
+  }
+};
+
 
 // GET /api/reports/maintenance
 exports.maintenance = async (req, res) => {

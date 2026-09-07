@@ -1,21 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import api from '../../api/api';
 import { useToast } from '../../components/UI/Toast';
 import { fmtDate, money } from '../../components/UI/DataTable';
 
 const REPORT_TYPES = [
+  { value: 'bus_wise', label: 'Bus Wise Report' },
+  { value: 'distance', label: 'Distance Travelled' },
   { value: 'attendance', label: 'Attendance Register' },
   { value: 'absentees', label: 'Absentees (date range)' },
   { value: 'routes_stops', label: 'Routes & Stops List' },
   { value: 'fuel', label: 'Fuel Usage' },
-  { value: 'distance', label: 'Distance Travelled' },
   { value: 'maintenance', label: 'Maintenance / Spare Parts' },
   { value: 'drivertrips', label: 'Driver Trips (date range)' }
 ];
 
 export default function Reports() {
   const today = new Date().toISOString().slice(0, 10);
-  const [st, setSt] = useState({ type: 'attendance', date: today, from: today, to: today, routeId: '', shift: '', institutionId: '' });
+  const [st, setSt] = useState({ type: 'bus_wise', date: today, from: today, to: today, routeId: '', shift: '', institutionId: '', busId: '' });
   const [refs, setRefs] = useState({});
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -37,7 +38,9 @@ export default function Reports() {
       } else if (st.type === 'fuel') {
         data = await api.repFuel(st.from, st.to, st.institutionId);
       } else if (st.type === 'distance') {
-        data = await api.repDistance(st.from, st.to, st.institutionId);
+        data = await api.repDistance(st.from, st.to, st.institutionId, st.busId);
+      } else if (st.type === 'bus_wise') {
+        data = await api.repBusWise(st.from, st.to, st.institutionId, st.busId);
       } else if (st.type === 'maintenance') {
         data = await api.repMaint(st.from, st.to, st.institutionId);
       } else if (st.type === 'drivertrips') {
@@ -75,6 +78,31 @@ export default function Reports() {
     } else if (type === 'fuel') {
       download(`fuel_${data.from}_${data.to}.csv`, ['Bus', 'Institution', 'Fills', 'Litres', 'Cost'],
         data.byBus.map(b => [b.registration_number, b.institution || '', b.fills, b.liters, Math.round(b.cost)]));
+    } else if (type === 'bus_wise') {
+      download(`bus_wise_report_${data.from}_${data.to}.csv`, [
+        '#', 'Bus Number', 'Institution', 'Total Trips', 'Total KM',
+        'Trip 1 (Morning 1) KM', 'Trip 1 (Morning 1) Trips',
+        'Trip 2 (Morning 2) KM', 'Trip 2 (Morning 2) Trips',
+        'Trip 3 (Evening 1) KM', 'Trip 3 (Evening 1) Trips',
+        'Trip 4 (Evening 2) KM', 'Trip 4 (Evening 2) Trips',
+        'Routes Operated', 'Drivers'
+      ], data.buses.map((b, i) => [
+        i + 1,
+        b.registration_number,
+        b.institution || '',
+        b.total_trips,
+        b.total_km,
+        b.morning1_km,
+        b.morning1_trips,
+        b.morning2_km,
+        b.morning2_trips,
+        b.evening1_km,
+        b.evening1_trips,
+        b.evening2_km,
+        b.evening2_trips,
+        b.routes || '',
+        b.drivers || ''
+      ]));
     } else if (type === 'distance') {
       download(`distance_${data.from}_${data.to}.csv`, ['Bus', 'Institution', 'Route', 'Driver', 'Trip 1 (Morning 1)', 'Trip 2 (Morning 2)', 'Trip 3 (Evening 1)', 'Trip 4 (Evening 2)', 'Total KM'],
         data.byBus.map(b => [
@@ -138,6 +166,20 @@ export default function Reports() {
               </select>
             </label>
 
+            {(st.type === 'bus_wise' || st.type === 'distance') && (
+              <label className="flabel">
+                <span>Bus Number</span>
+                <select className="fselect" value={st.busId} onChange={e => setSt(prev => ({ ...prev, busId: e.target.value }))}>
+                  <option value="">All Buses</option>
+                  {(refs.buses || [])
+                    .filter(b => !st.institutionId || !b.institution_id || String(b.institution_id) === String(st.institutionId))
+                    .map(b => (
+                      <option key={b.id} value={b.id}>{b.registration_number}</option>
+                    ))}
+                </select>
+              </label>
+            )}
+
             {!isRoutesStops && (
               isAtt ? (
                 <>
@@ -179,7 +221,7 @@ export default function Reports() {
               )
             )}
           </div>
-          {st.type === 'distance' && (
+          {(st.type === 'distance' || st.type === 'bus_wise') && (
             <div style={{
               marginTop: '16px',
               padding: '12px 16px',
@@ -211,6 +253,7 @@ export default function Reports() {
 
         {result && (
           <div>
+            {result.type === 'bus_wise' && <BusWiseReportView data={result.data} selectedBusId={st.busId} st={st} insts={insts} />}
             {result.type === 'attendance' && <AttendanceReportView data={result.data} />}
             {result.type === 'absentees' && <AbsenteesReportView data={result.data} />}
             {result.type === 'fuel' && <FuelReportView data={result.data} />}
@@ -376,8 +419,625 @@ function FuelReportView({ data }) {
   );
 }
 
+function BusWiseReportView({ data, selectedBusId, st, insts }) {
+  const [search, setSearch] = useState('');
+  const [expandedBus, setExpandedBus] = useState(null);
+  const [viewMode, setViewMode] = useState('detailed'); // 'detailed' | 'summary'
+
+  const buses = data?.buses || [];
+  const trips = data?.trips || [];
+
+  // Index trips by bus ID and registration number for instant retrieval
+  const tripsByBusId = {};
+  const tripsByRegNum = {};
+  trips.forEach(t => {
+    if (t.bus_id) {
+      if (!tripsByBusId[t.bus_id]) tripsByBusId[t.bus_id] = [];
+      tripsByBusId[t.bus_id].push(t);
+    }
+    if (t.registration_number) {
+      const reg = String(t.registration_number).trim().toUpperCase();
+      if (!tripsByRegNum[reg]) tripsByRegNum[reg] = [];
+      tripsByRegNum[reg].push(t);
+    }
+  });
+
+  const getBusTrips = (b) => {
+    if (b.bus_id && tripsByBusId[b.bus_id]) return tripsByBusId[b.bus_id];
+    if (b.id && tripsByBusId[b.id]) return tripsByBusId[b.id];
+    if (b.registration_number) {
+      const reg = String(b.registration_number).trim().toUpperCase();
+      if (tripsByRegNum[reg]) return tripsByRegNum[reg];
+    }
+    return [];
+  };
+
+  const filteredBuses = buses.filter(b => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
+    return (b.registration_number && b.registration_number.toLowerCase().includes(q)) ||
+           (b.institution && b.institution.toLowerCase().includes(q)) ||
+           (b.routes && b.routes.toLowerCase().includes(q)) ||
+           (b.drivers && b.drivers.toLowerCase().includes(q));
+  });
+
+  const totalKm = filteredBuses.reduce((sum, b) => sum + b.total_km, 0);
+  const totalTrips = filteredBuses.reduce((sum, b) => sum + b.total_trips, 0);
+  const avgKm = filteredBuses.length > 0 ? (totalKm / filteredBuses.length).toFixed(1) : 0;
+
+  // Active institution info for PDF printout header
+  const activeInst = (insts || []).find(i => String(i.id) === String(st?.institutionId));
+  const collegeName = activeInst ? activeInst.name.toUpperCase() : 'NADAR SARASWATHI COLLEGE OF ENGINEERING AND TECHNOLOGY';
+  const selectedInstitutionName = activeInst ? (activeInst.short_name || activeInst.name) : (st?.institutionId ? 'Selected Institution' : 'All Institutions');
+
+  const handlePrintDetailed = () => {
+    setViewMode('detailed');
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
+  return (
+    <div>
+      {/* Stat Cards - Screen Only */}
+      <div className="cards-grid hide-on-print" style={{ marginBottom: 20 }}>
+        <div className="stat-card">
+          <div className="stat-card__label">Buses Tracked</div>
+          <div className="stat-card__value">
+            {filteredBuses.length} 
+            {filteredBuses.length !== buses.length && (
+              <span style={{ fontSize: '13px', fontWeight: 'normal', color: 'var(--text-dim)', marginLeft: '6px' }}>
+                of {buses.length}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__label">Total Distance</div>
+          <div className="stat-card__value stat-card__value--amber">{totalKm.toLocaleString('en-IN')} km</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__label">Total Trips Logged</div>
+          <div className="stat-card__value stat-card__value--green">{totalTrips.toLocaleString('en-IN')}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__label">Avg Distance / Bus</div>
+          <div className="stat-card__value">{Number(avgKm).toLocaleString('en-IN')} km</div>
+        </div>
+      </div>
+
+      {/* Institutional Print / PDF Header */}
+      <div className="print-header" style={{ marginBottom: '18px', textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: '12px' }}>
+        <h2 style={{ fontSize: '17px', fontWeight: '800', margin: '0 0 4px 0', color: '#0f172a', letterSpacing: '0.5px' }}>
+          {collegeName}
+        </h2>
+        <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#334155', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          {viewMode === 'detailed' ? 'BUS WISE DETAILED FLEET PERFORMANCE REPORT' : 'BUS WISE FLEET SUMMARY REPORT'}
+        </div>
+        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+          <span>Period: <b>{fmtDate(data?.from || st?.from)}</b> to <b>{fmtDate(data?.to || st?.to)}</b></span>
+          <span style={{ margin: '0 8px' }}>•</span>
+          <span>Institution: <b>{selectedInstitutionName}</b></span>
+          <span style={{ margin: '0 8px' }}>•</span>
+          <span>Generated: <b>{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</b></span>
+        </div>
+        <div style={{ fontSize: '11px', color: '#0f172a', marginTop: '4px', fontWeight: '600' }}>
+          Buses: {filteredBuses.length} &nbsp;|&nbsp; Total Distance: {totalKm.toLocaleString('en-IN')} km &nbsp;|&nbsp; Total Trips: {totalTrips.toLocaleString('en-IN')} &nbsp;|&nbsp; Avg Distance: {avgKm} km/bus
+        </div>
+      </div>
+
+      {/* Navigation Toolbar: Search, Mode Switcher, Expand All, Print */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px',
+        marginBottom: '16px'
+      }} className="hide-on-print">
+        <div>
+          <div className="section-h" style={{ margin: 0 }}>Bus Wise Performance Report</div>
+          <div style={{ fontSize: '12.5px', color: 'var(--text-dim)', marginTop: '2px' }}>
+            {search ? (
+              <span>Found <b>{filteredBuses.length}</b> {filteredBuses.length === 1 ? 'bus' : 'buses'} matching <b>"{search}"</b></span>
+            ) : (
+              <span>Showing all <b>{buses.length}</b> buses with complete mileage & trip metrics</span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          {/* View Mode Toggle */}
+          <div style={{ display: 'flex', background: 'var(--paper-2)', padding: '3px', borderRadius: '8px', border: '1px solid var(--paper-3)' }}>
+            <button
+              type="button"
+              className={`btn btn-xs ${viewMode === 'detailed' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{ padding: '5px 12px', fontSize: '12px', borderRadius: '6px' }}
+              onClick={() => setViewMode('detailed')}
+            >
+              📑 Detailed Trip Cards (PDF)
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${viewMode === 'summary' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{ padding: '5px 12px', fontSize: '12px', borderRadius: '6px' }}
+              onClick={() => setViewMode('summary')}
+            >
+              📊 Summary Table View
+            </button>
+          </div>
+
+          {/* Quick Print Button */}
+          <button
+            type="button"
+            className="btn btn-xs btn-primary"
+            style={{ padding: '5px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}
+            onClick={handlePrintDetailed}
+            title="Print or Save as PDF with full trip breakdowns"
+          >
+            <span>🖨️</span> Print Detailed PDF
+          </button>
+
+          {/* Instant Search Bar */}
+          <div style={{ position: 'relative', width: '250px' }}>
+            <input
+              type="text"
+              className="finput"
+              style={{
+                paddingLeft: '34px',
+                paddingRight: search ? '30px' : '12px',
+                height: '36px',
+                borderRadius: '8px',
+                border: '1.5px solid var(--paper-3)',
+                fontSize: '13px',
+                background: 'var(--white)'
+              }}
+              placeholder="Search bus, route, driver..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            <span style={{ position: 'absolute', left: '10px', top: '8px', fontSize: '14px', color: 'var(--text-dim)' }}>🔍</span>
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '8px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-dim)',
+                  fontSize: '15px',
+                  lineHeight: '1'
+                }}
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MODE 1: DETAILED TRIP CARDS (PDF READY)                                   */}
+      {/* ========================================================================= */}
+      {viewMode === 'detailed' && (
+        <div>
+          {filteredBuses.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-dim)' }}>
+              No buses found matching <b>"{search}"</b>.
+            </div>
+          ) : (
+            filteredBuses.map((b, i) => {
+              const busTrips = getBusTrips(b);
+              return (
+                <div 
+                  key={b.bus_id || b.registration_number || i} 
+                  className="bus-print-card"
+                  style={{
+                    background: '#ffffff',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '8px',
+                    marginBottom: '18px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {/* Bus Header Bar */}
+                  <div 
+                    className="bus-print-card__header"
+                    style={{
+                      background: '#f8fafc',
+                      padding: '8px 12px',
+                      borderBottom: '1.5px solid #94a3b8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span 
+                        className="bus-badge"
+                        style={{
+                          fontWeight: '800',
+                          fontSize: '13px',
+                          background: '#0f172a',
+                          color: '#ffffff',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          letterSpacing: '0.5px',
+                          display: 'inline-block'
+                        }}
+                      >
+                        {b.registration_number}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#334155' }}>
+                        Institution: <strong style={{ color: '#0f172a' }}>{b.institution || '—'}</strong>
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>|</span>
+                      <span style={{ fontSize: '12px', color: '#334155' }}>
+                        Routes: <strong style={{ color: '#0369a1' }}>{b.routes || '—'}</strong>
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>|</span>
+                      <span style={{ fontSize: '12px', color: '#334155' }}>
+                        Drivers: <strong style={{ color: '#0f172a' }}>{b.drivers || '—'}</strong>
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', fontSize: '12px', flexShrink: 0 }}>
+                      <span style={{ color: '#334155' }}>Total Distance: <strong style={{ color: '#b45309' }}>{b.total_km.toLocaleString('en-IN')} km</strong></span>
+                      <span style={{ color: '#94a3b8' }}>|</span>
+                      <span style={{ color: '#334155' }}>Trips: <strong style={{ color: '#15803d' }}>{b.total_trips}</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Trips Breakdown Table */}
+                  {busTrips.length === 0 ? (
+                    <div style={{ padding: '14px 16px', textAlign: 'center', color: '#64748b', fontSize: '12.5px', fontStyle: 'italic' }}>
+                      No detailed trip records logged for this bus in the selected date range.
+                    </div>
+                  ) : (
+                    <div className="table-wrap" style={{ margin: 0, overflowX: 'auto' }}>
+                      <table className="tbl bus-print-table" style={{ margin: 0, width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: '#f1f5f9' }}>
+                            <th style={{ width: '28px', textAlign: 'center' }}>#</th>
+                            <th style={{ width: '85px', whiteSpace: 'nowrap' }}>Date</th>
+                            <th style={{ width: '80px', whiteSpace: 'nowrap' }}>Shift</th>
+                            <th style={{ minWidth: '100px', whiteSpace: 'nowrap' }}>Institution</th>
+                            <th style={{ minWidth: '140px' }}>Route</th>
+                            <th style={{ minWidth: '115px', whiteSpace: 'nowrap' }}>Driver</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>Stoppages (From ➔ To)</th>
+                            <th style={{ textAlign: 'right', width: '95px', whiteSpace: 'nowrap' }}>Odometer</th>
+                            <th style={{ textAlign: 'right', width: '70px', whiteSpace: 'nowrap' }}>Trip KM</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {busTrips.map((t, idx) => (
+                            <tr key={t.id || idx}>
+                              <td className="muted mono nowrap" style={{ textAlign: 'center' }}>{idx + 1}</td>
+                              <td className="mono nowrap">{fmtDate(t.date)}</td>
+                              <td className="nowrap">
+                                <span 
+                                  className="shift-badge"
+                                  style={{
+                                    fontSize: '10px',
+                                    textTransform: 'uppercase',
+                                    fontWeight: '700',
+                                    padding: '2px 6px',
+                                    borderRadius: '3px',
+                                    background: t.shift?.startsWith('morning') ? '#e6f4ea' : '#fef7e0',
+                                    color: t.shift?.startsWith('morning') ? '#137333' : '#b06000',
+                                    display: 'inline-block'
+                                  }}
+                                >
+                                  {t.shift}
+                                </span>
+                              </td>
+                              <td className="nowrap">{t.institution || b.institution || '—'}</td>
+                              <td>
+                                {t.route_code !== '—' ? (
+                                  <span><strong className="mono">{t.route_code}</strong> <span style={{ color: '#64748b', fontWeight: 'normal' }}>· {t.route_name}</span></span>
+                                ) : '—'}
+                              </td>
+                              <td className="nowrap"><strong>{t.driver_name || '—'}</strong></td>
+                              <td style={{ fontSize: '11.5px' }}>
+                                {t.start_stop || '—'} ➔ {t.end_stop || '—'}
+                              </td>
+                              <td className="mono nowrap" style={{ textAlign: 'right', fontSize: '11px', color: '#475569' }}>
+                                {t.start_km} ➔ {t.end_km}
+                              </td>
+                              <td className="mono nowrap" style={{ textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>
+                                {t.km.toLocaleString('en-IN')} km
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        {busTrips.length > 1 && (
+                          <tfoot>
+                            <tr style={{ background: '#f8fafc', fontWeight: 'bold' }}>
+                              <td colSpan="8" style={{ textAlign: 'right', fontSize: '12px', color: '#475569' }}>
+                                Total for {b.registration_number}:
+                              </td>
+                              <td className="mono" style={{ textAlign: 'right', color: '#0f172a', fontWeight: '800' }}>
+                                {b.total_km.toLocaleString('en-IN')} km
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODE 2: SUMMARY TABLE VIEW (WITH ACCORDION EXPANSION)                     */}
+      {/* ========================================================================= */}
+      {viewMode === 'summary' && (
+        <div className="table-wrap" style={{ marginBottom: 24 }}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th style={{ width: '40px' }}>#</th>
+                <th>Bus Number</th>
+                <th>Institution</th>
+                <th style={{ textAlign: 'center' }}>Total Trips</th>
+                <th style={{ textAlign: 'right' }}>Total KM</th>
+                <th style={{ textAlign: 'center' }}>Morning 1</th>
+                <th style={{ textAlign: 'center' }}>Morning 2</th>
+                <th style={{ textAlign: 'center' }}>Evening 1</th>
+                <th style={{ textAlign: 'center' }}>Evening 2</th>
+                <th>Routes Operated</th>
+                <th>Drivers</th>
+                <th className="hide-on-print" style={{ textAlign: 'center' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredBuses.length === 0 ? (
+                <tr>
+                  <td colSpan="12" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-dim)' }}>
+                    No buses found matching <b>"{search}"</b>. Try clearing your search or selecting "All Buses".
+                  </td>
+                </tr>
+              ) : (
+                filteredBuses.map((b, i) => {
+                  const isSelected = expandedBus && (expandedBus.bus_id === b.bus_id || expandedBus.registration_number === b.registration_number);
+                  const busTrips = getBusTrips(b);
+
+                  return (
+                    <Fragment key={b.bus_id || b.registration_number || i}>
+                      <tr 
+                        style={{ 
+                          cursor: 'pointer',
+                          background: isSelected ? 'rgba(244, 165, 33, 0.12)' : undefined,
+                          borderLeft: isSelected ? '4px solid var(--marigold)' : '4px solid transparent',
+                          transition: 'background 0.15s ease'
+                        }}
+                        onClick={() => setExpandedBus(isSelected ? null : b)}
+                      >
+                        <td className="muted mono">{i + 1}</td>
+                        <td className="mono">
+                          <span style={{
+                            fontWeight: '700',
+                            fontSize: '13px',
+                            background: 'var(--navy)',
+                            color: '#fff',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            display: 'inline-block',
+                            letterSpacing: '0.5px'
+                          }}>
+                            {b.registration_number}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{
+                            fontWeight: '600',
+                            color: 'var(--navy-2)',
+                            display: 'inline-block'
+                          }}>
+                            {b.institution || '—'}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{
+                            background: 'var(--present-soft)',
+                            color: 'var(--present)',
+                            fontWeight: '700',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontSize: '12px'
+                          }}>
+                            {b.total_trips} trips
+                          </span>
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right', fontWeight: '700', fontSize: '13px', color: 'var(--navy)' }}>
+                          {b.total_km.toLocaleString('en-IN')} km
+                        </td>
+                        <td style={{ textAlign: 'center' }} className="mono">
+                          {b.morning1_km > 0 ? (
+                            <span><b>{b.morning1_km} km</b> <span className="muted" style={{ fontSize: '10.5px' }}>({b.morning1_trips}t)</span></span>
+                          ) : <span className="muted">—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }} className="mono">
+                          {b.morning2_km > 0 ? (
+                            <span><b>{b.morning2_km} km</b> <span className="muted" style={{ fontSize: '10.5px' }}>({b.morning2_trips}t)</span></span>
+                          ) : <span className="muted">—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }} className="mono">
+                          {b.evening1_km > 0 ? (
+                            <span><b>{b.evening1_km} km</b> <span className="muted" style={{ fontSize: '10.5px' }}>({b.evening1_trips}t)</span></span>
+                          ) : <span className="muted">—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }} className="mono">
+                          {b.evening2_km > 0 ? (
+                            <span><b>{b.evening2_km} km</b> <span className="muted" style={{ fontSize: '10.5px' }}>({b.evening2_trips}t)</span></span>
+                          ) : <span className="muted">—</span>}
+                        </td>
+                        <td style={{ fontSize: '12px', maxWidth: '180px' }}>
+                          {b.routes !== '—' ? <b>{b.routes}</b> : <span className="muted">—</span>}
+                        </td>
+                        <td style={{ fontSize: '12px', maxWidth: '180px' }}>
+                          {b.drivers !== '—' ? b.drivers : <span className="muted">—</span>}
+                        </td>
+                        <td className="hide-on-print" style={{ textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            className={`btn btn-xs ${isSelected ? 'btn-primary' : 'btn-outline'}`}
+                            style={{ padding: '3px 8px', fontSize: '11px', whiteSpace: 'nowrap' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedBus(isSelected ? null : b);
+                            }}
+                          >
+                            {isSelected ? 'Hide Details ▲' : 'View Trips ▼'}
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* Expandable Accordion Row directly underneath this bus */}
+                      {isSelected && (
+                        <tr key={`trips-${b.bus_id || b.registration_number}`}>
+                          <td colSpan="12" style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '2px solid var(--marigold)', borderLeft: '4px solid var(--marigold)' }}>
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              marginBottom: '12px',
+                              flexWrap: 'wrap',
+                              gap: '10px'
+                            }}>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{
+                                    fontWeight: '700',
+                                    fontSize: '13.5px',
+                                    background: 'var(--navy)',
+                                    color: '#fff',
+                                    padding: '3px 8px',
+                                    borderRadius: '4px'
+                                  }}>
+                                    {b.registration_number}
+                                  </span>
+                                  <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--navy-2)' }}>
+                                    Detailed Trip History & Stoppages
+                                  </span>
+                                  <span className="tag tag--ok">
+                                    {busTrips.length} {busTrips.length === 1 ? 'Trip' : 'Trips'} Logged
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
+                                  Institution: <b>{b.institution || '—'}</b> &nbsp;|&nbsp; Total Distance: <b>{b.total_km.toLocaleString('en-IN')} km</b> &nbsp;|&nbsp; Routes: <b>{b.routes || '—'}</b>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-outline hide-on-print"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedBus(null);
+                                }}
+                              >
+                                Close Details ✕
+                              </button>
+                            </div>
+
+                            {busTrips.length === 0 ? (
+                              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '13px', background: '#fff', borderRadius: '6px', border: '1px solid var(--paper-2)' }}>
+                                No detailed trip records logged for this bus in the selected date range.
+                              </div>
+                            ) : (
+                              <div className="table-wrap" style={{ maxHeight: '380px', overflowY: 'auto', background: '#ffffff', borderRadius: '6px', border: '1px solid var(--paper-2)' }}>
+                                <table className="tbl" style={{ margin: 0 }}>
+                                  <thead>
+                                    <tr style={{ background: 'var(--paper-2)' }}>
+                                      <th style={{ width: '35px' }}>#</th>
+                                      <th>Date</th>
+                                      <th>Shift</th>
+                                      <th>Institution</th>
+                                      <th>Route</th>
+                                      <th>Driver</th>
+                                      <th>Stoppages (From ➔ To)</th>
+                                      <th style={{ textAlign: 'right' }}>Odometer</th>
+                                      <th style={{ textAlign: 'right' }}>Trip KM</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {busTrips.map((t, idx) => (
+                                      <tr key={t.id || idx}>
+                                        <td className="muted mono">{idx + 1}</td>
+                                        <td className="mono">{fmtDate(t.date)}</td>
+                                        <td>
+                                          <span style={{
+                                            fontSize: '11px',
+                                            textTransform: 'uppercase',
+                                            fontWeight: '700',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            background: t.shift?.startsWith('morning') ? '#e6f4ea' : '#fef7e0',
+                                            color: t.shift?.startsWith('morning') ? '#137333' : '#b06000'
+                                          }}>
+                                            {t.shift}
+                                          </span>
+                                        </td>
+                                        <td>{t.institution || b.institution || '—'}</td>
+                                        <td className="mono">
+                                          {t.route_code !== '—' ? <b>{t.route_code} <span className="muted" style={{ fontWeight: 'normal' }}>· {t.route_name}</span></b> : '—'}
+                                        </td>
+                                        <td><b>{t.driver_name || '—'}</b></td>
+                                        <td style={{ fontSize: '12px' }}>
+                                          {t.start_stop || '—'} ➔ {t.end_stop || '—'}
+                                        </td>
+                                        <td className="mono" style={{ textAlign: 'right', fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                                          {t.start_km} ➔ {t.end_km}
+                                        </td>
+                                        <td className="mono" style={{ textAlign: 'right', fontWeight: '700', color: 'var(--navy)' }}>
+                                          {t.km.toLocaleString('en-IN')} km
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DistanceReportView({ data }) {
+  const [busSearch, setBusSearch] = useState('');
   const totalKm = data.byBus.reduce((sum, r) => sum + r.km, 0);
+
+  const filteredByBus = (data.byBus || []).filter(b => {
+    if (!busSearch.trim()) return true;
+    const q = busSearch.toLowerCase().trim();
+    return (b.registration_number && b.registration_number.toLowerCase().includes(q)) ||
+           (b.institution && b.institution.toLowerCase().includes(q)) ||
+           (b.driver_name && b.driver_name.toLowerCase().includes(q)) ||
+           (b.route_code && b.route_code.toLowerCase().includes(q));
+  });
+
   return (
     <div>
       <div className="cards-grid" style={{ marginBottom: 20 }}>
@@ -399,12 +1059,33 @@ function DistanceReportView({ data }) {
           </tbody>
         </table>
       </div>
-      <div className="section-h">By Bus & Driver</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+        <div className="section-h" style={{ margin: 0 }}>By Bus & Driver</div>
+        <div className="hide-on-print" style={{ position: 'relative', width: '280px' }}>
+          <input 
+            type="text" 
+            className="finput" 
+            style={{ paddingLeft: '32px', height: '36px', borderRadius: '8px' }}
+            placeholder="Search bus number, driver..." 
+            value={busSearch} 
+            onChange={e => setBusSearch(e.target.value)} 
+          />
+          <span style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--text-dim)' }}>🔍</span>
+          {busSearch && (
+            <button 
+              type="button" 
+              onClick={() => setBusSearch('')} 
+              style={{ position: 'absolute', right: '10px', top: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: '14px' }}>
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
       <div className="table-wrap">
         <table className="tbl">
           <thead><tr><th>Bus</th><th>Institution</th><th>Route</th><th>Driver</th><th>Trip 1 (Morning 1)</th><th>Trip 2 (Morning 2)</th><th>Trip 3 (Evening 1)</th><th>Trip 4 (Evening 2)</th><th>Total KM</th></tr></thead>
           <tbody>
-            {data.byBus.map((b, i) => {
+            {filteredByBus.map((b, i) => {
               const hasOtherMorning1Driver = data.byBus.some(other => 
                 other.route_code === b.route_code && 
                 other.driver_name !== b.driver_name && 
@@ -498,6 +1179,7 @@ function DistanceReportView({ data }) {
     </div>
   );
 }
+
 
 function DriverTripsReportView({ data }) {
   const totalTrips = data.byDriver.reduce((sum, r) => sum + r.trips, 0);
@@ -648,8 +1330,12 @@ function RoutesStopsReportView({ data, insts = [], st = {} }) {
       </div>
 
       {activeTab === 'routes' && (
-        <div className="hide-on-print">
-          <div className="section-h">Routes Summary</div>
+        <div>
+          <div className="print-header" style={{ textAlign: 'center', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px 0', color: '#000' }}>{collegeName}</h2>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#444' }}>ROUTES SUMMARY REPORT</div>
+          </div>
+          <div className="section-h hide-on-print">Routes Summary</div>
           <div className="table-wrap">
             <table className="tbl">
               <thead>
@@ -688,8 +1374,12 @@ function RoutesStopsReportView({ data, insts = [], st = {} }) {
       )}
 
       {activeTab === 'stops' && (
-        <div className="hide-on-print">
-          <div className="section-h">Stops Details</div>
+        <div>
+          <div className="print-header" style={{ textAlign: 'center', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px 0', color: '#000' }}>{collegeName}</h2>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#444' }}>STOPS DETAILS REPORT</div>
+          </div>
+          <div className="section-h hide-on-print">Stops Details</div>
           <div className="table-wrap">
             <table className="tbl">
               <thead>
