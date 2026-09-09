@@ -10,6 +10,7 @@ import Dashboard from './pages/admin/Dashboard';
 import Institutions from './pages/admin/Institutions';
 import Buses from './pages/admin/Buses';
 import Drivers from './pages/admin/Drivers';
+import DriverMasterEdit from './pages/admin/DriverMasterEdit';
 import Students from './pages/admin/Students';
 import RoutesStops from './pages/admin/RoutesStops';
 import Assignments from './pages/admin/Assignments';
@@ -19,6 +20,7 @@ import DieselUsage from './pages/admin/DieselUsage';
 import Maintenance from './pages/admin/Maintenance';
 import Tyres from './pages/admin/Tyres';
 import FleetAlerts from './pages/admin/FleetAlerts';
+import AttendanceReport from './pages/admin/AttendanceReport';
 import Attendance from './pages/incharge/Attendance';
 import DriverPanel from './pages/driver/DriverPanel';
 import ParentTracker from './pages/parent/ParentTracker';
@@ -52,10 +54,12 @@ export default function App() {
               <Route path="institutions" element={<Institutions />} />
               <Route path="buses" element={<Buses />} />
               <Route path="drivers" element={<Drivers />} />
+              <Route path="driver-master-edit" element={<DriverMasterEdit />} />
               <Route path="students" element={<Students />} />
               <Route path="routes" element={<RoutesStops />} />
               <Route path="assignments" element={<Assignments />} />
               <Route path="users" element={<Users />} />
+              <Route path="attendance-report" element={<AttendanceReport />} />
               <Route path="reports" element={<Reports />} />
               <Route path="diesel" element={<DieselUsage />} />
               <Route path="maintenance" element={<Maintenance />} />

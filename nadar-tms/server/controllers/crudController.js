@@ -51,6 +51,109 @@ exports.list = (table) => async (req, res) => {
   const def = TABLES[table];
   if (!def) return res.status(404).json({ error: 'Unknown record type.' });
   try {
+    const qInst = req.query.institution_id;
+    let targetInst = null;
+    if (qInst !== undefined) {
+      if (qInst && qInst !== 'all' && qInst !== 'ALL') {
+        targetInst = qInst;
+      }
+    } else if (req.user && req.user.role === 'institution' && req.user.institution_id) {
+      targetInst = req.user.institution_id;
+    }
+
+    // ---- Enhanced Buses view with assignments & route linking (Grouped & Deduplicated) ----
+    if (table === 'buses') {
+      let sql = `
+        SELECT b.id, b.registration_number, b.bus_model, b.capacity, b.status,
+               b.fc_expiry, b.insurance_expiry, b.permit_expiry, b.puc_expiry,
+               b.bus_code, b.bus_name, b.vehicle_type, b.institution_id,
+               GROUP_CONCAT(DISTINCT r.route_code ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_code,
+               GROUP_CONCAT(DISTINCT r.route_name ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_name,
+               COALESCE(MAX(i.short_name), MAX(i.name), '—') AS institution_name
+        FROM buses b
+        LEFT JOIN assignments a ON a.bus_id = b.id
+        LEFT JOIN routes r ON r.id = a.route_id
+        LEFT JOIN institutions i ON i.id = COALESCE(b.institution_id, r.institution_id)
+      `;
+      const params = [];
+      const whereConditions = [];
+
+      if (req.query.route_id) {
+        whereConditions.push('(b.route_id = ? OR a.route_id = ?)');
+        params.push(req.query.route_id, req.query.route_id);
+      }
+      if (targetInst) {
+        whereConditions.push('(b.institution_id = ? OR r.institution_id = ?)');
+        params.push(targetInst, targetInst);
+      }
+
+      if (whereConditions.length > 0) {
+        sql += ` WHERE ` + whereConditions.join(' AND ');
+      }
+
+      sql += ` GROUP BY b.id ORDER BY b.registration_number`;
+      const items = await query(sql, params);
+      return res.json({ items });
+    }
+
+    // ---- Enhanced Drivers view with assignments & route linking (Grouped & Deduplicated) ----
+    if (table === 'drivers') {
+      let sql = `
+        SELECT d.*,
+               MAX(a.bus_id) AS current_bus_id,
+               GROUP_CONCAT(DISTINCT a.bus_id ORDER BY a.bus_id SEPARATOR ',') AS current_bus_ids,
+               COALESCE(MAX(a.route_id), d.route_id) AS current_route_id,
+               GROUP_CONCAT(DISTINCT a.route_id ORDER BY a.route_id SEPARATOR ',') AS current_route_ids,
+               COALESCE(d.institution_id, MAX(r.institution_id), MAX(b.institution_id)) AS current_institution_id,
+               GROUP_CONCAT(DISTINCT b.registration_number ORDER BY b.registration_number SEPARATOR ', ') AS assigned_bus_numbers,
+               GROUP_CONCAT(DISTINCT r.route_code ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_code,
+               GROUP_CONCAT(DISTINCT r.route_name ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_name,
+               COALESCE(MAX(i.short_name), MAX(i.name), '—') AS institution_name
+        FROM drivers d
+        LEFT JOIN assignments a ON a.driver_id = d.id
+        LEFT JOIN routes r ON r.id = a.route_id
+        LEFT JOIN buses b ON b.id = a.bus_id
+        LEFT JOIN institutions i ON i.id = COALESCE(d.institution_id, r.institution_id, b.institution_id)
+      `;
+      const params = [];
+      const whereConditions = [];
+
+      if (req.query.route_id) {
+        whereConditions.push('(d.route_id = ? OR a.route_id = ?)');
+        params.push(req.query.route_id, req.query.route_id);
+      }
+      if (targetInst) {
+        whereConditions.push('(d.institution_id = ? OR r.institution_id = ? OR b.institution_id = ?)');
+        params.push(targetInst, targetInst, targetInst);
+      }
+
+      if (whereConditions.length > 0) {
+        sql += ` WHERE ` + whereConditions.join(' AND ');
+      }
+
+      sql += ` GROUP BY d.id ORDER BY d.name`;
+      const items = await query(sql, params);
+      return res.json({ items });
+    }
+
+    // ---- Enhanced Routes view with institution info ----
+    if (table === 'routes') {
+      let sql = `
+        SELECT r.*,
+               COALESCE(i.short_name, i.name, '—') AS institution_name
+        FROM routes r
+        LEFT JOIN institutions i ON i.id = r.institution_id
+      `;
+      const params = [];
+      if (targetInst) {
+        sql += ` WHERE r.institution_id = ?`;
+        params.push(targetInst);
+      }
+      sql += ` ORDER BY r.route_code`;
+      const items = await query(sql, params);
+      return res.json({ items });
+    }
+
     const params = []; const where = [];
     let sql = `SELECT * FROM \`${table}\``;
     if (req.query.route_id && def.cols.includes('route_id')) { where.push('route_id = ?'); params.push(req.query.route_id); }

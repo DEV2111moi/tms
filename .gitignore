@@ -41,3 +41,8 @@ package-lock.json
 *.sql
 nadar-tms/nadar_tms.sql
 nadar_tms (1).sql
+
+# Scratch / test scripts
+scratch/
+nadar-tms/scratch/
+

@@ -124,33 +124,77 @@ exports.submit = async (req, res) => {
 // GET /api/reports/attendance?date=YYYY-MM-DD&routeId=1&shift=morning&institutionId=1
 exports.report = async (req, res) => {
   const date = req.query.date || new Date().toISOString().slice(0, 10);
-  const routeId = req.query.routeId || null;
+  const routeId = req.query.routeId ? Number(req.query.routeId) : null;
   const shift = req.query.shift || null;
-  const institutionId = req.query.institutionId || null;
+  let institutionId = req.query.institutionId ? Number(req.query.institutionId) : null;
+  if (req.user && req.user.role === 'institution') {
+    institutionId = req.user.institution_id || institutionId;
+  }
   try {
     const rows = await query(
-      `SELECT s.student_id, s.name, s.class_grade, s.guardian_phone,
-              r.route_code, r.route_name, st.stop_name, st.sequence,
-              i.short_name AS institution,
-              COALESCE(MAX(CASE WHEN (? IS NULL OR t.shift = ?) THEN a.status END), 'absent') AS status,
+      `SELECT s.id AS student_pk, s.student_id, s.name, s.class_grade,
+              COALESCE(s.parent_mobile, s.guardian_phone, '—') AS parent_phone,
+              r.id AS route_id, r.route_code, r.route_name, st.stop_name, st.sequence,
+              COALESCE(i.short_name, 'Campus') AS institution,
+              COALESCE(MAX(CASE WHEN (? IS NULL OR t.shift = ?) THEN a.status END), 'not_marked') AS status,
               MAX(CASE WHEN (? IS NULL OR t.shift = ?) THEN a.boarding_time END) AS boarding_time
        FROM students s
        LEFT JOIN routes r  ON r.id = s.route_id
        LEFT JOIN stops st  ON st.id = s.stop_id
-       LEFT JOIN institutions i ON i.id = s.institution_id
+       LEFT JOIN institutions i ON i.id = COALESCE(s.institution_id, r.institution_id)
        LEFT JOIN attendance a ON a.student_id = s.id AND a.attendance_date = ?
        LEFT JOIN trips t ON t.id = a.trip_id
-       WHERE (? IS NULL OR s.route_id = ?) AND (? IS NULL OR s.institution_id = ?)
-       GROUP BY s.id, s.student_id, s.name, s.class_grade, s.guardian_phone,
-                r.route_code, r.route_name, st.stop_name, st.sequence, i.short_name
+       WHERE (? IS NULL OR s.route_id = ?) 
+         AND (? IS NULL OR s.institution_id = ? OR r.institution_id = ?)
+       GROUP BY s.id, s.student_id, s.name, s.class_grade, s.parent_mobile, s.guardian_phone,
+                r.id, r.route_code, r.route_name, st.stop_name, st.sequence, i.short_name
        ORDER BY r.route_code, st.sequence, s.name`,
-      [shift, shift, shift, shift, date, routeId, routeId, institutionId, institutionId]
+      [shift, shift, shift, shift, date, routeId, routeId, institutionId, institutionId, institutionId]
     );
+
+    // Route metadata if specific route is requested
+    let routeInfo = null;
+    if (routeId) {
+      const [rRows] = [await query(`
+        SELECT r.id, r.route_code, r.route_name, r.origin, r.destination, r.total_distance,
+               a.shift, b.registration_number, d.name AS driver_name, d.phone AS driver_phone,
+               u.name AS incharge_name, u.phone AS incharge_phone
+        FROM routes r
+        LEFT JOIN assignments a ON a.route_id = r.id AND (? IS NULL OR a.shift = ?)
+        LEFT JOIN buses b ON b.id = a.bus_id
+        LEFT JOIN drivers d ON d.id = a.driver_id
+        LEFT JOIN users u ON u.id = a.incharge_id
+        WHERE r.id = ?
+        LIMIT 1
+      `, [shift, shift, routeId])];
+      routeInfo = rRows[0] || null;
+
+      // Check trip status for this route today
+      const [tripRows] = [await query(`
+        SELECT id, status, shift FROM trips
+        WHERE route_id = ? AND trip_date = ? AND (? IS NULL OR shift = ?)
+        LIMIT 1
+      `, [routeId, date, shift, shift])];
+      if (routeInfo && tripRows[0]) {
+        routeInfo.trip_id = tripRows[0].id;
+        routeInfo.trip_status = tripRows[0].status;
+      }
+    }
+
     const present = rows.filter((r) => r.status === 'present').length;
+    const absent = rows.filter((r) => r.status === 'absent').length;
+    const notMarked = rows.filter((r) => r.status === 'not_marked').length;
+    const total = rows.length;
+
     res.json({
-      date, routeId, shift, institutionId,
-      summary: { total: rows.length, present, absent: rows.length - present,
-                 rate: rows.length ? Math.round((present / rows.length) * 100) : 0 },
+      date, routeId, shift, institutionId, routeInfo,
+      summary: {
+        total,
+        present,
+        absent,
+        notMarked,
+        rate: total > 0 ? Math.round((present / total) * 100) : 0,
+      },
       rows,
     });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not build the report.' }); }

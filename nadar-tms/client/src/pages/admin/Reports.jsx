@@ -1331,16 +1331,16 @@ function RoutesStopsReportView({ data, insts = [], st = {} }) {
 
       {activeTab === 'routes' && (
         <div>
-          <div className="print-header" style={{ textAlign: 'center', marginBottom: 16 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px 0', color: '#000' }}>{collegeName}</h2>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#444' }}>ROUTES SUMMARY REPORT</div>
+          <div className="print-header" style={{ textAlign: 'center', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 5px 0', color: '#000', letterSpacing: '0.4px' }}>{collegeName}</h2>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', letterSpacing: '0.8px' }}>ROUTES SUMMARY REPORT</div>
           </div>
           <div className="section-h hide-on-print">Routes Summary</div>
           <div className="table-wrap">
-            <table className="tbl">
+            <table className="tbl tbl-spacious">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th style={{ width: 45 }}>#</th>
                   <th>Institution</th>
                   <th>Route Code</th>
                   <th>Route Name</th>
@@ -1375,16 +1375,16 @@ function RoutesStopsReportView({ data, insts = [], st = {} }) {
 
       {activeTab === 'stops' && (
         <div>
-          <div className="print-header" style={{ textAlign: 'center', marginBottom: 16 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px 0', color: '#000' }}>{collegeName}</h2>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#444' }}>STOPS DETAILS REPORT</div>
+          <div className="print-header" style={{ textAlign: 'center', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, margin: '0 0 5px 0', color: '#000', letterSpacing: '0.4px' }}>{collegeName}</h2>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', letterSpacing: '0.8px' }}>STOPS DETAILS REPORT</div>
           </div>
           <div className="section-h hide-on-print">Stops Details</div>
           <div className="table-wrap">
-            <table className="tbl">
+            <table className="tbl tbl-spacious">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th style={{ width: 45 }}>#</th>
                   <th>Institution</th>
                   <th>Route Code</th>
                   <th>Route Name</th>

@@ -24,8 +24,14 @@ function authenticate(req, res, next) {
  * Usage: requireRole('admin', 'incharge')
  */
 function requireRole(...roles) {
+  const allowed = roles.map((r) => String(r).toLowerCase().trim());
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    const userRole = (req.user?.role || '').toLowerCase().trim();
+    if (!req.user || !allowed.includes(userRole)) {
+      console.warn(
+        `[AUTH 403] Denied ${req.method} ${req.originalUrl} for user '${req.user?.name}' (role: '${req.user?.role}'). Allowed roles:`,
+        allowed
+      );
       return res.status(403).json({ error: 'You do not have access to this action.' });
     }
     next();

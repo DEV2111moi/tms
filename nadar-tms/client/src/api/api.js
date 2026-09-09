@@ -23,7 +23,7 @@ const api = {
   me: () => call('/auth/me'),
 
   // Dashboard
-  dashboard: () => call('/dashboard'),
+  dashboard: (date) => call(`/dashboard${date ? `?date=${date}` : ''}`),
 
   // Generic CRUD
   listRes: (t, filter) => {
@@ -40,6 +40,9 @@ const api = {
   alerts: (days = 30) => call(`/fleet/alerts?days=${days}`),
   assignments: () => call('/assignments'),
   assign: (body) => call('/assignments', { method: 'POST', body: JSON.stringify(body) }),
+  deleteAssignment: (id) => call(`/assignments/${id}`, { method: 'DELETE' }),
+  driverMasterEdit: (id, data) => call(`/drivers/${id}/master-edit`, { method: 'PUT', body: JSON.stringify(data) }),
+  driverMasterAdd: (data) => call('/drivers/master-add', { method: 'POST', body: JSON.stringify(data) }),
 
   // Attendance / Incharge
   todayTrip: (shift, routeId) => call(`/trips/today?shift=${shift || 'morning'}${routeId ? `&route_id=${routeId}` : ''}`),

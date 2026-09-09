@@ -53,6 +53,15 @@ exports.assign = async (req, res) => {
            ON DUPLICATE KEY UPDATE bus_id=VALUES(bus_id), driver_id=VALUES(driver_id), incharge_id=VALUES(incharge_id)`,
           [route_id, sh, bus_id || null, driver_id || null, incharge_id || null]);
       }
+      // Synchronize incharge assignment with today's trip if one exists
+      try {
+        await query(
+          `UPDATE trips SET incharge_id = ? WHERE route_id = ? AND shift = ? AND trip_date = CURDATE()`,
+          [incharge_id || null, route_id, sh]
+        );
+      } catch (tErr) {
+        console.error('Trip incharge sync error:', tErr);
+      }
     }
     try {
       const r = (await query('SELECT route_code, route_name, institution_id FROM routes WHERE id=?', [route_id]))[0] || {};
@@ -81,7 +90,7 @@ exports.assignments = async (req, res) => {
   try {
     const rows = await query(`
       SELECT a.id, a.route_id, a.shift, a.bus_id, a.driver_id, a.incharge_id,
-             r.route_code, r.route_name, r.total_distance, b.registration_number,
+             r.route_code, r.route_name, r.total_distance, r.institution_id, b.registration_number,
              d.name AS driver_name, u.name AS incharge_name,
              COALESCE(i.short_name, '—') AS institution_name
       FROM assignments a
@@ -144,7 +153,13 @@ exports.parentView = async (req, res) => {
 exports.refs = async (req, res) => {
   try {
     const [routes, buses, drivers, incharges, institutions] = await Promise.all([
-      query('SELECT id, route_code, route_name, institution_id FROM routes ORDER BY route_code'),
+      query(`
+        SELECT r.id, r.route_code, r.route_name, r.origin, r.destination, r.total_distance, r.shift, r.institution_id,
+               COALESCE(i.short_name, i.name, '—') AS institution_name
+        FROM routes r
+        LEFT JOIN institutions i ON i.id = r.institution_id
+        ORDER BY r.route_code
+      `),
       query('SELECT id, registration_number, institution_id FROM buses ORDER BY registration_number'),
       query('SELECT id, name FROM drivers ORDER BY name'),
       query("SELECT id, name, institution_id FROM users WHERE role='incharge' ORDER BY name"),
@@ -153,3 +168,356 @@ exports.refs = async (req, res) => {
     res.json({ routes, buses, drivers, incharges, institutions });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not load reference data.' }); }
 };
+
+// DELETE /api/assignments/:id
+exports.deleteAssignment = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const existing = (await query(`
+      SELECT a.*, r.route_code, r.institution_id 
+      FROM assignments a 
+      JOIN routes r ON r.id = a.route_id 
+      WHERE a.id = ?
+    `, [id]))[0];
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Assignment not found.' });
+    }
+
+    // Role check: if institution user, ensure they can only delete their institution's assignments
+    if (req.user.role === 'institution' && req.user.institution_id && existing.institution_id !== req.user.institution_id) {
+      return res.status(403).json({ error: 'You do not have permission to delete assignments for this institution.' });
+    }
+
+    await query('DELETE FROM assignments WHERE id = ?', [id]);
+
+    // Synchronize trips for today if scheduled and not started
+    try {
+      await query(
+        `UPDATE trips SET bus_id = NULL, driver_id = NULL, incharge_id = NULL 
+         WHERE route_id = ? AND shift = ? AND trip_date = CURDATE() AND status = 'scheduled'`,
+        [existing.route_id, existing.shift]
+      );
+    } catch (tErr) {
+      console.error('Trip assignment cleanup error:', tErr);
+    }
+
+    // Log notification
+    try {
+      const msg = `Assignment for Route ${existing.route_code} (${existing.shift}) was deleted.`;
+      await query('INSERT INTO notifications (message, route_id, institution_id) VALUES (?,?,?)',
+        [msg.slice(0, 255), existing.route_id, existing.institution_id || null]);
+    } catch (e) {
+      console.error('Notification log error:', e);
+    }
+
+    res.json({ ok: true, message: `Assignment for Route ${existing.route_code} (${existing.shift}) deleted.` });
+  } catch (e) {
+    console.error('deleteAssignment error:', e);
+    res.status(500).json({ error: 'Could not delete the assignment.' });
+  }
+};
+
+// PUT /api/drivers/:id/master-edit
+exports.driverMasterEdit = async (req, res) => {
+  const driverId = Number(req.params.id);
+  const { name, institution_id, route_id, bus_id, bus_ids, shift, phone, status } = req.body || {};
+
+  if (!driverId) return res.status(400).json({ error: 'Driver ID is required.' });
+
+  try {
+    const [driver] = await query('SELECT * FROM drivers WHERE id = ?', [driverId]);
+    if (!driver) return res.status(404).json({ error: 'Driver not found.' });
+
+    const newName = name ? String(name).trim() : driver.name;
+    const cleanInst = institution_id && institution_id !== 'all' ? Number(institution_id) : null;
+    const cleanRoute = route_id ? Number(route_id) : null;
+    const cleanBus = bus_id ? Number(bus_id) : null;
+    const cleanPhone = phone !== undefined ? (phone ? String(phone).trim() : null) : driver.phone;
+    const cleanStatus = status || driver.status || 'active';
+
+    // 1. Update drivers table
+    await query(
+      `UPDATE drivers SET name = ?, institution_id = ?, route_id = ?, phone = ?, status = ? WHERE id = ?`,
+      [newName, cleanInst, cleanRoute, cleanPhone, cleanStatus, driverId]
+    );
+
+    // 2. Synchronize assignments table for multiple buses
+    const shiftsToApply = (!shift || shift === 'both') ? ['morning1', 'evening1'] : [shift];
+    
+    // Normalize selectedBusIds: array of Numbers
+    let selectedBusIds = [];
+    if (Array.isArray(bus_ids)) {
+      selectedBusIds = bus_ids.map(Number).filter(Boolean);
+    } else if (bus_id) {
+      selectedBusIds = [Number(bus_id)];
+    }
+
+    if (selectedBusIds.length > 0) {
+      // Remove driver from assignments of buses that are NOT in selectedBusIds
+      await query(
+        `UPDATE assignments SET driver_id = NULL WHERE driver_id = ? AND bus_id NOT IN (?)`,
+        [driverId, selectedBusIds]
+      );
+
+      if (cleanRoute) {
+        // If driver has a primary route
+        if (selectedBusIds.length === 1) {
+          // Single bus assigned to specified shifts
+          for (const sh of shiftsToApply) {
+            await query(
+              `INSERT INTO assignments (route_id, shift, bus_id, driver_id)
+               VALUES (?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE bus_id = VALUES(bus_id), driver_id = VALUES(driver_id)`,
+              [cleanRoute, sh, selectedBusIds[0], driverId]
+            );
+          }
+        } else {
+          // Multiple buses: distribute across shifts or assign each
+          // e.g. first bus to morning1, second bus to evening1
+          if (shiftsToApply.includes('morning1') && selectedBusIds[0]) {
+            await query(
+              `INSERT INTO assignments (route_id, shift, bus_id, driver_id)
+               VALUES (?, 'morning1', ?, ?)
+               ON DUPLICATE KEY UPDATE bus_id = VALUES(bus_id), driver_id = VALUES(driver_id)`,
+              [cleanRoute, selectedBusIds[0], driverId]
+            );
+          }
+          if (shiftsToApply.includes('evening1') && selectedBusIds[1]) {
+            await query(
+              `INSERT INTO assignments (route_id, shift, bus_id, driver_id)
+               VALUES (?, 'evening1', ?, ?)
+               ON DUPLICATE KEY UPDATE bus_id = VALUES(bus_id), driver_id = VALUES(driver_id)`,
+              [cleanRoute, selectedBusIds[1], driverId]
+            );
+          }
+          // For any additional buses, link to their existing route assignments
+          for (const bId of selectedBusIds) {
+            const [existingBusAssign] = await query(
+              `SELECT id, route_id, shift FROM assignments WHERE bus_id = ? LIMIT 1`,
+              [bId]
+            );
+            if (existingBusAssign) {
+              await query(`UPDATE assignments SET driver_id = ? WHERE id = ?`, [driverId, existingBusAssign.id]);
+            } else {
+              await query(
+                `INSERT INTO assignments (route_id, shift, bus_id, driver_id) VALUES (?, 'morning1', ?, ?)
+                 ON DUPLICATE KEY UPDATE driver_id = VALUES(driver_id)`,
+                [cleanRoute, bId, driverId]
+              );
+            }
+          }
+        }
+      } else {
+        // No specific route passed: link driver to all selected buses
+        for (const bId of selectedBusIds) {
+          const [existingBusAssign] = await query(
+            `SELECT id FROM assignments WHERE bus_id = ? LIMIT 1`,
+            [bId]
+          );
+          if (existingBusAssign) {
+            await query(`UPDATE assignments SET driver_id = ? WHERE id = ?`, [driverId, existingBusAssign.id]);
+          } else {
+            // Find bus's route if any
+            const [bRow] = await query('SELECT route_id FROM buses WHERE id = ?', [bId]);
+            const rId = bRow?.route_id || 1;
+            await query(
+              `INSERT INTO assignments (route_id, shift, bus_id, driver_id) VALUES (?, 'morning1', ?, ?)
+               ON DUPLICATE KEY UPDATE driver_id = VALUES(driver_id)`,
+              [rId, bId, driverId]
+            );
+          }
+        }
+      }
+
+      // Sync today's trips for all assigned buses
+      try {
+        await query(
+          `UPDATE trips SET driver_id = ? WHERE bus_id IN (?) AND trip_date = CURDATE()`,
+          [driverId, selectedBusIds]
+        );
+      } catch (tErr) {
+        console.error('Trip sync error in driverMasterEdit:', tErr);
+      }
+    } else if (cleanRoute && selectedBusIds.length === 0) {
+      // Route assigned without any bus
+      await query(
+        `UPDATE assignments SET driver_id = NULL WHERE driver_id = ? AND route_id != ?`,
+        [driverId, cleanRoute]
+      );
+      for (const sh of shiftsToApply) {
+        await query(
+          `INSERT INTO assignments (route_id, shift, driver_id, bus_id)
+           VALUES (?, ?, ?, NULL)
+           ON DUPLICATE KEY UPDATE driver_id = VALUES(driver_id), bus_id = NULL`,
+          [cleanRoute, sh, driverId]
+        );
+      }
+    } else {
+      // Both route and bus unassigned: clear driver assignments
+      await query(
+        `UPDATE assignments SET driver_id = NULL WHERE driver_id = ?`,
+        [driverId]
+      );
+    }
+
+    // Auto calculate and insert trips if missing
+    try {
+      const { autoLogTrips } = require('./reportController');
+      if (typeof autoLogTrips === 'function') autoLogTrips().catch(() => {});
+    } catch {}
+
+    res.json({
+      ok: true,
+      driver_id: driverId,
+      name: newName,
+      institution_id: cleanInst,
+      route_id: cleanRoute,
+      bus_id: cleanBus
+    });
+  } catch (err) {
+    console.error('driverMasterEdit error:', err);
+    res.status(500).json({ error: err.message || 'Could not save driver master details.' });
+  }
+};
+
+// POST /api/drivers/master-add
+// Creates a new driver asking only for: Driver Name, Assigned Bus No (Multiple), Assigned Route, Campus/Institution
+// Balance fields (Licence, Mobile, Expiry, Status) stay empty / default
+exports.driverMasterAdd = async (req, res) => {
+  const { name, institution_id, route_id, bus_id, bus_ids, shift, phone, status, license_number, license_expiry } = req.body || {};
+
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ error: 'Driver name is required.' });
+  }
+
+  try {
+    const cleanName = String(name).trim();
+    const cleanInst = institution_id && institution_id !== 'all' ? Number(institution_id) : null;
+    const cleanRoute = route_id ? Number(route_id) : null;
+    const cleanPhone = phone ? String(phone).trim() : null;
+    const cleanLicense = license_number ? String(license_number).trim() : null;
+    const cleanExpiry = license_expiry ? String(license_expiry).trim() : null;
+    const cleanStatus = status || 'active';
+
+    // 1. Insert into drivers table
+    const result = await query(
+      `INSERT INTO drivers (name, institution_id, route_id, phone, license_number, license_expiry, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [cleanName, cleanInst, cleanRoute, cleanPhone, cleanLicense, cleanExpiry, cleanStatus]
+    );
+    const driverId = result.insertId;
+
+    // 2. Synchronize assignments table for multiple buses
+    const shiftsToApply = (!shift || shift === 'both') ? ['morning1', 'evening1'] : [shift];
+    let selectedBusIds = [];
+    if (Array.isArray(bus_ids)) {
+      selectedBusIds = bus_ids.map(Number).filter(Boolean);
+    } else if (bus_id) {
+      selectedBusIds = [Number(bus_id)];
+    }
+
+    if (selectedBusIds.length > 0) {
+      if (cleanRoute) {
+        if (selectedBusIds.length === 1) {
+          for (const sh of shiftsToApply) {
+            await query(
+              `INSERT INTO assignments (route_id, shift, bus_id, driver_id)
+               VALUES (?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE bus_id = VALUES(bus_id), driver_id = VALUES(driver_id)`,
+              [cleanRoute, sh, selectedBusIds[0], driverId]
+            );
+          }
+        } else {
+          if (shiftsToApply.includes('morning1') && selectedBusIds[0]) {
+            await query(
+              `INSERT INTO assignments (route_id, shift, bus_id, driver_id)
+               VALUES (?, 'morning1', ?, ?)
+               ON DUPLICATE KEY UPDATE bus_id = VALUES(bus_id), driver_id = VALUES(driver_id)`,
+              [cleanRoute, selectedBusIds[0], driverId]
+            );
+          }
+          if (shiftsToApply.includes('evening1') && selectedBusIds[1]) {
+            await query(
+              `INSERT INTO assignments (route_id, shift, bus_id, driver_id)
+               VALUES (?, 'evening1', ?, ?)
+               ON DUPLICATE KEY UPDATE bus_id = VALUES(bus_id), driver_id = VALUES(driver_id)`,
+              [cleanRoute, selectedBusIds[1], driverId]
+            );
+          }
+          for (const bId of selectedBusIds) {
+            const [existingBusAssign] = await query(
+              `SELECT id, route_id, shift FROM assignments WHERE bus_id = ? LIMIT 1`,
+              [bId]
+            );
+            if (existingBusAssign) {
+              await query(`UPDATE assignments SET driver_id = ? WHERE id = ?`, [driverId, existingBusAssign.id]);
+            } else {
+              await query(
+                `INSERT INTO assignments (route_id, shift, bus_id, driver_id) VALUES (?, 'morning1', ?, ?)
+                 ON DUPLICATE KEY UPDATE driver_id = VALUES(driver_id)`,
+                [cleanRoute, bId, driverId]
+              );
+            }
+          }
+        }
+      } else {
+        for (const bId of selectedBusIds) {
+          const [existingBusAssign] = await query(
+            `SELECT id FROM assignments WHERE bus_id = ? LIMIT 1`,
+            [bId]
+          );
+          if (existingBusAssign) {
+            await query(`UPDATE assignments SET driver_id = ? WHERE id = ?`, [driverId, existingBusAssign.id]);
+          } else {
+            const [bRow] = await query('SELECT route_id FROM buses WHERE id = ?', [bId]);
+            const rId = bRow?.route_id || 1;
+            await query(
+              `INSERT INTO assignments (route_id, shift, bus_id, driver_id) VALUES (?, 'morning1', ?, ?)
+               ON DUPLICATE KEY UPDATE driver_id = VALUES(driver_id)`,
+              [rId, bId, driverId]
+            );
+          }
+        }
+      }
+
+      try {
+        await query(
+          `UPDATE trips SET driver_id = ? WHERE bus_id IN (?) AND trip_date = CURDATE()`,
+          [driverId, selectedBusIds]
+        );
+      } catch (tErr) {
+        console.error('Trip sync error in driverMasterAdd:', tErr);
+      }
+    } else if (cleanRoute && selectedBusIds.length === 0) {
+      for (const sh of shiftsToApply) {
+        await query(
+          `INSERT INTO assignments (route_id, shift, driver_id, bus_id)
+           VALUES (?, ?, ?, NULL)
+           ON DUPLICATE KEY UPDATE driver_id = VALUES(driver_id), bus_id = NULL`,
+          [cleanRoute, sh, driverId]
+        );
+      }
+    }
+
+    try {
+      const { autoLogTrips } = require('./reportController');
+      if (typeof autoLogTrips === 'function') autoLogTrips().catch(() => {});
+    } catch {}
+
+    res.status(201).json({
+      ok: true,
+      id: driverId,
+      driver_id: driverId,
+      name: cleanName,
+      institution_id: cleanInst,
+      route_id: cleanRoute,
+      bus_ids: selectedBusIds,
+      status: cleanStatus
+    });
+  } catch (err) {
+    console.error('driverMasterAdd error:', err);
+    res.status(500).json({ error: err.message || 'Could not add new driver.' });
+  }
+};
+

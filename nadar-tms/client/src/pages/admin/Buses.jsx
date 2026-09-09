@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const COLUMNS = [
   { key: 'registration_number', label: 'Reg. Number', mono: true },
+  { key: 'assigned_route_code', label: 'Assigned Route', mono: true },
   { key: 'bus_model', label: 'Model' },
   { key: 'capacity', label: 'Seats', mono: true },
   { key: 'status', label: 'Status', tag: true },
@@ -57,13 +58,19 @@ export default function Buses() {
   const canEdit = user?.role === 'admin';
 
   const load = (inst) => {
-    const filter = inst ? { institution_id: inst } : undefined;
-    api.listRes('buses', filter).then(d => { setItems(d.items || []); setLoading(false); });
+    setLoading(true);
+    const filter = (inst && inst !== 'all') ? { institution_id: inst } : { institution_id: 'all' };
+    api.listRes('buses', filter).then(d => {
+      setItems(d.items || []);
+      setLoading(false);
+    });
   };
 
   useEffect(() => {
     api.refs().then(r => setRefs(r)).catch(() => {});
-    load(user?.role === 'institution' ? user.institution_id : '');
+    const initialInst = user?.role === 'institution' && user.institution_id ? String(user.institution_id) : 'all';
+    setInstFilter(initialInst);
+    load(initialInst);
   }, []);
 
   const handleInstChange = (v) => { setInstFilter(v); load(v); };
@@ -75,6 +82,8 @@ export default function Buses() {
     if (!query) return true;
     return (
       (item.registration_number || '').toLowerCase().includes(query) ||
+      (item.assigned_route_code || '').toLowerCase().includes(query) ||
+      (item.assigned_route_name || '').toLowerCase().includes(query) ||
       (item.bus_model || '').toLowerCase().includes(query) ||
       (item.bus_name || '').toLowerCase().includes(query) ||
       (item.bus_code || '').toLowerCase().includes(query)
@@ -94,15 +103,24 @@ export default function Buses() {
           <input
             type="text"
             className="fselect"
-            placeholder="🔍 Search registration, model, name..."
+            placeholder="🔍 Search registration, route, model..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             style={{ maxWidth: 300 }}
           />
-          {(refs.institutions?.length > 0 && user?.role !== 'institution') && (
-            <select className="fselect" value={instFilter} onChange={e => handleInstChange(e.target.value)} style={{ maxWidth: 280 }}>
-              <option value="">All institutions</option>
-              {refs.institutions.map(i => <option key={i.id} value={i.id}>{i.short_name || i.name}</option>)}
+          {refs.institutions?.length > 0 && (
+            <select
+              className="fselect"
+              value={instFilter}
+              onChange={e => handleInstChange(e.target.value)}
+              style={{ maxWidth: 280, fontWeight: 600 }}
+            >
+              <option value="all">All Fleet Buses</option>
+              {refs.institutions.map(i => (
+                <option key={i.id} value={String(i.id)}>
+                  {i.short_name || i.name} {String(i.id) === String(user?.institution_id) ? '(My Campus)' : ''}
+                </option>
+              ))}
             </select>
           )}
         </div>

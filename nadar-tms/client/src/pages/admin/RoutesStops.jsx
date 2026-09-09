@@ -16,12 +16,14 @@ export default function RoutesStops() {
   const [shiftFilter, setShiftFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [allStops, setAllStops] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const toast = useToast();
   const { user } = useAuth();
   const canEdit = user?.role === 'admin';
 
   const loadRoutes = (inst) => {
-    const filter = inst ? { institution_id: inst } : undefined;
+    setLoading(true);
+    const filter = (inst && inst !== 'all') ? { institution_id: inst } : { institution_id: 'all' };
     api.listRes('routes', filter).then(d => {
       setRoutes(d.items || []);
       setLoading(false);
@@ -34,7 +36,10 @@ export default function RoutesStops() {
 
   useEffect(() => {
     api.refs().then(r => setRefs(r)).catch(() => {});
-    loadRoutes(user?.role === 'institution' ? user.institution_id : '');
+    api.assignments().then(a => setAssignments(a.items || [])).catch(() => {});
+    const initialInst = user?.role === 'institution' && user.institution_id ? String(user.institution_id) : 'all';
+    setInstFilter(initialInst);
+    loadRoutes(initialInst);
     reloadStops();
   }, []);
 
@@ -99,8 +104,34 @@ export default function RoutesStops() {
     return match ? match.stop_name : null;
   };
 
+  const SHIFT_OPTIONS = [
+    { key: 'morning1', label: 'Morning 1' },
+    { key: 'morning2', label: 'Morning 2' },
+    { key: 'evening1', label: 'Evening 1' },
+    { key: 'evening2', label: 'Evening 2' },
+  ];
+
+  const routeHasShift = (r, s) => {
+    if (!s) return true;
+    if (r.shift === s) return true;
+    return assignments.some(a => a.route_id === r.id && a.shift === s);
+  };
+
+  const getShiftCount = (s) => {
+    if (!s) return routes.length;
+    return routes.filter(r => routeHasShift(r, s)).length;
+  };
+
+  const getRouteShifts = (r) => {
+    const sSet = new Set();
+    if (r.shift) sSet.add(r.shift);
+    const rAssigns = assignments.filter(a => a.route_id === r.id);
+    rAssigns.forEach(a => { if (a.shift) sSet.add(a.shift); });
+    return Array.from(sSet);
+  };
+
   const filteredRoutes = routes.filter(r => {
-    if (shiftFilter && r.shift !== shiftFilter) return false;
+    if (shiftFilter && !routeHasShift(r, shiftFilter)) return false;
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     const matchRoute = (r.route_code || '').toLowerCase().includes(term) || (r.route_name || '').toLowerCase().includes(term);
@@ -138,21 +169,96 @@ export default function RoutesStops() {
         {canEdit && <button className="btn btn-sm btn-primary" onClick={() => setEditingRoute({ shift: 'morning1' })}>+ Add Route</button>}
       </div>
       <div className="page-body">
+        {/* Filter by Shift pills (Identical style to institution filter in image 1) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'wrap',
+          marginBottom: 16,
+          padding: '10px 14px',
+          background: 'var(--paper)',
+          borderRadius: 8,
+          border: '1px solid var(--paper-2)'
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            FILTER BY SHIFT:
+          </span>
+          <button
+            type="button"
+            onClick={() => setShiftFilter('')}
+            style={{
+              padding: '4px 11px',
+              borderRadius: 20,
+              border: '1px solid',
+              borderColor: !shiftFilter ? 'var(--navy)' : 'var(--paper-2)',
+              background: !shiftFilter ? 'var(--navy)' : '#fff',
+              color: !shiftFilter ? '#fff' : 'var(--ink)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            All Shifts ({routes.length})
+          </button>
+          {SHIFT_OPTIONS.map(s => {
+            const isSelected = shiftFilter === s.key;
+            const count = getShiftCount(s.key);
+            return (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setShiftFilter(isSelected ? '' : s.key)}
+                style={{
+                  padding: '4px 11px',
+                  borderRadius: 20,
+                  border: '1px solid',
+                  borderColor: isSelected ? 'var(--navy)' : 'var(--paper-2)',
+                  background: isSelected ? 'var(--navy)' : '#fff',
+                  color: isSelected ? '#fff' : (count > 0 ? 'var(--ink)' : 'var(--text-dim)'),
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  transition: 'all 0.15s ease',
+                  opacity: count === 0 ? 0.6 : 1
+                }}
+              >
+                <span>{s.label}</span>
+                <span style={{
+                  padding: '1px 6px',
+                  borderRadius: 10,
+                  fontSize: 11,
+                  background: isSelected ? 'rgba(255,255,255,0.25)' : (count > 0 ? '#fee2e2' : '#f3f4f6'),
+                  color: isSelected ? '#fff' : (count > 0 ? '#b91c1c' : '#6b7280'),
+                  fontWeight: 700
+                }}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-          {(refs.institutions?.length > 0 && user?.role !== 'institution') && (
-            <select className="fselect" value={instFilter} onChange={e => handleInstChange(e.target.value)} style={{ maxWidth: 220 }}>
-              <option value="">All institutions</option>
-              {refs.institutions.map(i => <option key={i.id} value={i.id}>{i.short_name || i.name}</option>)}
+          {refs.institutions?.length > 0 && (
+            <select
+              className="fselect"
+              value={instFilter}
+              onChange={e => handleInstChange(e.target.value)}
+              style={{ maxWidth: 240, fontWeight: 600 }}
+            >
+              <option value="all">All institutions</option>
+              {refs.institutions.map(i => (
+                <option key={i.id} value={String(i.id)}>
+                  {i.short_name || i.name} {String(i.id) === String(user?.institution_id) ? '(My Campus)' : ''}
+                </option>
+              ))}
             </select>
           )}
-
-          <select className="fselect" value={shiftFilter} onChange={e => setShiftFilter(e.target.value)} style={{ maxWidth: 180 }}>
-            <option value="">All shifts</option>
-            <option value="morning1">Morning 1</option>
-            <option value="morning2">Morning 2</option>
-            <option value="evening1">Evening 1</option>
-            <option value="evening2">Evening 2</option>
-          </select>
 
           <input className="finput" type="text" placeholder="🔍 Search route code, name, or stop name..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ flex: 1, minWidth: 260 }} />
         </div>
@@ -168,7 +274,13 @@ export default function RoutesStops() {
                     {r.route_code} · {r.route_name}
                   </div>
                   <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-                    {r.origin} → {r.destination} · {r.total_distance || 0} km · <b style={{ color: 'var(--navy)' }}>{instLabel(r.institution_id)}</b> · <span className="tag tag--ok" style={{ padding: '2px 8px', fontSize: 11, textTransform: 'uppercase' }}>{r.shift || 'morning1'}</span>
+                    {r.origin} → {r.destination} · {r.total_distance || 0} km · <b style={{ color: 'var(--navy)' }}>{instLabel(r.institution_id)}</b> · {
+                      getRouteShifts(r).map(sh => (
+                        <span key={sh} className="tag tag--ok" style={{ padding: '2px 8px', fontSize: 11, textTransform: 'uppercase', marginRight: 4 }}>
+                          {sh}
+                        </span>
+                      ))
+                    }
                   </div>
                   {getMatchingStop(r.id, searchTerm) && (
                     <div style={{ fontSize: 12, color: 'var(--marigold)', marginTop: 6, fontWeight: 600 }}>

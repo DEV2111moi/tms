@@ -18,7 +18,7 @@ router.post('/auth/login', auth.login);
 router.get('/auth/me', authenticate, auth.me);
 
 // ---- Dashboard ----
-router.get('/dashboard', authenticate, requireRole('admin', 'executive'), dash.summary);
+router.get('/dashboard', authenticate, requireRole('admin', 'executive', 'institution'), dash.summary);
 
 // ---- Trips & attendance (bus incharge + admin) ----
 router.get('/trips/today', authenticate, requireRole('incharge', 'admin'), att.todayTrip);
@@ -36,11 +36,16 @@ router.post('/trips/:tripId/location', authenticate, requireRole('incharge', 'dr
   router.delete(`/${t}/:id`, authenticate, requireRole(...writers), crud.remove(t));
 });
 
+// Driver Master Edit & Add (Driver Name, Bus No, Route, Institution)
+router.put('/drivers/:id/master-edit', authenticate, requireRole('admin'), fleet.driverMasterEdit);
+router.post('/drivers/master-add', authenticate, requireRole('admin'), fleet.driverMasterAdd);
+
 // ---- Fleet: FC alerts, assignments, reference lists ----
 router.get('/fleet/alerts', authenticate, requireRole('admin', 'executive', 'institution'), fleet.alerts);
 router.get('/fleet/refs', authenticate, requireRole('admin', 'executive', 'institution'), fleet.refs);
 router.get('/assignments', authenticate, requireRole('admin', 'executive', 'institution'), fleet.assignments);
 router.post('/assignments', authenticate, requireRole('admin', 'institution'), fleet.assign);
+router.delete('/assignments/:id', authenticate, requireRole('admin', 'institution'), fleet.deleteAssignment);
 
 // ---- Parent ----
 router.get('/parent/me', authenticate, requireRole('parent', 'admin'), fleet.parentView);
@@ -61,7 +66,7 @@ router.put('/users/:id', authenticate, requireRole('admin', 'institution'), user
 router.delete('/users/:id', authenticate, requireRole('admin', 'institution'), users.remove);
 
 // ---- Admin reporting ----
-router.get('/reports/attendance', authenticate, requireRole('admin', 'executive'), att.report);
+router.get('/reports/attendance', authenticate, requireRole('admin', 'executive', 'institution'), att.report);
 router.get('/reports/fuel', authenticate, requireRole('admin', 'executive'), driver.fuelReport);
 router.get('/reports/absentees', authenticate, requireRole('admin', 'executive'), rep.absentees);
 router.get('/reports/fuel-usage', authenticate, requireRole('admin', 'executive'), rep.fuel);
@@ -74,6 +79,6 @@ router.post('/fuel', authenticate, requireRole('admin'), driver.addFuel);
 router.post('/upload', authenticate, requireRole('admin', 'institution'), upload.upload);
 router.get('/notifications', authenticate, notifs.list);
 router.get('/fuel/bus/:busId', authenticate, requireRole('admin', 'executive'), driver.busFuel);
-router.get('/attendance/daily/:date', authenticate, requireRole('admin'), att.daily);
+router.get('/attendance/daily/:date', authenticate, requireRole('admin', 'institution'), att.daily);
 
 module.exports = router;
