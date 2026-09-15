@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('admin@tms.in');
-  const [password, setPassword] = useState('1234');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,12 +31,6 @@ export default function Login() {
       setError(err.message || 'Login failed. Please check your credentials.');
     }
     setLoading(false);
-  };
-
-  const handleQuickFill = () => {
-    setEmail('admin@tms.in');
-    setPassword('1234');
-    setError('');
   };
 
   return (
@@ -152,22 +146,6 @@ export default function Login() {
             )}
           </button>
         </form>
-
-        {/* Demo Credentials Quick-Fill helper */}
-        <div className="login-demo-card">
-          <div className="login-demo-text">
-            <span className="login-demo-title">Default Credentials</span>
-            <span className="login-demo-creds">admin@tms.in · 1234</span>
-          </div>
-          <button
-            type="button"
-            className="login-demo-btn"
-            onClick={handleQuickFill}
-            title="Auto fill credentials"
-          >
-            Auto Fill
-          </button>
-        </div>
 
         <div className="login-foot-note">
           TMHNU Central Fleet Control · Theni<br />

@@ -41,26 +41,63 @@ exports.assign = async (req, res) => {
   const shifts = (!shift || shift === 'both') ? ['morning1', 'evening1'] : [shift];
   const inchargeOnly = req.user.role === 'institution';
   try {
-    for (const sh of shifts) {
-      if (inchargeOnly) {
+    if (inchargeOnly) {
+      for (const sh of shifts) {
         await query(
           `INSERT INTO assignments (route_id, shift, incharge_id) VALUES (?,?,?)
            ON DUPLICATE KEY UPDATE incharge_id=VALUES(incharge_id)`,
           [route_id, sh, incharge_id || null]);
-      } else {
+        try {
+          await query(
+            `UPDATE trips SET incharge_id = ? WHERE route_id = ? AND shift = ? AND trip_date = CURDATE()`,
+            [incharge_id || null, route_id, sh]
+          );
+        } catch (tErr) {}
+      }
+    } else {
+      // 1. If shift is both, synchronize all existing assignment shifts on this route to prevent stale driver/bus
+      if (!shift || shift === 'both') {
+        await query(
+          `UPDATE assignments SET bus_id = ?, driver_id = ?, incharge_id = COALESCE(?, incharge_id) WHERE route_id = ?`,
+          [bus_id || null, driver_id || null, incharge_id || null, route_id]
+        );
+      }
+
+      for (const sh of shifts) {
         await query(
           `INSERT INTO assignments (route_id, shift, bus_id, driver_id, incharge_id) VALUES (?,?,?,?,?)
-           ON DUPLICATE KEY UPDATE bus_id=VALUES(bus_id), driver_id=VALUES(driver_id), incharge_id=VALUES(incharge_id)`,
+           ON DUPLICATE KEY UPDATE bus_id=VALUES(bus_id), driver_id=VALUES(driver_id), incharge_id=COALESCE(VALUES(incharge_id), incharge_id)`,
           [route_id, sh, bus_id || null, driver_id || null, incharge_id || null]);
+
+        try {
+          await query(
+            `UPDATE trips SET bus_id = ?, driver_id = ?, incharge_id = ? WHERE route_id = ? AND shift = ? AND trip_date = CURDATE()`,
+            [bus_id || null, driver_id || null, incharge_id || null, route_id, sh]
+          );
+        } catch (tErr) {}
       }
-      // Synchronize incharge assignment with today's trip if one exists
-      try {
+
+      // 2. CRITICAL: When driver is changed for a bus, update all assignments for that bus
+      // so the bus stores ONLY the new driver (replaces old driver cleanly)
+      if (bus_id && driver_id) {
         await query(
-          `UPDATE trips SET incharge_id = ? WHERE route_id = ? AND shift = ? AND trip_date = CURDATE()`,
-          [incharge_id || null, route_id, sh]
+          `UPDATE assignments SET driver_id = ? WHERE bus_id = ?`,
+          [driver_id, bus_id]
         );
-      } catch (tErr) {
-        console.error('Trip incharge sync error:', tErr);
+        try {
+          await query(
+            `UPDATE trips SET driver_id = ? WHERE bus_id = ? AND trip_date = CURDATE()`,
+            [driver_id, bus_id]
+          );
+        } catch (tErr) {}
+      }
+
+      // 3. Link driver's primary route in drivers table
+      if (driver_id && route_id) {
+        await query(
+          `UPDATE drivers SET route_id = ? WHERE id = ?`,
+          [route_id, driver_id]
+        );
       }
     }
     try {
@@ -160,7 +197,19 @@ exports.refs = async (req, res) => {
         LEFT JOIN institutions i ON i.id = r.institution_id
         ORDER BY r.route_code
       `),
-      query('SELECT id, registration_number, institution_id FROM buses ORDER BY registration_number'),
+      query(`
+        SELECT b.id, b.registration_number, b.institution_id,
+               COALESCE(
+                 (SELECT d.name FROM assignments a JOIN drivers d ON d.id = a.driver_id WHERE a.bus_id = b.id ORDER BY a.id DESC LIMIT 1),
+                 (SELECT td.name FROM trips t JOIN drivers td ON td.id = t.driver_id WHERE t.bus_id = b.id AND t.trip_date = CURDATE() ORDER BY t.id DESC LIMIT 1)
+               ) AS driver_name,
+               COALESCE(
+                 (SELECT a.driver_id FROM assignments a WHERE a.bus_id = b.id AND a.driver_id IS NOT NULL ORDER BY a.id DESC LIMIT 1),
+                 (SELECT t.driver_id FROM trips t WHERE t.bus_id = b.id AND t.trip_date = CURDATE() AND t.driver_id IS NOT NULL ORDER BY t.id DESC LIMIT 1)
+               ) AS driver_id
+        FROM buses b
+        ORDER BY b.registration_number
+      `),
       query('SELECT id, name FROM drivers ORDER BY name'),
       query("SELECT id, name, institution_id FROM users WHERE role='incharge' ORDER BY name"),
       query('SELECT id, code, name, short_name FROM institutions ORDER BY name'),

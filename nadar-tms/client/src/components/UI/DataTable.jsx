@@ -11,9 +11,16 @@ export default function DataTable({ columns, data, onEdit, onDelete, onPdf, onMa
     );
   }
 
-  const renderCell = (item, col) => {
+  const renderCell = (item, col, index) => {
+    if (col.key === 'sno' || col.key === 'serial') {
+      return (
+        <span className="mono" style={{ fontWeight: 600, color: 'var(--text-dim, #64748b)' }}>
+          {index + 1}
+        </span>
+      );
+    }
     const val = item[col.key];
-    if (col.render) return col.render(val, item);
+    if (col.render) return col.render(val, item, index);
     if (col.date) return fmtDate(val);
     if (col.money) return val ? money(val) : '—';
     if (col.mono) return <span className="mono">{val ?? '—'}</span>;
@@ -38,7 +45,11 @@ export default function DataTable({ columns, data, onEdit, onDelete, onPdf, onMa
                 S.NO
               </th>
             )}
-            {columns.map((c, i) => <th key={i}>{c.label}</th>)}
+            {columns.map((c, i) => (
+              <th key={i} style={c.key === 'sno' || c.key === 'serial' ? { width: c.width || 55, textAlign: 'center' } : undefined}>
+                {c.label}
+              </th>
+            ))}
             {showActions && <th></th>}
           </tr>
         </thead>
@@ -50,7 +61,11 @@ export default function DataTable({ columns, data, onEdit, onDelete, onPdf, onMa
                   {i + 1}
                 </td>
               )}
-              {columns.map((c, j) => <td key={j}>{renderCell(item, c)}</td>)}
+              {columns.map((c, j) => (
+                <td key={j} style={c.key === 'sno' || c.key === 'serial' ? { width: c.width || 55, textAlign: 'center' } : undefined}>
+                  {renderCell(item, c, i)}
+                </td>
+              ))}
               {showActions && (
                 <td>
                   <div className="row-actions">

@@ -8,6 +8,11 @@ import { useAuth } from '../../context/AuthContext';
 
 const COLUMNS = [
   {
+    key: 'sno',
+    label: 'S.NO',
+    width: 55
+  },
+  {
     key: 'name',
     label: 'Name',
     render: (val) => (

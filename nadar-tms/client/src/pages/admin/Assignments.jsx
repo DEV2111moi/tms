@@ -23,16 +23,24 @@ const COLUMNS = [
   { key: 'incharge_name', label: 'Bus Incharge' },
 ];
 
-function SearchableSelect({ label, value, options, onChange, placeholder = "Search...", emptyText = "—" }) {
+function SearchableSelect({ label, value, options, onChange, placeholder = "Search...", emptyText = "—", currentDriverName }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(0); // 0 is emptyText, 1+ are filteredOptions
   
   const selectedOption = options.find(o => String(o.value) === String(value));
+  const activeDriverName = currentDriverName !== undefined ? currentDriverName : (selectedOption?.driver_name || '');
   
-  const filteredOptions = options.filter(o => 
-    o.label.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredOptions = options.filter(o => {
+    const q = search.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (o.label || '').toLowerCase().includes(q) ||
+      (o.searchText || '').toLowerCase().includes(q) ||
+      (o.registration_number || '').toLowerCase().includes(q) ||
+      (o.driver_name || '').toLowerCase().includes(q)
+    );
+  });
   
   useEffect(() => {
     if (!isOpen) return;
@@ -58,7 +66,7 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
         onChange('');
       } else {
         const option = filteredOptions[focusedIndex - 1];
-        if (option) onChange(option.value);
+        if (option) onChange(option.value, option);
       }
       setIsOpen(false);
       setSearch('');
@@ -91,8 +99,42 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
             minHeight: '38px'
           }}
         >
-          <span>{selectedOption ? selectedOption.label : emptyText}</span>
-          <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>▼</span>
+          {selectedOption ? (
+            selectedOption.driver_name !== undefined ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: 'var(--navy)' }}>
+                  🚌 {selectedOption.registration_number || selectedOption.label.split(' · ')[0]}
+                </span>
+                {activeDriverName ? (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe',
+                      padding: '1px 7px',
+                      borderRadius: 4,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <span>👤</span> {activeDriverName}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                    (Standby)
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span>{selectedOption.label}</span>
+            )
+          ) : (
+            <span style={{ color: 'var(--text-dim)' }}>{emptyText}</span>
+          )}
+          <span style={{ fontSize: '10px', color: 'var(--text-dim)', marginLeft: 8 }}>▼</span>
         </div>
         
         {isOpen && (
@@ -105,11 +147,11 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
               background: 'var(--paper)', 
               border: '1px solid var(--paper-2)', 
               borderRadius: '4px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              boxShadow: '0 6px 18px rgba(0,0,0,0.18)',
               zIndex: 1000,
               marginTop: '4px',
               padding: '6px',
-              maxHeight: '260px',
+              maxHeight: '280px',
               display: 'flex',
               flexDirection: 'column'
             }}
@@ -126,7 +168,7 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                 marginBottom: '6px', 
                 width: '100%', 
                 boxSizing: 'border-box',
-                padding: '6px 8px',
+                padding: '7px 9px',
                 fontSize: '13px'
               }}
               onClick={e => e.stopPropagation()}
@@ -139,7 +181,8 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                   fontSize: '13px',
                   borderRadius: '3px',
                   background: focusedIndex === 0 ? 'var(--paper-2)' : 'transparent',
-                  fontWeight: !value ? '600' : 'normal'
+                  fontWeight: !value ? '600' : 'normal',
+                  color: 'var(--text-dim)'
                 }}
                 onClick={() => { onChange(''); setIsOpen(false); setSearch(''); }}
               >
@@ -158,23 +201,73 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                   <div 
                     key={o.value} 
                     style={{ 
-                      padding: '6px 8px', 
+                      padding: '7px 10px', 
                       cursor: 'pointer', 
                       fontSize: '13px',
-                      borderRadius: '3px',
+                      borderRadius: '4px',
                       background: bg,
                       color: isSelected ? 'var(--navy)' : 'inherit',
-                      fontWeight: isSelected ? '600' : 'normal'
+                      fontWeight: isSelected ? '600' : 'normal',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      borderBottom: '1px solid rgba(0,0,0,0.03)'
                     }}
-                    onClick={() => { onChange(o.value); setIsOpen(false); setSearch(''); }}
+                    onClick={() => { onChange(o.value, o); setIsOpen(false); setSearch(''); }}
                   >
-                    {o.label}
+                    {o.driver_name !== undefined ? (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                          <span style={{ fontSize: 13 }}>🚌</span>
+                          <span style={{ fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: isSelected ? '#1d4ed8' : '#0f172a' }}>
+                            {o.registration_number || o.label.split(' · ')[0]}
+                          </span>
+                        </div>
+                        {o.driver_name ? (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              background: '#eff6ff',
+                              color: '#1d4ed8',
+                              border: '1px solid #bfdbfe',
+                              padding: '2px 8px',
+                              borderRadius: 4,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            <span>👤</span> {o.driver_name}
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: '#94a3b8',
+                              fontStyle: 'italic',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            Standby
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span>{o.label}</span>
+                    )}
                   </div>
                 );
               })}
               {filteredOptions.length === 0 && (
-                <div style={{ padding: '6px 8px', color: 'var(--text-dim)', fontSize: '13px', fontStyle: 'italic' }}>
-                  No results found
+                <div style={{ padding: '8px', color: 'var(--text-dim)', fontSize: '13px', fontStyle: 'italic', textAlign: 'center' }}>
+                  No matching options found
                 </div>
               )}
             </div>
@@ -350,46 +443,6 @@ export default function Assignments() {
     }
   };
 
-  const handleRouteChange = (val) => {
-    if (!val) {
-      setForm(prev => ({ ...prev, route_id: '', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '' }));
-      return;
-    }
-    const existing = items.filter(a => String(a.route_id) === String(val));
-    if (existing.length > 0) {
-      const morning = existing.find(a => a.shift === 'morning1' || a.shift === 'morning');
-      const evening = existing.find(a => a.shift === 'evening1' || a.shift === 'evening');
-      if (morning && evening && (morning.bus_id !== evening.bus_id || morning.driver_id !== evening.driver_id)) {
-        setSameForBoth(false);
-        setForm(prev => ({
-          ...prev,
-          route_id: val,
-          shift: 'both',
-          bus_id: morning.bus_id || '',
-          driver_id: morning.driver_id || '',
-          evening_bus_id: evening.bus_id || '',
-          evening_driver_id: evening.driver_id || '',
-          incharge_id: morning.incharge_id || evening.incharge_id || prev.incharge_id
-        }));
-      } else {
-        const first = existing[0];
-        setSameForBoth(true);
-        setForm(prev => ({
-          ...prev,
-          route_id: val,
-          shift: existing.length > 1 ? 'both' : (first.shift || 'both'),
-          bus_id: first.bus_id || '',
-          driver_id: first.driver_id || '',
-          evening_bus_id: '',
-          evening_driver_id: '',
-          incharge_id: first.incharge_id || prev.incharge_id
-        }));
-      }
-    } else {
-      setForm(prev => ({ ...prev, route_id: val }));
-    }
-  };
-
   if (loading) return <div className="loading-center"><div className="spinner" /> Loading...</div>;
 
   const routes = refs.routes || [];
@@ -412,9 +465,79 @@ export default function Assignments() {
       label: `${r.route_code} — ${r.route_name}${statusBadge}`
     };
   });
-  const busOptions = buses.map(b => ({ value: b.id, label: b.registration_number }));
+
+  const busOptions = buses.map(b => {
+    const assignedInItems = items.filter(a => String(a.bus_id) === String(b.id) && a.driver_name);
+    // Take the latest assigned driver from items to ensure a bus only has a single driver
+    const latestAssign = [...assignedInItems].reverse()[0];
+    const driverName = b.driver_name || latestAssign?.driver_name || '';
+    let driverId = b.driver_id || latestAssign?.driver_id || null;
+
+    if (!driverId && driverName) {
+      const dMatch = drivers.find(d => d.name.trim().toLowerCase() === driverName.trim().toLowerCase());
+      if (dMatch) driverId = dMatch.id;
+    }
+
+    return {
+      value: b.id,
+      registration_number: b.registration_number,
+      driver_name: driverName || '',
+      driver_id: driverId || null,
+      label: driverName ? `${b.registration_number} · 👤 ${driverName}` : `${b.registration_number} · Standby`,
+      searchText: `${b.registration_number} ${driverName || ''}`
+    };
+  });
+
   const driverOptions = drivers.map(d => ({ value: d.id, label: d.name }));
   const inchargeOptions = filteredIncharges.map(u => ({ value: u.id, label: u.name }));
+
+  const handleRouteChange = (val) => {
+    if (!val) {
+      setForm(prev => ({ ...prev, route_id: '', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '' }));
+      return;
+    }
+    const existing = items.filter(a => String(a.route_id) === String(val));
+    if (existing.length > 0) {
+      const morning = existing.find(a => a.shift === 'morning1' || a.shift === 'morning');
+      const evening = existing.find(a => a.shift === 'evening1' || a.shift === 'evening');
+
+      const resolveBusDriverId = (busId, existingDriverId) => {
+        if (existingDriverId) return String(existingDriverId);
+        if (!busId) return '';
+        const bOpt = busOptions.find(b => String(b.value) === String(busId));
+        return bOpt?.driver_id ? String(bOpt.driver_id) : '';
+      };
+
+      if (morning && evening && (morning.bus_id !== evening.bus_id || morning.driver_id !== evening.driver_id)) {
+        setSameForBoth(false);
+        setForm(prev => ({
+          ...prev,
+          route_id: val,
+          shift: 'both',
+          bus_id: morning.bus_id || '',
+          driver_id: resolveBusDriverId(morning.bus_id, morning.driver_id),
+          evening_bus_id: evening.bus_id || '',
+          evening_driver_id: resolveBusDriverId(evening.bus_id, evening.driver_id),
+          incharge_id: morning.incharge_id || evening.incharge_id || prev.incharge_id
+        }));
+      } else {
+        const first = existing[0];
+        setSameForBoth(true);
+        setForm(prev => ({
+          ...prev,
+          route_id: val,
+          shift: existing.length > 1 ? 'both' : (first.shift || 'both'),
+          bus_id: first.bus_id || '',
+          driver_id: resolveBusDriverId(first.bus_id, first.driver_id),
+          evening_bus_id: '',
+          evening_driver_id: '',
+          incharge_id: first.incharge_id || prev.incharge_id
+        }));
+      }
+    } else {
+      setForm(prev => ({ ...prev, route_id: val }));
+    }
+  };
 
   // Calculate unassigned routes (no bus assigned or missing session/driver)
   const allUnassignedRoutes = routes.map(r => {
@@ -712,8 +835,17 @@ export default function Assignments() {
                       label="Morning Bus"
                       value={form.bus_id}
                       options={busOptions}
-                      onChange={val => setForm(prev => ({ ...prev, bus_id: val }))}
-                      placeholder="🔍 Search morning registration number..."
+                      currentDriverName={drivers.find(d => String(d.id) === String(form.driver_id))?.name}
+                      onChange={val => {
+                        const chosenBus = busOptions.find(o => String(o.value) === String(val));
+                        const autoDriver = chosenBus?.driver_id ? String(chosenBus.driver_id) : '';
+                        setForm(prev => ({
+                          ...prev,
+                          bus_id: val,
+                          driver_id: autoDriver || (val ? prev.driver_id : '')
+                        }));
+                      }}
+                      placeholder="🔍 Search morning bus number or driver..."
                     />
 
                     <SearchableSelect
@@ -728,8 +860,17 @@ export default function Assignments() {
                       label="Evening Bus"
                       value={form.evening_bus_id}
                       options={busOptions}
-                      onChange={val => setForm(prev => ({ ...prev, evening_bus_id: val }))}
-                      placeholder="🔍 Search evening registration number..."
+                      currentDriverName={drivers.find(d => String(d.id) === String(form.evening_driver_id))?.name}
+                      onChange={val => {
+                        const chosenBus = busOptions.find(o => String(o.value) === String(val));
+                        const autoDriver = chosenBus?.driver_id ? String(chosenBus.driver_id) : '';
+                        setForm(prev => ({
+                          ...prev,
+                          evening_bus_id: val,
+                          evening_driver_id: autoDriver || (val ? prev.evening_driver_id : '')
+                        }));
+                      }}
+                      placeholder="🔍 Search evening bus number or driver..."
                     />
 
                     <SearchableSelect
@@ -746,8 +887,17 @@ export default function Assignments() {
                       label="Bus"
                       value={form.bus_id}
                       options={busOptions}
-                      onChange={val => setForm(prev => ({ ...prev, bus_id: val }))}
-                      placeholder="🔍 Search registration number..."
+                      currentDriverName={drivers.find(d => String(d.id) === String(form.driver_id))?.name}
+                      onChange={val => {
+                        const chosenBus = busOptions.find(o => String(o.value) === String(val));
+                        const autoDriver = chosenBus?.driver_id ? String(chosenBus.driver_id) : '';
+                        setForm(prev => ({
+                          ...prev,
+                          bus_id: val,
+                          driver_id: autoDriver || (val ? prev.driver_id : '')
+                        }));
+                      }}
+                      placeholder="🔍 Search bus number or driver..."
                     />
 
                     <SearchableSelect
