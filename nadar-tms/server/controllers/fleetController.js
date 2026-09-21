@@ -35,10 +35,31 @@ exports.alerts = async (req, res) => {
 
 // POST /api/assignments
 exports.assign = async (req, res) => {
-  const { route_id, bus_id, driver_id, incharge_id } = req.body || {};
+  const { route_id, bus_id, driver_id, incharge_id, shifts: customShifts } = req.body || {};
   const shift = req.body && req.body.shift;
   if (!route_id) return res.status(400).json({ error: 'Choose a route.' });
-  const shifts = (!shift || shift === 'both') ? ['morning1', 'evening1'] : [shift];
+
+  let shifts = [];
+  if (Array.isArray(customShifts) && customShifts.length > 0) {
+    shifts = customShifts;
+  } else if (Array.isArray(req.body.shifts) && req.body.shifts.length > 0) {
+    shifts = req.body.shifts;
+  } else if (shift === 'both' || shift === 'm1_e1') {
+    shifts = ['morning1', 'evening1'];
+  } else if (shift === 'm1_e2') {
+    shifts = ['morning1', 'evening2'];
+  } else if (shift === 'm2_e1') {
+    shifts = ['morning2', 'evening1'];
+  } else if (shift === 'm2_e2') {
+    shifts = ['morning2', 'evening2'];
+  } else if (shift === 'all') {
+    shifts = ['morning1', 'morning2', 'evening1', 'evening2'];
+  } else if (shift) {
+    shifts = [shift];
+  } else {
+    shifts = ['morning1', 'evening1'];
+  }
+
   const inchargeOnly = req.user.role === 'institution';
   try {
     if (inchargeOnly) {
@@ -55,11 +76,11 @@ exports.assign = async (req, res) => {
         } catch (tErr) {}
       }
     } else {
-      // 1. If shift is both, synchronize all existing assignment shifts on this route to prevent stale driver/bus
-      if (!shift || shift === 'both') {
+      // 1. If multiple shifts are being assigned together, synchronize those assignment shifts on this route
+      if (shifts.length > 1) {
         await query(
-          `UPDATE assignments SET bus_id = ?, driver_id = ?, incharge_id = COALESCE(?, incharge_id) WHERE route_id = ?`,
-          [bus_id || null, driver_id || null, incharge_id || null, route_id]
+          `UPDATE assignments SET bus_id = ?, driver_id = ?, incharge_id = COALESCE(?, incharge_id) WHERE route_id = ? AND shift IN (?)`,
+          [bus_id || null, driver_id || null, incharge_id || null, route_id, shifts]
         );
       }
 

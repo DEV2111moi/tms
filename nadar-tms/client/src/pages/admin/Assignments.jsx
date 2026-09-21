@@ -13,6 +13,28 @@ const SHIFT_MAP = {
   evening2: '🌙 Evening 2'
 };
 
+const PRESET_COMBINATIONS = [
+  { value: 'm1_e1', label: '☀️🌙 Both sessions (Morning 1 + Evening 1)', shifts: ['morning1', 'evening1'] },
+  { value: 'm1_e2', label: '☀️🌙 Morning 1 + Evening 2', shifts: ['morning1', 'evening2'] },
+  { value: 'm2_e1', label: '☀️🌙 Morning 2 + Evening 1', shifts: ['morning2', 'evening1'] },
+  { value: 'm2_e2', label: '☀️🌙 Morning 2 + Evening 2', shifts: ['morning2', 'evening2'] },
+  { value: 'all', label: '🔄 All 4 sessions (M1, M2, E1, E2)', shifts: ['morning1', 'morning2', 'evening1', 'evening2'] },
+  { value: 'morning1', label: '☀️ Morning 1 only', shifts: ['morning1'] },
+  { value: 'morning2', label: '☀️ Morning 2 only', shifts: ['morning2'] },
+  { value: 'evening1', label: '🌙 Evening 1 only', shifts: ['evening1'] },
+  { value: 'evening2', label: '🌙 Evening 2 only', shifts: ['evening2'] },
+];
+
+const getSelectValue = (shifts) => {
+  if (!shifts || shifts.length === 0) return 'custom';
+  for (const preset of PRESET_COMBINATIONS) {
+    if (preset.shifts.length === shifts.length && preset.shifts.every(s => shifts.includes(s))) {
+      return preset.value;
+    }
+  }
+  return 'custom';
+};
+
 const COLUMNS = [
   { key: 'route_code', label: 'Route', render: (val, item) => <b>{val} · {item.route_name}</b> },
   { key: 'institution_name', label: 'Institution' },
@@ -284,13 +306,14 @@ export default function Assignments() {
   const [form, setForm] = useState({
     assignment_id: null,
     route_id: '',
-    shift: 'both',
+    shift: 'm1_e1',
     bus_id: '',
     driver_id: '',
     evening_bus_id: '',
     evening_driver_id: '',
     incharge_id: ''
   });
+  const [selectedShifts, setSelectedShifts] = useState(['morning1', 'evening1']);
   const [sameForBoth, setSameForBoth] = useState(true);
   const [instFilter, setInstFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -315,56 +338,98 @@ export default function Assignments() {
 
   useEffect(() => { load(); }, []);
 
+  const handleShiftSelectChange = (val) => {
+    if (val === 'custom') return;
+    const match = PRESET_COMBINATIONS.find(p => p.value === val);
+    if (match) {
+      setSelectedShifts(match.shifts);
+      setForm(prev => ({ ...prev, shift: val }));
+    }
+  };
+
+  const handleToggleShift = (shiftKey) => {
+    setSelectedShifts(prev => {
+      let next;
+      if (prev.includes(shiftKey)) {
+        if (prev.length <= 1) {
+          toast('At least one session must be selected');
+          return prev;
+        }
+        next = prev.filter(s => s !== shiftKey);
+      } else {
+        next = [...prev, shiftKey];
+      }
+      const presetVal = getSelectValue(next);
+      setForm(f => ({ ...f, shift: presetVal }));
+      return next;
+    });
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (!form.route_id) { toast('Please select a route'); return; }
+    if (!selectedShifts || selectedShifts.length === 0) { toast('Please select at least one session'); return; }
+
     try {
-      if (form.shift === 'both' && !sameForBoth) {
-        // Save morning 1
-        await api.assign({
-          route_id: form.route_id,
-          shift: 'morning1',
-          bus_id: form.bus_id || null,
-          driver_id: form.driver_id || null,
-          incharge_id: form.incharge_id || null
-        });
-        // Save evening 1
-        await api.assign({
-          route_id: form.route_id,
-          shift: 'evening1',
-          bus_id: form.evening_bus_id || null,
-          driver_id: form.evening_driver_id || null,
-          incharge_id: form.incharge_id || null
-        });
+      const mShifts = selectedShifts.filter(s => s.toLowerCase().includes('morning'));
+      const eShifts = selectedShifts.filter(s => s.toLowerCase().includes('evening'));
+
+      if (!sameForBoth && mShifts.length > 0 && eShifts.length > 0) {
+        // Save morning shifts
+        for (const sh of mShifts) {
+          await api.assign({
+            route_id: form.route_id,
+            shift: sh,
+            bus_id: form.bus_id || null,
+            driver_id: form.driver_id || null,
+            incharge_id: form.incharge_id || null
+          });
+        }
+        // Save evening shifts
+        for (const sh of eShifts) {
+          await api.assign({
+            route_id: form.route_id,
+            shift: sh,
+            bus_id: form.evening_bus_id || null,
+            driver_id: form.evening_driver_id || null,
+            incharge_id: form.incharge_id || null
+          });
+        }
       } else {
-        // Standard single assign or 'both' with same bus and driver
+        // Standard assign for all selected shifts with same bus & driver
         await api.assign({
           route_id: form.route_id,
-          shift: form.shift,
+          shifts: selectedShifts,
           bus_id: form.bus_id || null,
           driver_id: form.driver_id || null,
           incharge_id: form.incharge_id || null
         });
       }
       toast('Assignment saved');
-      setForm({ assignment_id: null, route_id: '', shift: 'both', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '', incharge_id: '' });
+      setForm({ assignment_id: null, route_id: '', shift: 'm1_e1', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '', incharge_id: '' });
+      setSelectedShifts(['morning1', 'evening1']);
       setSameForBoth(true);
       load();
     } catch (err) {
-      toast(err.message);
+      toast(err.message || 'Could not save assignment');
     }
   };
 
   const handleEdit = (item) => {
     const routeAssignments = items.filter(a => a.route_id === item.route_id);
-    const morningAssign = routeAssignments.find(a => a.shift === 'morning1' || a.shift === 'morning');
-    const eveningAssign = routeAssignments.find(a => a.shift === 'evening1' || a.shift === 'evening');
+    const morningAssign = routeAssignments.find(a => a.shift && a.shift.toLowerCase().includes('morning'));
+    const eveningAssign = routeAssignments.find(a => a.shift && a.shift.toLowerCase().includes('evening'));
+
+    const routeShifts = routeAssignments.map(a => a.shift).filter(Boolean);
+    const activeShifts = routeShifts.length > 0 ? routeShifts : [item.shift || 'morning1'];
+    setSelectedShifts(activeShifts);
+    const presetVal = getSelectValue(activeShifts);
 
     if (morningAssign && eveningAssign && (morningAssign.bus_id !== eveningAssign.bus_id || morningAssign.driver_id !== eveningAssign.driver_id)) {
       setForm({
         assignment_id: item.id,
         route_id: item.route_id,
-        shift: 'both',
+        shift: presetVal,
         bus_id: morningAssign.bus_id || '',
         driver_id: morningAssign.driver_id || '',
         evening_bus_id: eveningAssign.bus_id || '',
@@ -373,12 +438,13 @@ export default function Assignments() {
       });
       setSameForBoth(false);
     } else {
+      const currentAss = routeAssignments.find(a => a.id === item.id) || item;
       setForm({
         assignment_id: item.id,
         route_id: item.route_id,
-        shift: item.shift,
-        bus_id: item.bus_id || '',
-        driver_id: item.driver_id || '',
+        shift: presetVal,
+        bus_id: currentAss.bus_id || '',
+        driver_id: currentAss.driver_id || '',
         evening_bus_id: '',
         evening_driver_id: '',
         incharge_id: item.incharge_id || ''
@@ -398,7 +464,8 @@ export default function Assignments() {
       await api.deleteAssignment(item.id);
       toast(`Assignment deleted for ${routeCode}`);
       if (form.route_id === item.route_id) {
-        setForm({ assignment_id: null, route_id: '', shift: 'both', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '', incharge_id: '' });
+        setForm({ assignment_id: null, route_id: '', shift: 'm1_e1', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '', incharge_id: '' });
+        setSelectedShifts(['morning1', 'evening1']);
         setSameForBoth(true);
       }
       load();
@@ -418,7 +485,7 @@ export default function Assignments() {
       const shiftLabel = curAssign ? (SHIFT_MAP[curAssign.shift] || curAssign.shift) : (SHIFT_MAP[form.shift] || form.shift);
       confirmMsg = `Are you sure you want to delete the ${shiftLabel} assignment for ${routeCode}?`;
     } else {
-      confirmMsg = `Are you sure you want to delete all assignments for ${routeCode}?`;
+      confirmMsg = `Are you sure you want to delete selected sessions for ${routeCode}?`;
     }
 
     if (!window.confirm(confirmMsg)) return;
@@ -429,13 +496,14 @@ export default function Assignments() {
       } else {
         const matches = items.filter(a => String(a.route_id) === String(form.route_id));
         for (const m of matches) {
-          if (form.shift === 'both' || m.shift === form.shift) {
+          if (selectedShifts.includes(m.shift)) {
             await api.deleteAssignment(m.id);
           }
         }
       }
       toast(`Assignment deleted for ${routeCode}`);
-      setForm({ assignment_id: null, route_id: '', shift: 'both', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '', incharge_id: '' });
+      setForm({ assignment_id: null, route_id: '', shift: 'm1_e1', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '', incharge_id: '' });
+      setSelectedShifts(['morning1', 'evening1']);
       setSameForBoth(true);
       load();
     } catch (err) {
@@ -498,8 +566,13 @@ export default function Assignments() {
     }
     const existing = items.filter(a => String(a.route_id) === String(val));
     if (existing.length > 0) {
-      const morning = existing.find(a => a.shift === 'morning1' || a.shift === 'morning');
-      const evening = existing.find(a => a.shift === 'evening1' || a.shift === 'evening');
+      const activeShifts = existing.map(a => a.shift).filter(Boolean);
+      const newSelectedShifts = activeShifts.length > 0 ? activeShifts : ['morning1', 'evening1'];
+      setSelectedShifts(newSelectedShifts);
+      const presetVal = getSelectValue(newSelectedShifts);
+
+      const morning = existing.find(a => a.shift && a.shift.toLowerCase().includes('morning'));
+      const evening = existing.find(a => a.shift && a.shift.toLowerCase().includes('evening'));
 
       const resolveBusDriverId = (busId, existingDriverId) => {
         if (existingDriverId) return String(existingDriverId);
@@ -513,7 +586,7 @@ export default function Assignments() {
         setForm(prev => ({
           ...prev,
           route_id: val,
-          shift: 'both',
+          shift: presetVal,
           bus_id: morning.bus_id || '',
           driver_id: resolveBusDriverId(morning.bus_id, morning.driver_id),
           evening_bus_id: evening.bus_id || '',
@@ -521,12 +594,12 @@ export default function Assignments() {
           incharge_id: morning.incharge_id || evening.incharge_id || prev.incharge_id
         }));
       } else {
-        const first = existing[0];
+        const first = morning || evening || existing[0];
         setSameForBoth(true);
         setForm(prev => ({
           ...prev,
           route_id: val,
-          shift: existing.length > 1 ? 'both' : (first.shift || 'both'),
+          shift: presetVal,
           bus_id: first.bus_id || '',
           driver_id: resolveBusDriverId(first.bus_id, first.driver_id),
           evening_bus_id: '',
@@ -739,6 +812,13 @@ export default function Assignments() {
     );
   });
 
+  const morningShifts = selectedShifts.filter(s => s.toLowerCase().includes('morning'));
+  const eveningShifts = selectedShifts.filter(s => s.toLowerCase().includes('evening'));
+  const morningLabel = morningShifts.map(s => SHIFT_MAP[s] || s).join(' + ') || 'Morning';
+  const eveningLabel = eveningShifts.map(s => SHIFT_MAP[s] || s).join(' + ') || 'Evening';
+  const hasMultipleSessions = selectedShifts.length > 1;
+  const isSplitSessions = hasMultipleSessions && !sameForBoth && morningShifts.length > 0 && eveningShifts.length > 0;
+
   return (
     <>
       <div className="page-head">
@@ -802,19 +882,76 @@ export default function Assignments() {
               emptyText="Choose route"
             />
 
-            <label className="flabel">
-              <span>Apply to *</span>
-              <select className="fselect" value={form.shift} required onChange={e => setForm(prev => ({ ...prev, shift: e.target.value }))}>
-                <option value="both">Both sessions (morning 1 + evening 1)</option>
-                <option value="morning1">Morning 1</option>
-                <option value="morning2">Morning 2</option>
-                <option value="evening1">Evening 1</option>
-                <option value="evening2">Evening 2</option>
+            <div className="flabel" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-main)' }}>Apply to Sessions *</span>
+                <span style={{ fontSize: 11, color: '#1d4ed8', fontWeight: 600 }}>
+                  {selectedShifts.length} session{selectedShifts.length === 1 ? '' : 's'} selected
+                </span>
+              </div>
+              <select
+                className="fselect"
+                value={getSelectValue(selectedShifts)}
+                required
+                onChange={e => handleShiftSelectChange(e.target.value)}
+                style={{ fontWeight: 500 }}
+              >
+                {PRESET_COMBINATIONS.map(p => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+                <option value="custom" disabled={getSelectValue(selectedShifts) !== 'custom'}>
+                  ⚡ Custom Selection ({selectedShifts.map(s => SHIFT_MAP[s] || s).join(', ')})
+                </option>
               </select>
-            </label>
 
-            {form.shift === 'both' && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, gridColumn: 'span 2', cursor: 'pointer', marginTop: 6, marginBottom: 6 }}>
+              {/* Selectable toggle chips for sessions */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                {[
+                  { key: 'morning1', label: 'Morning 1', icon: '☀️' },
+                  { key: 'morning2', label: 'Morning 2', icon: '☀️' },
+                  { key: 'evening1', label: 'Evening 1', icon: '🌙' },
+                  { key: 'evening2', label: 'Evening 2', icon: '🌙' }
+                ].map(({ key, label, icon }) => {
+                  const isSelected = selectedShifts.includes(key);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleToggleShift(key)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: isSelected ? 700 : 500,
+                        cursor: 'pointer',
+                        border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                        background: isSelected ? '#eff6ff' : '#f8fafc',
+                        color: isSelected ? '#1d4ed8' : '#64748b',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        boxShadow: isSelected ? '0 1px 3px rgba(37,99,235,0.2)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title={`Toggle ${label}`}
+                    >
+                      <span>{icon}</span>
+                      <span>{label}</span>
+                      <span style={{ 
+                        fontSize: 11, 
+                        fontWeight: 800, 
+                        color: isSelected ? '#2563eb' : '#94a3b8' 
+                      }}>
+                        {isSelected ? '✓' : '+'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {hasMultipleSessions && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, gridColumn: 'span 2', cursor: 'pointer', marginTop: 4, marginBottom: 4 }}>
                 <input
                   type="checkbox"
                   checked={sameForBoth}
@@ -822,17 +959,17 @@ export default function Assignments() {
                   style={{ width: 18, height: 18, cursor: 'pointer' }}
                 />
                 <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-main)' }}>
-                  Same bus and driver for both sessions
+                  Same bus and driver for {selectedShifts.length === 2 ? 'both sessions' : 'all selected sessions'} ({selectedShifts.map(s => SHIFT_MAP[s] || s).join(', ')})
                 </span>
               </label>
             )}
 
             {!isInst && (
               <>
-                {form.shift === 'both' && !sameForBoth ? (
+                {isSplitSessions ? (
                   <>
                     <SearchableSelect
-                      label="Morning Bus"
+                      label={`${morningLabel} Bus`}
                       value={form.bus_id}
                       options={busOptions}
                       currentDriverName={drivers.find(d => String(d.id) === String(form.driver_id))?.name}
@@ -845,19 +982,19 @@ export default function Assignments() {
                           driver_id: autoDriver || (val ? prev.driver_id : '')
                         }));
                       }}
-                      placeholder="🔍 Search morning bus number or driver..."
+                      placeholder={`🔍 Search ${morningLabel.toLowerCase()} bus number or driver...`}
                     />
 
                     <SearchableSelect
-                      label="Morning Driver"
+                      label={`${morningLabel} Driver`}
                       value={form.driver_id}
                       options={driverOptions}
                       onChange={val => setForm(prev => ({ ...prev, driver_id: val }))}
-                      placeholder="🔍 Search morning driver name..."
+                      placeholder={`🔍 Search ${morningLabel.toLowerCase()} driver name...`}
                     />
 
                     <SearchableSelect
-                      label="Evening Bus"
+                      label={`${eveningLabel} Bus`}
                       value={form.evening_bus_id}
                       options={busOptions}
                       currentDriverName={drivers.find(d => String(d.id) === String(form.evening_driver_id))?.name}
@@ -870,21 +1007,21 @@ export default function Assignments() {
                           evening_driver_id: autoDriver || (val ? prev.evening_driver_id : '')
                         }));
                       }}
-                      placeholder="🔍 Search evening bus number or driver..."
+                      placeholder={`🔍 Search ${eveningLabel.toLowerCase()} bus number or driver...`}
                     />
 
                     <SearchableSelect
-                      label="Evening Driver"
+                      label={`${eveningLabel} Driver`}
                       value={form.evening_driver_id}
                       options={driverOptions}
                       onChange={val => setForm(prev => ({ ...prev, evening_driver_id: val }))}
-                      placeholder="🔍 Search evening driver name..."
+                      placeholder={`🔍 Search ${eveningLabel.toLowerCase()} driver name...`}
                     />
                   </>
                 ) : (
                   <>
                     <SearchableSelect
-                      label="Bus"
+                      label={hasMultipleSessions ? `Bus (${selectedShifts.map(s => SHIFT_MAP[s] || s).join(', ')})` : 'Bus'}
                       value={form.bus_id}
                       options={busOptions}
                       currentDriverName={drivers.find(d => String(d.id) === String(form.driver_id))?.name}
@@ -901,7 +1038,7 @@ export default function Assignments() {
                     />
 
                     <SearchableSelect
-                      label="Driver"
+                      label={hasMultipleSessions ? `Driver (${selectedShifts.map(s => SHIFT_MAP[s] || s).join(', ')})` : 'Driver'}
                       value={form.driver_id}
                       options={driverOptions}
                       onChange={val => setForm(prev => ({ ...prev, driver_id: val }))}
@@ -927,7 +1064,8 @@ export default function Assignments() {
               <>
                 <button type="button" className="btn btn-sm btn-outline"
                   onClick={() => {
-                    setForm({ assignment_id: null, route_id: '', shift: 'both', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '', incharge_id: '' });
+                    setForm({ assignment_id: null, route_id: '', shift: 'm1_e1', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '', incharge_id: '' });
+                    setSelectedShifts(['morning1', 'evening1']);
                     setSameForBoth(true);
                   }}>
                   Cancel edit
