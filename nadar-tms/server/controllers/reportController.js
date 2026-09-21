@@ -89,12 +89,14 @@ async function autoLogTrips() {
           WHERE route_id = ?
         `, [assign.route_id]);
 
-        const start_t = (stopsInfo[0] && stopsInfo[0].start_t) || '07:30:00';
+        const isMorning = String(assign.shift || '').startsWith('morning');
+        const defaultStart = isMorning ? '07:30:00' : '16:00:00';
+        const defaultEnd = isMorning ? '09:30:00' : '18:00:00';
+
+        const start_t = (stopsInfo[0] && stopsInfo[0].start_t) || defaultStart;
         const end_t = (stopsInfo[0] && stopsInfo[0].end_t) || null;
 
         // Sensible shift cutoff: morning shifts finish by 09:30 AM, evening shifts by 06:00 PM
-        const isMorning = String(assign.shift || '').startsWith('morning');
-        const defaultEnd = isMorning ? '09:30:00' : '18:00:00';
         const effectiveEnd = (isMorning && end_t && end_t > '12:00:00') ? defaultEnd : (end_t || defaultEnd);
 
         // If checking for today, ensure current time is past the shift's end time
@@ -169,9 +171,9 @@ async function autoLogTrips() {
             linkedUserId,
             targetDateStr,
             assign.shift,
-            `${targetDateStr} ${start_t}`,
+            `${targetDateStr} ${start_t || defaultStart}`,
             start_km,
-            `${targetDateStr} ${end_t}`,
+            `${targetDateStr} ${effectiveEnd || defaultEnd}`,
             end_km,
             assign.origin || 'Start',
             assign.destination || 'End'
