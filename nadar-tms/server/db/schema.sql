@@ -234,6 +234,8 @@ CREATE TABLE `routes` (
   `id` int(11) NOT NULL,
   `route_code` varchar(20) NOT NULL,
   `route_name` varchar(120) NOT NULL,
+  `initial_point` varchar(120) DEFAULT NULL,
+  `initial_time` varchar(20) DEFAULT NULL,
   `origin` varchar(120) NOT NULL,
   `destination` varchar(120) NOT NULL,
   `total_distance` decimal(5,2) NOT NULL DEFAULT 0.00,

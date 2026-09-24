@@ -5,6 +5,7 @@ import DataTable from '../../components/UI/DataTable';
 import FormModal from '../../components/UI/FormModal';
 import { useToast } from '../../components/UI/Toast';
 import { useAuth } from '../../context/AuthContext';
+import { exportDriverShiftBackupPdf } from '../../utils/driverBackupPdf';
 
 const COLUMNS = [
   {
@@ -149,7 +150,22 @@ export default function Drivers() {
   }, []);
 
   const handleInstChange = (v) => { setInstFilter(v); load(v); };
-  const handleSave = async (data, id) => { await api.saveRes('drivers', data, id); toast(id ? 'Saved' : 'Added'); load(instFilter); };
+  const handleSave = async (data, id) => {
+    const cleanData = { ...data };
+    ['license_expiry', 'date_of_birth', 'joining_date', 'license_issue_date', 'badge_expiry_date'].forEach(k => {
+      if (k in cleanData) {
+        const v = cleanData[k];
+        if (!v) cleanData[k] = null;
+        else if (typeof v === 'string') {
+          const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
+          cleanData[k] = m ? m[1] : null;
+        }
+      }
+    });
+    await api.saveRes('drivers', cleanData, id);
+    toast(id ? 'Saved' : 'Added');
+    load(instFilter);
+  };
   const handleDel = async (item) => { if (!confirm('Delete this driver?')) return; await api.delRes('drivers', item.id); toast('Deleted'); load(instFilter); };
 
   const filteredItems = items.filter(item => {
@@ -902,6 +918,20 @@ export default function Drivers() {
     toast('Drivers list downloaded as CSV');
   };
 
+  const handlePrintDriverShiftBackup = async () => {
+    try {
+      await exportDriverShiftBackupPdf({
+        institutionTitle,
+        userName: user?.name || 'Administrator',
+        activeInstId: instFilter,
+        searchQuery
+      });
+    } catch (err) {
+      console.error('Failed to export driver shift backup PDF:', err);
+      toast('Could not generate Driver Shift Backup PDF');
+    }
+  };
+
   if (loading) return <div className="loading-center"><div className="spinner" /> Loading...</div>;
 
   return (
@@ -962,6 +992,25 @@ export default function Drivers() {
             title="Direct print / Save all driver details as PDF"
           >
             <span>🖨️</span> All Drivers (PDF)
+          </button>
+
+          <button
+            className="btn btn-sm"
+            onClick={handlePrintDriverShiftBackup}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: 700,
+              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)',
+              cursor: 'pointer'
+            }}
+            title="Download / Print Complete Driver Backup (Driver, Bus, Campus, Route & Morning/Evening Shifts)"
+          >
+            <span>💾</span> Driver Shift Backup (PDF)
           </button>
 
           {canEdit && (

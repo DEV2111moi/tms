@@ -4,7 +4,18 @@ import Modal from './Modal';
 export default function FormModal({ title, fields, initial, onSave, onClose, refs }) {
   const [data, setData] = useState(() => {
     const d = {};
-    fields.forEach(f => { d[f.key] = initial?.[f.key] ?? ''; });
+    fields.forEach(f => {
+      let val = initial?.[f.key] ?? '';
+      if (f.type === 'date' && val) {
+        if (typeof val === 'string') {
+          const m = val.match(/^(\d{4}-\d{2}-\d{2})/);
+          if (m) val = m[1];
+        } else if (val instanceof Date) {
+          val = val.toISOString().slice(0, 10);
+        }
+      }
+      d[f.key] = val;
+    });
     return d;
   });
   const [error, setError] = useState('');
@@ -18,7 +29,19 @@ export default function FormModal({ title, fields, initial, onSave, onClose, ref
     if (missing) { setError(`${missing.label} is required.`); return; }
     setSaving(true);
     try {
-      await onSave(data, initial?.id);
+      const sanitized = { ...data };
+      fields.forEach(f => {
+        if (f.type === 'date') {
+          const v = sanitized[f.key];
+          if (!v) {
+            sanitized[f.key] = null;
+          } else if (typeof v === 'string') {
+            const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
+            sanitized[f.key] = m ? m[1] : null;
+          }
+        }
+      });
+      await onSave(sanitized, initial?.id);
       onClose();
     } catch (e) {
       setError(e.message);
@@ -88,7 +111,12 @@ export default function FormModal({ title, fields, initial, onSave, onClose, ref
       );
     }
     const type = f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text';
-    return <input className="finput" type={type} value={val} required={f.required} onChange={e => set(f.key, e.target.value)} />;
+    let inputVal = val;
+    if (f.type === 'date' && typeof inputVal === 'string') {
+      const m = inputVal.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) inputVal = m[1];
+    }
+    return <input className="finput" type={type} value={inputVal} required={f.required} onChange={e => set(f.key, e.target.value)} />;
   };
 
   return (

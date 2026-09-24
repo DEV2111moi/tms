@@ -29,7 +29,7 @@ router.post('/trips/:tripId/location', authenticate, requireRole('incharge', 'dr
 
 // ---- Entry modules (admin only): buses, drivers, students, routes, stops, etc. ----
 ['institutions', 'buses', 'drivers', 'students', 'routes', 'stops', 'maintenance_logs', 'tyres'].forEach((t) => {
-  const writers = t === 'students' ? ['admin', 'institution'] : ['admin'];
+  const writers = (t === 'students' || t === 'routes' || t === 'stops') ? ['admin', 'institution'] : ['admin'];
   router.get(`/${t}`, authenticate, crud.list(t));
   router.post(`/${t}`, authenticate, requireRole(...writers), crud.create(t));
   router.put(`/${t}/:id`, authenticate, requireRole(...writers), crud.update(t));

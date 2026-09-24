@@ -8,6 +8,18 @@ const apiRouter = require('./routes/api');
 
 const app = express();
 
+// Ensure schema enhancements (e.g. initial_point and initial_time for routes)
+const { query } = require('./db/pool');
+(async () => {
+  try {
+    await query(`ALTER TABLE routes ADD COLUMN IF NOT EXISTS initial_point VARCHAR(120) DEFAULT NULL`);
+    await query(`ALTER TABLE routes ADD COLUMN IF NOT EXISTS initial_time VARCHAR(20) DEFAULT NULL`);
+  } catch (e) {
+    try { await query(`ALTER TABLE routes ADD COLUMN initial_point VARCHAR(120) DEFAULT NULL`); } catch (e2) {}
+    try { await query(`ALTER TABLE routes ADD COLUMN initial_time VARCHAR(20) DEFAULT NULL`); } catch (e3) {}
+  }
+})();
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));

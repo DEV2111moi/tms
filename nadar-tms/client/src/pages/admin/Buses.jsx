@@ -74,7 +74,22 @@ export default function Buses() {
   }, []);
 
   const handleInstChange = (v) => { setInstFilter(v); load(v); };
-  const handleSave = async (data, id) => { await api.saveRes('buses', data, id); toast(id ? 'Saved' : 'Added'); load(instFilter); };
+  const handleSave = async (data, id) => {
+    const cleanData = { ...data };
+    ['fc_expiry', 'insurance_expiry', 'permit_expiry', 'puc_expiry', 'purchase_date'].forEach(k => {
+      if (k in cleanData) {
+        const v = cleanData[k];
+        if (!v) cleanData[k] = null;
+        else if (typeof v === 'string') {
+          const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
+          cleanData[k] = m ? m[1] : null;
+        }
+      }
+    });
+    await api.saveRes('buses', cleanData, id);
+    toast(id ? 'Saved' : 'Added');
+    load(instFilter);
+  };
   const handleDel = async (item) => { if (!confirm('Delete this bus?')) return; await api.delRes('buses', item.id); toast('Deleted'); load(instFilter); };
 
   const filteredItems = items.filter(item => {

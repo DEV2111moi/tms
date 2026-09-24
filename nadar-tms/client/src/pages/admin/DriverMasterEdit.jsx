@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, Fragment } from 'react';
 import api from '../../api/api';
 import { useToast } from '../../components/UI/Toast';
 import { useAuth } from '../../context/AuthContext';
+import { exportDriverShiftBackupPdf } from '../../utils/driverBackupPdf';
 
 // =========================================================================
 // 1. MultiBusSearchPicker: Searchable & supports MULTIPLE buses for one driver
@@ -253,7 +254,232 @@ function MultiBusSearchPicker({ buses = [], selectedBusIds = [], onChange, activ
 }
 
 // =========================================================================
-// 2. RouteSearchPicker: Search & Enter for Route Selection
+// 1b. SingleBusSearchPicker: Search button & quick selection for single bus
+// =========================================================================
+function SingleBusSearchPicker({ buses = [], selectedBusId, onChange, activeInstId }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedBus = buses.find(b => String(b.id) === String(selectedBusId));
+
+  const q = query.toLowerCase().trim();
+  const matchedBuses = buses.filter(b => {
+    if (!q) return true;
+    return (b.registration_number || '').toLowerCase().includes(q) ||
+           (b.bus_code || '').toLowerCase().includes(q) ||
+           String(b.capacity || '').includes(q);
+  });
+
+  const sortedMatches = [...matchedBuses].sort((a, b) => {
+    if (activeInstId) {
+      const aMatch = String(a.institution_id) === String(activeInstId);
+      const bMatch = String(b.institution_id) === String(activeInstId);
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+    }
+    return (a.registration_number || '').localeCompare(b.registration_number || '');
+  });
+
+  const selectBus = (busId) => {
+    onChange(busId ? String(busId) : '');
+    setQuery('');
+    setIsOpen(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (sortedMatches.length > 0) {
+        selectBus(sortedMatches[0].id);
+      }
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: '#ffffff',
+          border: isOpen ? '1.5px solid #2563eb' : '1.5px solid #cbd5e1',
+          borderRadius: 6,
+          padding: '4px 6px 4px 8px',
+          minHeight: 38,
+          boxShadow: isOpen ? '0 0 0 3px rgba(37, 99, 235, 0.15)' : '0 1px 2px rgba(0,0,0,0.04)'
+        }}
+      >
+        <span style={{ fontSize: 14 }}>🚌</span>
+        <input
+          ref={inputRef}
+          type="text"
+          value={isOpen ? query : (selectedBus ? `${selectedBus.registration_number} ${selectedBus.bus_code ? `(${selectedBus.bus_code})` : ''} ${selectedBus.capacity ? `· ${selectedBus.capacity} seats` : ''}` : '')}
+          onChange={e => {
+            setQuery(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => {
+            setIsOpen(true);
+            setQuery('');
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder={selectedBus ? selectedBus.registration_number : "Search bus no (e.g. TN45, 2337)..."}
+          style={{
+            flex: 1,
+            border: 'none',
+            outline: 'none',
+            fontSize: 12.5,
+            fontWeight: selectedBus && !isOpen ? 700 : 500,
+            fontFamily: selectedBus && !isOpen ? 'JetBrains Mono, monospace' : 'inherit',
+            color: selectedBus && !isOpen ? '#1d4ed8' : '#0f172a',
+            background: 'transparent'
+          }}
+        />
+
+        {selectedBus && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              selectBus('');
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: 13,
+              cursor: 'pointer',
+              padding: '0 4px',
+              fontWeight: 800
+            }}
+            title="Clear selected bus"
+          >
+            ✕
+          </button>
+        )}
+
+        {/* Search Button */}
+        <button
+          type="button"
+          onClick={() => {
+            setIsOpen(!isOpen);
+            if (!isOpen && inputRef.current) inputRef.current.focus();
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: 4,
+            padding: '5px 10px',
+            fontSize: 11.5,
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 1px 2px rgba(37, 99, 235, 0.2)'
+          }}
+          title="Search and select bus number"
+        >
+          <span>🔍</span>
+          <span>Search</span>
+        </button>
+      </div>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 3px)',
+            left: 0,
+            width: '100%',
+            minWidth: 260,
+            maxHeight: 220,
+            overflowY: 'auto',
+            background: '#ffffff',
+            border: '1.5px solid #2563eb',
+            borderRadius: 6,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            zIndex: 150
+          }}
+        >
+          <div style={{ padding: '5px 8px', fontSize: 10.5, fontWeight: 700, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>PRESS ENTER TO SELECT:</span>
+            <span>{sortedMatches.length} matching buses</span>
+          </div>
+
+          {sortedMatches.length === 0 ? (
+            <div style={{ padding: '10px 12px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+              No matching buses found
+            </div>
+          ) : (
+            sortedMatches.map((b, i) => {
+              const isSelected = selectedBusId && String(b.id) === String(selectedBusId);
+              const isCampusBus = activeInstId && String(b.institution_id) === String(activeInstId);
+              return (
+                <div
+                  key={b.id}
+                  onClick={() => selectBus(b.id)}
+                  style={{
+                    padding: '7px 10px',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    borderBottom: '1px solid #f1f5f9',
+                    background: isSelected ? '#eff6ff' : (i === 0 && query ? '#f8fafc' : 'transparent'),
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
+                  onMouseLeave={e => e.currentTarget.style.background = (isSelected ? '#eff6ff' : (i === 0 && query ? '#f8fafc' : 'transparent'))}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontWeight: 800, fontFamily: 'monospace', color: '#1d4ed8', fontSize: 12.5 }}>
+                      🚌 {b.registration_number}
+                    </span>
+                    {b.bus_code && (
+                      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>({b.bus_code})</span>
+                    )}
+                    {b.capacity && (
+                      <span style={{ fontSize: 11, color: '#64748b' }}>· {b.capacity} seats</span>
+                    )}
+                    {isCampusBus && (
+                      <span style={{ fontSize: 9.5, background: '#dcfce7', color: '#15803d', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>
+                        Campus
+                      </span>
+                    )}
+                  </div>
+                  {isSelected && (
+                    <span style={{ fontSize: 11, color: '#15803d', fontWeight: 800 }}>✓ Selected</span>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =========================================================================
+// 2. RouteSearchPicker: Search button & quick selection for Route
 // =========================================================================
 function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstId }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -279,6 +505,7 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
     return (r.route_code || '').toLowerCase().includes(q) ||
            (r.route_name || '').toLowerCase().includes(q) ||
            (r.name || '').toLowerCase().includes(q) ||
+           (r.origin || '').toLowerCase().includes(q) ||
            (r.destination || '').toLowerCase().includes(q);
   });
 
@@ -315,18 +542,20 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
         style={{
           display: 'flex',
           alignItems: 'center',
+          gap: 6,
           background: '#ffffff',
-          border: isOpen ? '1.5px solid #0284c7' : '1.5px solid #93c5fd',
+          border: isOpen ? '1.5px solid #059669' : '1.5px solid #cbd5e1',
           borderRadius: 6,
-          padding: '4px 8px',
-          minHeight: 36,
-          boxShadow: isOpen ? '0 0 0 2px rgba(2, 132, 199, 0.15)' : 'none'
+          padding: '4px 6px 4px 8px',
+          minHeight: 38,
+          boxShadow: isOpen ? '0 0 0 3px rgba(5, 150, 105, 0.15)' : '0 1px 2px rgba(0,0,0,0.04)'
         }}
       >
+        <span style={{ fontSize: 14 }}>🛣️</span>
         <input
           ref={inputRef}
           type="text"
-          value={isOpen ? query : (selectedRoute ? `${selectedRoute.route_code} · ${selectedRoute.route_name || selectedRoute.name || ''}` : '')}
+          value={isOpen ? query : (selectedRoute ? `${selectedRoute.route_code} · ${selectedRoute.route_name || selectedRoute.name || ''} (${selectedRoute.origin || 'Start'} ➔ ${selectedRoute.destination || 'Campus'})` : '')}
           onChange={e => {
             setQuery(e.target.value);
             setIsOpen(true);
@@ -336,12 +565,12 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
             setQuery('');
           }}
           onKeyDown={handleKeyDown}
-          placeholder="🛣️ Search route code & Enter..."
+          placeholder={selectedRoute ? selectedRoute.route_code : "Search route code (e.g. 111, USILAMPATTI)..."}
           style={{
             flex: 1,
             border: 'none',
             outline: 'none',
-            fontSize: 12,
+            fontSize: 12.5,
             fontWeight: selectedRoute && !isOpen ? 700 : 500,
             fontFamily: selectedRoute && !isOpen ? 'JetBrains Mono, monospace' : 'inherit',
             color: selectedRoute && !isOpen ? '#0f172a' : '#334155',
@@ -360,7 +589,7 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
               background: 'none',
               border: 'none',
               color: '#94a3b8',
-              fontSize: 12,
+              fontSize: 13,
               cursor: 'pointer',
               padding: '0 4px',
               fontWeight: 800
@@ -370,6 +599,33 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
             ✕
           </button>
         )}
+
+        {/* Search Button */}
+        <button
+          type="button"
+          onClick={() => {
+            setIsOpen(!isOpen);
+            if (!isOpen && inputRef.current) inputRef.current.focus();
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: 4,
+            padding: '5px 10px',
+            fontSize: 11.5,
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 1px 2px rgba(5, 150, 105, 0.2)'
+          }}
+          title="Search and select route"
+        >
+          <span>🔍</span>
+          <span>Search</span>
+        </button>
       </div>
 
       {/* Dropdown Menu */}
@@ -380,17 +636,17 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
             top: 'calc(100% + 3px)',
             left: 0,
             width: '100%',
-            minWidth: 260,
-            maxHeight: 220,
+            minWidth: 280,
+            maxHeight: 230,
             overflowY: 'auto',
             background: '#ffffff',
-            border: '1.5px solid #0284c7',
+            border: '1.5px solid #059669',
             borderRadius: 6,
             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-            zIndex: 100
+            zIndex: 150
           }}
         >
-          <div style={{ padding: '4px 8px', fontSize: 10.5, fontWeight: 700, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ padding: '5px 8px', fontSize: 10.5, fontWeight: 700, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>PRESS ENTER TO SELECT:</span>
             <span
               onClick={() => selectRoute('')}
@@ -401,40 +657,51 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
           </div>
 
           {sortedMatches.length === 0 ? (
-            <div style={{ padding: '8px 10px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+            <div style={{ padding: '10px 12px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
               No matching routes found
             </div>
           ) : (
             sortedMatches.map((r, i) => {
+              const isSelected = selectedRouteId && String(r.id) === String(selectedRouteId);
               const isCampusRoute = activeInstId && String(r.institution_id) === String(activeInstId);
               return (
                 <div
                   key={r.id}
                   onClick={() => selectRoute(r.id)}
                   style={{
-                    padding: '6px 10px',
+                    padding: '7px 10px',
                     fontSize: 12,
                     cursor: 'pointer',
                     borderBottom: '1px solid #f1f5f9',
-                    background: i === 0 && query ? '#f0f9ff' : 'transparent',
+                    background: isSelected ? '#ecfdf5' : (i === 0 && query ? '#f8fafc' : 'transparent'),
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 2
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f0f9ff'}
-                  onMouseLeave={e => e.currentTarget.style.background = (i === 0 && query ? '#f0f9ff' : 'transparent')}
+                  onMouseEnter={e => e.currentTarget.style.background = '#ecfdf5'}
+                  onMouseLeave={e => e.currentTarget.style.background = (isSelected ? '#ecfdf5' : (i === 0 && query ? '#f8fafc' : 'transparent'))}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <b className="mono" style={{ color: '#0f172a' }}>🛣️ {r.route_code}</b>
-                    {isCampusRoute && (
-                      <span style={{ fontSize: 9.5, background: '#dcfce7', color: '#15803d', padding: '1px 4px', borderRadius: 3, fontWeight: 700 }}>
-                        Campus
-                      </span>
-                    )}
+                    <b className="mono" style={{ color: '#047857', fontSize: 12.5 }}>🛣️ {r.route_code}</b>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {isSelected && (
+                        <span style={{ fontSize: 11, color: '#059669', fontWeight: 800 }}>✓ Selected</span>
+                      )}
+                      {isCampusRoute && (
+                        <span style={{ fontSize: 9.5, background: '#dcfce7', color: '#15803d', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>
+                          Campus
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {(r.route_name || r.name) && (
-                    <div style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: 11.5, color: '#334155', fontWeight: 600 }}>
                       {r.route_name || r.name}
+                    </div>
+                  )}
+                  {(r.origin || r.destination) && (
+                    <div style={{ fontSize: 10.5, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {r.origin || 'Start'} ➔ {r.destination || 'Campus'}
                     </div>
                   )}
                 </div>
@@ -446,6 +713,7 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
     </div>
   );
 }
+
 
 // =========================================================================
 // 3. InstSearchPicker: Search & Enter for Campus / Institution
@@ -614,6 +882,35 @@ function InstSearchPicker({ institutions = [], selectedInstId, onChange }) {
   );
 }
 
+const SHIFT_MAP = {
+  morning1: '☀️ Morning 1',
+  morning2: '☀️ Morning 2',
+  evening1: '🌙 Evening 1',
+  evening2: '🌙 Evening 2'
+};
+
+const PRESET_COMBINATIONS = [
+  { value: 'm1_e1', label: '☀️ 🌙 Both sessions (Morning 1 + Evening 1)', shifts: ['morning1', 'evening1'] },
+  { value: 'm1_e2', label: '☀️ 🌙 Morning 1 + Evening 2', shifts: ['morning1', 'evening2'] },
+  { value: 'm2_e1', label: '☀️ 🌙 Morning 2 + Evening 1', shifts: ['morning2', 'evening1'] },
+  { value: 'm2_e2', label: '☀️ 🌙 Morning 2 + Evening 2', shifts: ['morning2', 'evening2'] },
+  { value: 'all', label: '🔄 All 4 sessions (M1, M2, E1, E2)', shifts: ['morning1', 'morning2', 'evening1', 'evening2'] },
+  { value: 'morning1', label: '☀️ Morning 1 only', shifts: ['morning1'] },
+  { value: 'morning2', label: '☀️ Morning 2 only', shifts: ['morning2'] },
+  { value: 'evening1', label: '🌙 Evening 1 only', shifts: ['evening1'] },
+  { value: 'evening2', label: '🌙 Evening 2 only', shifts: ['evening2'] },
+];
+
+const getSelectValue = (shifts) => {
+  if (!shifts || shifts.length === 0) return 'custom';
+  for (const preset of PRESET_COMBINATIONS) {
+    if (preset.shifts.length === shifts.length && preset.shifts.every(s => shifts.includes(s))) {
+      return preset.value;
+    }
+  }
+  return 'custom';
+};
+
 // =========================================================================
 // Main DriverMasterEdit Component
 // =========================================================================
@@ -629,6 +926,13 @@ export default function DriverMasterEdit() {
   const [editingDriverId, setEditingDriverId] = useState(null);
   const [rowForm, setRowForm] = useState(null);
   const [savingId, setSavingId] = useState(null);
+
+  // Multi-tab trip edit modal for single driver
+  const [modalDriver, setModalDriver] = useState(null);
+  const [driverTrips, setDriverTrips] = useState([]);
+  const [activeTripTab, setActiveTripTab] = useState(0);
+  const [driverForm, setDriverForm] = useState({ name: '', phone: '', status: 'active', institution_id: '' });
+  const [modalSaving, setModalSaving] = useState(false);
 
   // Add new driver modal state (asks only Name, Assigned Bus No (Multiple), Assigned Route, Campus / Institution)
   const [showAddModal, setShowAddModal] = useState(false);
@@ -662,6 +966,24 @@ export default function DriverMasterEdit() {
       console.error('Failed to load driver master edit data:', err);
       toast('Could not load driver data');
       setLoading(false);
+    }
+  };
+
+  const handlePrintDriverShiftBackup = async () => {
+    try {
+      const activeInst = refs.institutions?.find(i => String(i.id) === String(instFilter));
+      const institutionTitle = activeInst 
+        ? (activeInst.name || activeInst.short_name).toUpperCase() 
+        : 'NADAR GROUP OF INSTITUTIONS — FLEET MANAGEMENT';
+      await exportDriverShiftBackupPdf({
+        institutionTitle,
+        userName: user?.name || 'Administrator',
+        activeInstId: instFilter !== 'ALL' ? instFilter : 'all',
+        searchQuery
+      });
+    } catch (err) {
+      console.error('Failed to export driver shift backup PDF:', err);
+      toast('Could not generate Driver Shift Backup PDF');
     }
   };
 
@@ -751,6 +1073,224 @@ export default function DriverMasterEdit() {
     } catch (err) {
       setSavingId(null);
       toast(err.message || 'Could not save driver details');
+    }
+  };
+
+  // =========================================================================
+  // MULTI-TAB DRIVER EDIT POPUP MODAL (S.No wise trips & buses)
+  // =========================================================================
+  const openDriverEditModal = async (d) => {
+    setModalDriver(d);
+    setDriverForm({
+      name: d.name || '',
+      phone: d.phone || '',
+      status: d.status || 'active',
+      institution_id: d.current_institution_id ? String(d.current_institution_id) : (d.institution_id ? String(d.institution_id) : '')
+    });
+
+    let existingTrips = [];
+    let currentRefs = refs;
+    try {
+      // Re-fetch latest refs and assignments so any changes in Routes & Stops or Driver Edit are immediately fresh
+      const [freshRefs, assignRes] = await Promise.all([
+        api.refs(),
+        api.assignments()
+      ]);
+      if (freshRefs) {
+        currentRefs = freshRefs;
+        setRefs(freshRefs);
+      }
+      const drvAssigns = (assignRes.items || []).filter(a => Number(a.driver_id) === Number(d.id));
+
+      if (drvAssigns.length > 0) {
+        const grouped = {};
+        drvAssigns.forEach(a => {
+          const key = `${a.bus_id || ''}_${a.route_id || ''}`;
+          if (!grouped[key]) {
+            grouped[key] = {
+              ...a,
+              shifts: a.shift ? [a.shift] : ['morning1']
+            };
+          } else {
+            if (a.shift && !grouped[key].shifts.includes(a.shift)) {
+              grouped[key].shifts.push(a.shift);
+            }
+          }
+        });
+
+        existingTrips = Object.values(grouped).map((a, idx) => {
+          const rObj = currentRefs.routes?.find(r => Number(r.id) === Number(a.route_id));
+          return {
+            id: a.id || idx + 1,
+            sno: idx + 1,
+            bus_id: a.bus_id ? String(a.bus_id) : '',
+            route_id: a.route_id ? String(a.route_id) : '',
+            shifts: a.shifts || [a.shift || (idx === 0 ? 'morning1' : 'morning2')],
+            shift: a.shifts?.[0] || a.shift || 'morning1',
+            initial_point: rObj?.initial_point || '',
+            initial_time: rObj?.initial_time ? rObj.initial_time.slice(0, 5) : '',
+            origin: rObj?.origin || '',
+            boarding_time: rObj?.boarding_time ? rObj.boarding_time.slice(0, 5) : '',
+            destination: rObj?.destination || '',
+            end_time: rObj?.end_time ? rObj.end_time.slice(0, 5) : ''
+          };
+        });
+      }
+    } catch (err) {
+      console.warn('Could not load specific assignments, using fallback', err);
+    }
+
+    if (existingTrips.length === 0) {
+      const primaryRouteObj = currentRefs.routes?.find(r => Number(r.id) === Number(d.current_route_id || d.route_id));
+      const primaryBusId = d.current_bus_ids ? d.current_bus_ids.split(',')[0] : (d.current_bus_id ? String(d.current_bus_id) : '');
+
+      existingTrips = [
+        {
+          id: 1,
+          sno: 1,
+          bus_id: primaryBusId || '',
+          route_id: primaryRouteObj ? String(primaryRouteObj.id) : '',
+          shifts: ['morning1', 'evening1'],
+          shift: 'morning1',
+          initial_point: primaryRouteObj?.initial_point || '',
+          initial_time: primaryRouteObj?.initial_time ? primaryRouteObj.initial_time.slice(0, 5) : '',
+          origin: primaryRouteObj?.origin || '',
+          boarding_time: primaryRouteObj?.boarding_time ? primaryRouteObj.boarding_time.slice(0, 5) : '',
+          destination: primaryRouteObj?.destination || '',
+          end_time: primaryRouteObj?.end_time ? primaryRouteObj.end_time.slice(0, 5) : ''
+        }
+      ];
+    }
+
+    setDriverTrips(existingTrips);
+    setActiveTripTab(0);
+  };
+
+  const handleAddTripTab = () => {
+    const nextSno = driverTrips.length + 1;
+    let defaultShifts = ['morning2'];
+    if (driverTrips.some(t => (t.shifts || [t.shift]).includes('morning2'))) defaultShifts = ['evening2'];
+
+    const lastBus = driverTrips[driverTrips.length - 1]?.bus_id || '';
+
+    const newTrip = {
+      id: Date.now(),
+      sno: nextSno,
+      bus_id: lastBus,
+      route_id: '',
+      shifts: defaultShifts,
+      shift: defaultShifts[0],
+      initial_point: '',
+      initial_time: '',
+      origin: '',
+      boarding_time: '',
+      destination: '',
+      end_time: ''
+    };
+    setDriverTrips(prev => [...prev, newTrip]);
+    setActiveTripTab(driverTrips.length);
+  };
+
+  const handleTripPresetChange = (presetValue) => {
+    const preset = PRESET_COMBINATIONS.find(p => p.value === presetValue);
+    if (!preset) return;
+    setDriverTrips(prev => prev.map((t, idx) => {
+      if (idx === activeTripTab) {
+        return {
+          ...t,
+          shifts: preset.shifts,
+          shift: preset.shifts[0] || 'morning1'
+        };
+      }
+      return t;
+    }));
+  };
+
+  const handleToggleTripShift = (shiftKey) => {
+    const currentTrip = driverTrips[activeTripTab];
+    if (!currentTrip) return;
+    const currentShifts = currentTrip.shifts || (currentTrip.shift ? [currentTrip.shift] : ['morning1']);
+    if (currentShifts.includes(shiftKey) && currentShifts.length <= 1) {
+      toast('At least one session/shift must remain selected.');
+      return;
+    }
+    const nextShifts = currentShifts.includes(shiftKey)
+      ? currentShifts.filter(s => s !== shiftKey)
+      : [...currentShifts, shiftKey];
+
+    setDriverTrips(prev => prev.map((t, idx) => {
+      if (idx === activeTripTab) {
+        return {
+          ...t,
+          shifts: nextShifts,
+          shift: nextShifts[0] || 'morning1'
+        };
+      }
+      return t;
+    }));
+  };
+
+  const handleRemoveTripTab = (indexToRemove, e) => {
+    if (e) e.stopPropagation();
+    if (driverTrips.length <= 1) {
+      toast('At least one trip must remain.');
+      return;
+    }
+    const updated = driverTrips.filter((_, idx) => idx !== indexToRemove).map((t, idx) => ({ ...t, sno: idx + 1 }));
+    setDriverTrips(updated);
+    if (activeTripTab >= updated.length) {
+      setActiveTripTab(updated.length - 1);
+    }
+  };
+
+  const handleTripRouteChange = (routeId) => {
+    const rObj = refs.routes?.find(r => String(r.id) === String(routeId));
+    setDriverTrips(prev => prev.map((t, idx) => {
+      if (idx === activeTripTab) {
+        return {
+          ...t,
+          route_id: routeId,
+          initial_point: rObj?.initial_point || '',
+          initial_time: rObj?.initial_time ? rObj.initial_time.slice(0, 5) : '',
+          origin: rObj?.origin || '',
+          boarding_time: rObj?.boarding_time ? rObj.boarding_time.slice(0, 5) : '',
+          destination: rObj?.destination || '',
+          end_time: rObj?.end_time ? rObj.end_time.slice(0, 5) : ''
+        };
+      }
+      return t;
+    }));
+  };
+
+  const updateActiveTripField = (field, value) => {
+    setDriverTrips(prev => prev.map((t, idx) => {
+      if (idx === activeTripTab) {
+        return { ...t, [field]: value };
+      }
+      return t;
+    }));
+  };
+
+  const handleSaveDriverTripsModal = async () => {
+    if (!driverForm.name?.trim()) {
+      toast('Driver name cannot be empty');
+      return;
+    }
+
+    setModalSaving(true);
+    try {
+      await api.driverMasterEdit(modalDriver.id, {
+        ...driverForm,
+        trips: driverTrips
+      });
+
+      toast(`✓ Successfully saved multi-trip assignments for ${driverForm.name}`);
+      setModalSaving(false);
+      setModalDriver(null);
+      loadData();
+    } catch (err) {
+      setModalSaving(false);
+      toast(err.message || 'Could not save driver trips');
     }
   };
 
@@ -868,6 +1408,26 @@ export default function DriverMasterEdit() {
             title="Add a new driver with bus, route & campus mapping"
           >
             <span>➕</span> Add New Driver
+          </button>
+          <button
+            className="btn btn-sm"
+            onClick={handlePrintDriverShiftBackup}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: 700,
+              padding: '6px 14px',
+              borderRadius: 6,
+              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)',
+              cursor: 'pointer'
+            }}
+            title="Download / Print Complete Driver Backup before/after editing (Driver, Bus, Campus, Route & Morning/Evening Shifts)"
+          >
+            <span>💾</span> Driver Shift Backup (PDF)
           </button>
           <button
             className="btn btn-sm btn-secondary"
@@ -1349,7 +1909,7 @@ export default function DriverMasterEdit() {
                       <button
                         type="button"
                         className="btn btn-sm"
-                        onClick={() => startRowEdit(d)}
+                        onClick={() => openDriverEditModal(d)}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -1624,6 +2184,730 @@ export default function DriverMasterEdit() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MULTI-TAB DRIVER EDIT POPUP MODAL (S.No wise trips & multiple buses)     */}
+      {/* ========================================================================= */}
+      {modalDriver && (
+        <div
+          className="modal-bg"
+          onClick={() => setModalDriver(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: 20
+          }}
+        >
+          {(() => {
+            const currentTrip = driverTrips[activeTripTab] || driverTrips[0] || {};
+            const activeBus = refs.buses?.find(b => String(b.id) === String(currentTrip.bus_id));
+            const activeRoute = refs.routes?.find(r => String(r.id) === String(currentTrip.route_id));
+
+            return (
+              <div
+                className="modal"
+                style={{
+                  maxWidth: 960,
+                  width: '100%',
+                  maxHeight: '92vh',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: 0,
+                  overflow: 'hidden',
+                  borderRadius: 14,
+                  boxShadow: '0 25px 60px rgba(0,0,0,0.4)',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  animation: 'slideUp 0.25s ease'
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* 1. Modal Header */}
+                <div
+                  style={{
+                    padding: '16px 24px',
+                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: '1px solid #334155'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 10,
+                        background: 'rgba(255,255,255,0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 22
+                      }}
+                    >
+                      👨‍✈️
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18, fontWeight: 800, color: '#ffffff', letterSpacing: '0.3px', fontFamily: 'Oswald, sans-serif' }}>
+                          {driverForm.name || modalDriver.name}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            background: driverForm.status === 'active' ? '#22c55e' : '#ef4444',
+                            color: '#ffffff',
+                            padding: '2px 8px',
+                            borderRadius: 12,
+                            fontWeight: 700,
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          {driverForm.status}
+                        </span>
+                        {modalDriver.employee_code && (
+                          <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.15)', color: '#93c5fd', padding: '2px 7px', borderRadius: 4, fontFamily: 'monospace' }}>
+                            ID: {modalDriver.employee_code}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+                        Driver Name is constant · Single driver can be assigned multiple buses, routes & trips
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModalDriver(null)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#94a3b8',
+                      fontSize: 24,
+                      cursor: 'pointer',
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      lineHeight: 1
+                    }}
+                    title="Close"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* 2. Constant Driver Info Bar */}
+                <div
+                  style={{
+                    padding: '10px 24px',
+                    background: '#f8fafc',
+                    borderBottom: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 12
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 12.5 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Driver Name:</span>
+                      <span style={{ fontWeight: 800, color: '#0369a1', background: '#e0f2fe', padding: '2px 10px', borderRadius: 6 }}>
+                        👤 {driverForm.name}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Mobile:</span>
+                      <input
+                        type="text"
+                        className="finput"
+                        value={driverForm.phone}
+                        onChange={e => setDriverForm(prev => ({ ...prev, phone: e.target.value }))}
+                        placeholder="Mobile number"
+                        style={{ padding: '3px 8px', fontSize: 12, width: 130, background: '#ffffff' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Campus:</span>
+                      <select
+                        className="fselect"
+                        value={driverForm.institution_id || ''}
+                        onChange={e => setDriverForm(prev => ({ ...prev, institution_id: e.target.value }))}
+                        style={{ padding: '3px 8px', fontSize: 12, minWidth: 160, background: '#ffffff' }}
+                      >
+                        <option value="">Consolidated / Unassigned</option>
+                        {(refs.institutions || []).map(i => (
+                          <option key={i.id} value={i.id}>{i.short_name || i.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Status:</span>
+                      <select
+                        className="fselect"
+                        value={driverForm.status}
+                        onChange={e => setDriverForm(prev => ({ ...prev, status: e.target.value }))}
+                        style={{ padding: '3px 8px', fontSize: 12, background: '#ffffff' }}
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Multi-Tab Navigation (S.No wise for trips/buses) */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '12px 24px 0',
+                    background: '#f1f5f9',
+                    borderBottom: '1px solid #cbd5e1',
+                    overflowX: 'auto'
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: 4, whiteSpace: 'nowrap', paddingBottom: 10 }}>
+                    TRIP TABS (S.NO WISE):
+                  </div>
+                  {driverTrips.map((trip, idx) => {
+                    const isActive = activeTripTab === idx;
+                    const bObj = refs.buses?.find(b => String(b.id) === String(trip.bus_id));
+                    const rObj = refs.routes?.find(r => String(r.id) === String(trip.route_id));
+                    return (
+                      <div
+                        key={trip.id || idx}
+                        onClick={() => setActiveTripTab(idx)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '8px 14px',
+                          borderRadius: '8px 8px 0 0',
+                          borderTop: isActive ? '3px solid #0284c7' : '1px solid #cbd5e1',
+                          borderLeft: '1px solid #cbd5e1',
+                          borderRight: '1px solid #cbd5e1',
+                          borderBottom: isActive ? '1px solid #ffffff' : '1px solid #cbd5e1',
+                          background: isActive ? '#ffffff' : '#e2e8f0',
+                          color: isActive ? '#0284c7' : '#475569',
+                          fontWeight: 700,
+                          fontSize: 12.5,
+                          cursor: 'pointer',
+                          boxShadow: isActive ? '0 -2px 6px rgba(0,0,0,0.04)' : 'none',
+                          transition: 'all 0.15s ease',
+                          whiteSpace: 'nowrap',
+                          position: 'relative',
+                          marginBottom: -1
+                        }}
+                      >
+                        <span
+                          style={{
+                            background: isActive ? '#0284c7' : '#94a3b8',
+                            color: '#ffffff',
+                            padding: '1px 7px',
+                            borderRadius: 10,
+                            fontSize: 11,
+                            fontWeight: 800
+                          }}
+                        >
+                          S.No {idx + 1}
+                        </span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <span>🚌</span>
+                          <span>{bObj ? bObj.registration_number : `Bus #${idx + 1}`}</span>
+                          {rObj && (
+                            <span style={{ color: isActive ? '#0369a1' : '#64748b', fontSize: 11.5, fontWeight: 600 }}>
+                              · {rObj.route_code}
+                            </span>
+                          )}
+                          <span style={{ 
+                            background: isActive ? '#0284c7' : '#e2e8f0', 
+                            color: isActive ? '#ffffff' : '#475569', 
+                            fontSize: 10, 
+                            fontWeight: 700, 
+                            padding: '1px 5px', 
+                            borderRadius: 10,
+                            marginLeft: 3
+                          }}>
+                            {(trip.shifts || [trip.shift || 'morning1']).map(s => s === 'morning1' ? 'M1' : s === 'morning2' ? 'M2' : s === 'evening1' ? 'E1' : 'E2').join('+')}
+                          </span>
+                        </span>
+                        {driverTrips.length > 1 && (
+                          <span
+                            onClick={(e) => handleRemoveTripTab(idx, e)}
+                            style={{
+                              marginLeft: 4,
+                              fontSize: 13,
+                              color: '#ef4444',
+                              padding: '2px 5px',
+                              borderRadius: 4,
+                              lineHeight: 1,
+                              cursor: 'pointer'
+                            }}
+                            title={`Remove Trip ${idx + 1}`}
+                          >
+                            ✕
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={handleAddTripTab}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      padding: '7px 14px',
+                      borderRadius: 6,
+                      border: '1.5px dashed #0284c7',
+                      background: '#f0f9ff',
+                      color: '#0284c7',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      marginLeft: 6,
+                      marginBottom: 6
+                    }}
+                    title="Add Another Trip / Bus (Trip 2, Trip 3, etc.)"
+                  >
+                    <span>+ Add Trip {driverTrips.length + 1}</span>
+                  </button>
+                </div>
+
+                {/* 4. Active Tab Form Body */}
+                <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, background: '#ffffff' }}>
+                  {/* Trip Header Banner */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: '#eff6ff',
+                      border: '1.5px solid #bfdbfe',
+                      borderRadius: 8,
+                      padding: '10px 16px',
+                      marginBottom: 18,
+                      flexWrap: 'wrap',
+                      gap: 10
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 16 }}>🚌</span>
+                      <span style={{ fontWeight: 800, fontSize: 13.5, color: '#1e3a8a' }}>
+                        CONFIGURATION FOR S.NO {activeTripTab + 1}: TRIP {activeTripTab + 1}
+                      </span>
+                      <span style={{ fontSize: 11, background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: 12, fontWeight: 700 }}>
+                        Driver: {driverForm.name}
+                      </span>
+                    </div>
+                    {/* Selectable Trip / Sessions (Matching 1st Image) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#1e3a8a' }}>Trip / Shift:</span>
+                        <select
+                          className="fselect"
+                          value={getSelectValue(currentTrip.shifts || [currentTrip.shift || 'morning1'])}
+                          onChange={e => handleTripPresetChange(e.target.value)}
+                          style={{ padding: '5px 12px', fontSize: 12.5, background: '#ffffff', fontWeight: 600, minWidth: 280, borderRadius: 6, border: '1.5px solid #cbd5e1' }}
+                        >
+                          {PRESET_COMBINATIONS.map(p => (
+                            <option key={p.value} value={p.value}>{p.label}</option>
+                          ))}
+                          <option value="custom" disabled={getSelectValue(currentTrip.shifts || [currentTrip.shift || 'morning1']) !== 'custom'}>
+                            ⚡ Custom Selection ({(currentTrip.shifts || [currentTrip.shift || 'morning1']).map(s => SHIFT_MAP[s] || s).join(', ')})
+                          </option>
+                        </select>
+                      </div>
+
+                      {/* Selectable toggle chips like in Image 1 */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' }}>
+                        {[
+                          { key: 'morning1', label: 'Morning 1', icon: '☀️' },
+                          { key: 'morning2', label: 'Morning 2', icon: '☀️' },
+                          { key: 'evening1', label: 'Evening 1', icon: '🌙' },
+                          { key: 'evening2', label: 'Evening 2', icon: '🌙' }
+                        ].map(({ key, label, icon }) => {
+                          const isSelected = (currentTrip.shifts || [currentTrip.shift || 'morning1']).includes(key);
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => handleToggleTripShift(key)}
+                              style={{
+                                padding: '4px 12px',
+                                borderRadius: 20,
+                                fontSize: 12,
+                                fontWeight: isSelected ? 700 : 500,
+                                cursor: 'pointer',
+                                border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                                background: isSelected ? '#eff6ff' : '#ffffff',
+                                color: isSelected ? '#1d4ed8' : '#64748b',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                boxShadow: isSelected ? '0 1px 3px rgba(37,99,235,0.2)' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                              title={`Toggle ${label}`}
+                            >
+                              <span>{icon}</span>
+                              <span>{label}</span>
+                              <span style={{ 
+                                fontSize: 11, 
+                                fontWeight: 800, 
+                                color: isSelected ? '#2563eb' : '#94a3b8' 
+                              }}>
+                                {isSelected ? '✓' : '+'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main Grid: Bus & Route Selection with Search Buttons */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 18 }}>
+                    {/* Bus Selection with Search Button */}
+                    <div className="card" style={{ padding: 14, margin: 0, border: '1.5px solid #e2e8f0', borderRadius: 8 }}>
+                      <label style={{ display: 'block', fontWeight: 800, fontSize: 12, color: '#334155', marginBottom: 6 }}>
+                        🚌 ASSIGNED BUS NUMBER (S.NO {activeTripTab + 1})
+                      </label>
+                      <SingleBusSearchPicker
+                        buses={refs.buses || []}
+                        selectedBusId={currentTrip.bus_id || ''}
+                        activeInstId={driverForm.institution_id || modalDriver?.current_institution_id || modalDriver?.institution_id}
+                        onChange={newBusId => updateActiveTripField('bus_id', newBusId)}
+                      />
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
+                        Click <b>Search</b> or type registration number (e.g. TN45, 2337)
+                      </div>
+                    </div>
+
+                    {/* Route Selection with Search Button */}
+                    <div className="card" style={{ padding: 14, margin: 0, border: '1.5px solid #e2e8f0', borderRadius: 8 }}>
+                      <label style={{ display: 'block', fontWeight: 800, fontSize: 12, color: '#334155', marginBottom: 6 }}>
+                        🛣️ ASSIGNED ROUTE (S.NO {activeTripTab + 1})
+                      </label>
+                      <RouteSearchPicker
+                        routes={refs.routes || []}
+                        selectedRouteId={currentTrip.route_id || ''}
+                        activeInstId={driverForm.institution_id || modalDriver?.current_institution_id || modalDriver?.institution_id}
+                        onChange={newRouteId => handleTripRouteChange(newRouteId)}
+                      />
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
+                        Click <b>Search</b> or type route code (pre-fills initial stop, timings & boarding)
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Route Schedule & Stoppages Editable Section */}
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: 10,
+                      padding: 16,
+                      marginBottom: 18
+                    }}
+                  >
+                    <div style={{ fontWeight: 800, fontSize: 12.5, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>⏱️</span>
+                      <span>ROUTE JOURNEY SCHEDULE & TIMINGS (EDITABLE IN THIS PLACE)</span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+                      {/* Initial Point & Timing */}
+                      <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: 8, padding: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                          <span style={{ fontSize: 15 }}>🚌</span>
+                          <span style={{ fontWeight: 800, fontSize: 12, color: '#1d4ed8' }}>INITIAL STARTING POINT</span>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 3 }}>
+                            Initial Stop Name (Bus Starts From)
+                          </label>
+                          <input
+                            type="text"
+                            className="finput"
+                            value={currentTrip.initial_point || ''}
+                            onChange={e => updateActiveTripField('initial_point', e.target.value)}
+                            placeholder="e.g. Periyakulam (Bus start point)"
+                            style={{ width: '100%', padding: '6px 10px', fontSize: 12.5 }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 3 }}>
+                            Initial Timing (Departure Time)
+                          </label>
+                          <input
+                            type="time"
+                            className="finput"
+                            value={currentTrip.initial_time || ''}
+                            onChange={e => updateActiveTripField('initial_time', e.target.value)}
+                            placeholder="HH:MM"
+                            style={{ width: '100%', padding: '6px 10px', fontSize: 12.5 }}
+                          />
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 6 }}>
+                          Where the bus starts before passenger boarding
+                        </div>
+                      </div>
+
+                      {/* Boarding Point & Time */}
+                      <div style={{ background: '#ffffff', border: '1.5px solid #bbf7d0', borderRadius: 8, padding: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                          <span style={{ fontSize: 15 }}>🚏</span>
+                          <span style={{ fontWeight: 800, fontSize: 12, color: '#15803d' }}>BOARDING POINT (FIRST PICKUP)</span>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 3 }}>
+                            Boarding Stop Name (First Pickup)
+                          </label>
+                          <input
+                            type="text"
+                            className="finput"
+                            value={currentTrip.origin || ''}
+                            onChange={e => updateActiveTripField('origin', e.target.value)}
+                            placeholder="e.g. Vadugapatti (First pickup stop)"
+                            style={{ width: '100%', padding: '6px 10px', fontSize: 12.5 }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 3 }}>
+                            Boarding Time (Scheduled Pickup Time)
+                          </label>
+                          <input
+                            type="time"
+                            className="finput"
+                            value={currentTrip.boarding_time || ''}
+                            onChange={e => updateActiveTripField('boarding_time', e.target.value)}
+                            placeholder="HH:MM"
+                            style={{ width: '100%', padding: '6px 10px', fontSize: 12.5 }}
+                          />
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 6 }}>
+                          Starting point of the route where passengers first board the bus
+                        </div>
+                      </div>
+
+                      {/* End Point & Time */}
+                      <div style={{ background: '#ffffff', border: '1.5px solid #fed7aa', borderRadius: 8, padding: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                          <span style={{ fontSize: 15 }}>🏫</span>
+                          <span style={{ fontWeight: 800, fontSize: 12, color: '#b45309' }}>END POINT</span>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 3 }}>
+                            End Point Stop Name (Destination Campus)
+                          </label>
+                          <input
+                            type="text"
+                            className="finput"
+                            value={currentTrip.destination || ''}
+                            onChange={e => updateActiveTripField('destination', e.target.value)}
+                            placeholder="e.g. NSCET CLG"
+                            style={{ width: '100%', padding: '6px 10px', fontSize: 12.5 }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 3 }}>
+                            End Point Time (Arrival Time)
+                          </label>
+                          <input
+                            type="time"
+                            className="finput"
+                            value={currentTrip.end_time || ''}
+                            onChange={e => updateActiveTripField('end_time', e.target.value)}
+                            placeholder="HH:MM"
+                            style={{ width: '100%', padding: '6px 10px', fontSize: 12.5 }}
+                          />
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 6 }}>
+                          Institution destination / college campus where the route ends
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Live Journey Chain Banner */}
+                    <div
+                      style={{
+                        marginTop: 14,
+                        padding: '10px 14px',
+                        background: '#f0fdf4',
+                        border: '1px solid #86efac',
+                        borderRadius: 6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 10,
+                        fontSize: 12
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 800, color: '#16a34a' }}>⚡ Trip Journey:</span>
+                        <span style={{ background: '#ffffff', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: 4, fontWeight: 700, color: '#1e40af' }}>
+                          🚌 {currentTrip.initial_point || 'Initial Point'} ({currentTrip.initial_time || '--:--'})
+                        </span>
+                        <span style={{ color: '#16a34a', fontWeight: 800 }}>➔</span>
+                        <span style={{ background: '#ffffff', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 4, fontWeight: 700, color: '#15803d' }}>
+                          🚏 {currentTrip.origin || 'Boarding Point'} ({currentTrip.boarding_time || '--:--'})
+                        </span>
+                        <span style={{ color: '#16a34a', fontWeight: 800 }}>➔</span>
+                        <span style={{ background: '#ffffff', border: '1px solid #fed7aa', padding: '2px 8px', borderRadius: 4, fontWeight: 700, color: '#b45309' }}>
+                          🏫 {currentTrip.destination || 'End Point'} ({currentTrip.end_time || '--:--'})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Table of All Trips Configured for this Driver */}
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontWeight: 800, fontSize: 12, color: '#475569', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      📋 ALL CONFIGURED TRIPS ({driverTrips.length}):
+                    </div>
+                    <div className="table-wrap" style={{ margin: 0, border: '1.5px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                      <table className="tbl" style={{ margin: 0, fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ background: '#f8fafc' }}>
+                            <th style={{ width: 50, textAlign: 'center' }}>S.No</th>
+                            <th>Shift / Trip</th>
+                            <th>Bus Number</th>
+                            <th>Assigned Route</th>
+                            <th>Initial Point & Timing</th>
+                            <th>Boarding Point & Timing</th>
+                            <th>End Point & Timing</th>
+                            <th style={{ width: 70, textAlign: 'center' }}>Switch</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {driverTrips.map((t, idx) => {
+                            const b = refs.buses?.find(item => String(item.id) === String(t.bus_id));
+                            const r = refs.routes?.find(item => String(item.id) === String(t.route_id));
+                            const isSel = activeTripTab === idx;
+                            return (
+                              <tr key={t.id || idx} style={{ background: isSel ? '#eff6ff' : '#ffffff' }}>
+                                <td style={{ textAlign: 'center', fontWeight: 700 }} className="mono">{idx + 1}</td>
+                                <td>
+                                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                    {(t.shifts && t.shifts.length > 0 ? t.shifts : [t.shift || 'morning1']).map(s => (
+                                      <span
+                                        key={s}
+                                        className="tag tag--ok"
+                                        style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 12 }}
+                                      >
+                                        {SHIFT_MAP[s] || s}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="mono" style={{ fontWeight: 700, color: '#1d4ed8' }}>
+                                  {b ? `🚌 ${b.registration_number}` : '— Not selected —'}
+                                </td>
+                                <td>
+                                  {r ? <b>{r.route_code} · {r.route_name}</b> : '— Not selected —'}
+                                </td>
+                                <td>
+                                  {t.initial_point ? (
+                                    <span>{t.initial_point} {t.initial_time ? `(${t.initial_time})` : ''}</span>
+                                  ) : '—'}
+                                </td>
+                                <td>
+                                  {t.origin ? (
+                                    <span>{t.origin} {t.boarding_time ? `(${t.boarding_time})` : ''}</span>
+                                  ) : '—'}
+                                </td>
+                                <td>
+                                  {t.destination ? (
+                                    <span>{t.destination} {t.end_time ? `(${t.end_time})` : ''}</span>
+                                  ) : '—'}
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline"
+                                    onClick={() => setActiveTripTab(idx)}
+                                    style={{ padding: '2px 8px', fontSize: 11 }}
+                                  >
+                                    {isSel ? 'Active' : 'Edit'}
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Modal Footer */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '14px 24px',
+                    borderTop: '1px solid #e2e8f0',
+                    background: '#ffffff'
+                  }}
+                >
+                  <div style={{ fontSize: 12.5, color: '#64748b' }}>
+                    Configured <b>{driverTrips.length}</b> trip(s) for <b>{driverForm.name}</b>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => setModalDriver(null)}
+                      disabled={modalSaving}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleSaveDriverTripsModal}
+                      disabled={modalSaving || !driverForm.name?.trim()}
+                      style={{
+                        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                        fontWeight: 700,
+                        padding: '8px 24px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        border: 'none',
+                        color: '#ffffff',
+                        boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {modalSaving ? 'Saving...' : '💾 Save All Assignments'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </>

@@ -348,21 +348,17 @@ export default function Assignments() {
   };
 
   const handleToggleShift = (shiftKey) => {
-    setSelectedShifts(prev => {
-      let next;
-      if (prev.includes(shiftKey)) {
-        if (prev.length <= 1) {
-          toast('At least one session must be selected');
-          return prev;
-        }
-        next = prev.filter(s => s !== shiftKey);
-      } else {
-        next = [...prev, shiftKey];
-      }
-      const presetVal = getSelectValue(next);
-      setForm(f => ({ ...f, shift: presetVal }));
-      return next;
-    });
+    if (selectedShifts.includes(shiftKey) && selectedShifts.length <= 1) {
+      toast('At least one session must be selected');
+      return;
+    }
+    const next = selectedShifts.includes(shiftKey)
+      ? selectedShifts.filter(s => s !== shiftKey)
+      : [...selectedShifts, shiftKey];
+
+    setSelectedShifts(next);
+    const presetVal = getSelectValue(next);
+    setForm(f => ({ ...f, shift: presetVal }));
   };
 
   const handleSave = async (e) => {

@@ -19,7 +19,7 @@ exports.login = async (req, res) => {
     const normalizedRole = (user.role || '').toLowerCase().trim();
     const payload = { id: user.id, name: user.name, role: normalizedRole, institution_id: user.institution_id };
     const token = jwt.sign(payload, SECRET, {
-      expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      expiresIn: process.env.JWT_EXPIRES_IN || '30d',
     });
     res.json({ token, user: payload });
   } catch (err) {

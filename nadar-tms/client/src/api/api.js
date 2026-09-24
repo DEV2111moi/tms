@@ -12,6 +12,13 @@ async function call(path, opts = {}) {
   });
   if (!res.ok) {
     const b = await res.json().catch(() => ({}));
+    if (res.status === 401 && !path.includes('/auth/login')) {
+      localStorage.removeItem('tms_token');
+      localStorage.removeItem('tms_user');
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        window.location.href = '/login?expired=1';
+      }
+    }
     throw new Error(b.error || 'Request failed');
   }
   return res.json();

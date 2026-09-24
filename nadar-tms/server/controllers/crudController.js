@@ -19,7 +19,7 @@ const TABLES = {
     order: 'name',
   },
   routes: {
-    cols: ['route_code', 'route_name', 'origin', 'destination', 'total_distance', 'institution_id', 'shift'],
+    cols: ['route_code', 'route_name', 'origin', 'destination', 'initial_point', 'initial_time', 'total_distance', 'institution_id', 'shift'],
     order: 'route_code',
   },
   stops: {
@@ -36,13 +36,62 @@ const TABLES = {
   },
 };
 
+// Whitelist of date column names that must be formatted as YYYY-MM-DD (or NULL) for MySQL DATE columns
+const DATE_COLS = new Set([
+  'license_expiry',
+  'date_of_birth',
+  'joining_date',
+  'license_issue_date',
+  'badge_expiry_date',
+  'fc_expiry',
+  'insurance_expiry',
+  'permit_expiry',
+  'puc_expiry',
+  'purchase_date',
+  'service_date',
+  'next_due_date',
+  'fitted_date',
+  'attendance_date',
+]);
+
+const isDateCol = (col) => {
+  if (!col) return false;
+  return DATE_COLS.has(col) || col.endsWith('_expiry') || col.endsWith('_date') || col === 'date_of_birth';
+};
+
 // Turn '' into NULL so optional foreign keys / dates don't break.
-const clean = (v) => (v === '' || v === undefined ? null : v);
+// Also sanitize any date columns into YYYY-MM-DD or NULL to prevent MySQL ER_TRUNCATED_WRONG_VALUE (1292).
+const clean = (v, col) => {
+  if (v === '' || v === undefined || v === null || v === 'null' || v === 'undefined') return null;
+
+  if (isDateCol(col)) {
+    if (typeof v === 'string') {
+      const trimmed = v.trim();
+      if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null;
+      // Match YYYY-MM-DD from ISO strings like '2029-09-23T18:30:00.000Z' or '2029-09-23 00:00:00'
+      const isoMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (isoMatch) return isoMatch[1];
+      // Match DD-MM-YYYY or DD/MM/YYYY
+      const ddmmyyyy = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (ddmmyyyy) {
+        return `${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}`;
+      }
+      const d = new Date(trimmed);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+      return null;
+    }
+    if (v instanceof Date && !isNaN(v.getTime())) {
+      return v.toISOString().slice(0, 10);
+    }
+  }
+
+  return v;
+};
 
 function pick(table, body) {
   const def = TABLES[table];
   const data = {};
-  def.cols.forEach((c) => { if (c in body) data[c] = clean(body[c]); });
+  def.cols.forEach((c) => { if (c in body) data[c] = clean(body[c], c); });
   return data;
 }
 

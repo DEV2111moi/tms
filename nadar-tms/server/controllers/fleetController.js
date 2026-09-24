@@ -149,6 +149,17 @@ exports.assignments = async (req, res) => {
     const rows = await query(`
       SELECT a.id, a.route_id, a.shift, a.bus_id, a.driver_id, a.incharge_id,
              r.route_code, r.route_name, r.total_distance, r.institution_id, b.registration_number,
+             r.initial_point, r.initial_time, r.origin, r.destination,
+             COALESCE(
+               (SELECT scheduled_time FROM stops WHERE route_id = r.id AND LOWER(TRIM(stop_name)) = LOWER(TRIM(r.origin)) LIMIT 1),
+               (SELECT scheduled_time FROM stops WHERE route_id = r.id AND sequence = 1 LIMIT 1),
+               (SELECT scheduled_time FROM stops WHERE route_id = r.id ORDER BY sequence ASC LIMIT 1)
+             ) AS boarding_time,
+             COALESCE(
+               (SELECT scheduled_time FROM stops WHERE route_id = r.id AND LOWER(TRIM(stop_name)) = LOWER(TRIM(r.destination)) LIMIT 1),
+               (SELECT scheduled_time FROM stops WHERE route_id = r.id AND (LOWER(stop_name) LIKE '%clg%' OR LOWER(stop_name) LIKE '%school%' OR LOWER(stop_name) LIKE '%college%' OR LOWER(stop_name) LIKE '%campus%') ORDER BY sequence DESC LIMIT 1),
+               (SELECT scheduled_time FROM stops WHERE route_id = r.id ORDER BY sequence DESC LIMIT 1)
+             ) AS end_time,
              d.name AS driver_name, u.name AS incharge_name,
              COALESCE(i.short_name, '—') AS institution_name
       FROM assignments a
@@ -213,6 +224,17 @@ exports.refs = async (req, res) => {
     const [routes, buses, drivers, incharges, institutions] = await Promise.all([
       query(`
         SELECT r.id, r.route_code, r.route_name, r.origin, r.destination, r.total_distance, r.shift, r.institution_id,
+               r.initial_point, r.initial_time,
+               COALESCE(
+                 (SELECT scheduled_time FROM stops WHERE route_id = r.id AND LOWER(TRIM(stop_name)) = LOWER(TRIM(r.origin)) LIMIT 1),
+                 (SELECT scheduled_time FROM stops WHERE route_id = r.id AND sequence = 1 LIMIT 1),
+                 (SELECT scheduled_time FROM stops WHERE route_id = r.id ORDER BY sequence ASC LIMIT 1)
+               ) AS boarding_time,
+               COALESCE(
+                 (SELECT scheduled_time FROM stops WHERE route_id = r.id AND LOWER(TRIM(stop_name)) = LOWER(TRIM(r.destination)) LIMIT 1),
+                 (SELECT scheduled_time FROM stops WHERE route_id = r.id AND (LOWER(stop_name) LIKE '%clg%' OR LOWER(stop_name) LIKE '%school%' OR LOWER(stop_name) LIKE '%college%' OR LOWER(stop_name) LIKE '%campus%') ORDER BY sequence DESC LIMIT 1),
+                 (SELECT scheduled_time FROM stops WHERE route_id = r.id ORDER BY sequence DESC LIMIT 1)
+               ) AS end_time,
                COALESCE(i.short_name, i.name, '—') AS institution_name
         FROM routes r
         LEFT JOIN institutions i ON i.id = r.institution_id
@@ -312,7 +334,156 @@ exports.driverMasterEdit = async (req, res) => {
       [newName, cleanInst, cleanRoute, cleanPhone, cleanStatus, driverId]
     );
 
-    // 2. Synchronize assignments table for multiple buses
+    // If trips array is provided from the multi-tab popup modal
+    if (Array.isArray(req.body.trips) && req.body.trips.length > 0) {
+      const tripsList = req.body.trips;
+      const primaryRouteId = tripsList[0]?.route_id ? Number(tripsList[0].route_id) : cleanRoute;
+      if (primaryRouteId) {
+        await query(`UPDATE drivers SET route_id = ? WHERE id = ?`, [primaryRouteId, driverId]);
+      }
+
+      // Collect all bus IDs from trips
+      const validBusIds = tripsList.map(t => Number(t.bus_id)).filter(Boolean);
+
+      // Unassign driver from assignments not belonging to these buses/routes
+      if (validBusIds.length > 0) {
+        await query(
+          `UPDATE assignments SET driver_id = NULL WHERE driver_id = ? AND bus_id NOT IN (?)`,
+          [driverId, validBusIds]
+        );
+      } else {
+        await query(`UPDATE assignments SET driver_id = NULL WHERE driver_id = ?`, [driverId]);
+      }
+
+      // Process each trip tab
+      for (const t of tripsList) {
+        const rId = t.route_id ? Number(t.route_id) : null;
+        const bId = t.bus_id ? Number(t.bus_id) : null;
+        const sh = t.shift || 'morning1';
+
+        if (rId) {
+          // Normalize points & times
+          const initialPoint = t.initial_point !== undefined ? (t.initial_point ? String(t.initial_point).trim() : null) : null;
+          let initialTime = t.initial_time !== undefined ? (t.initial_time ? String(t.initial_time).trim() : null) : null;
+          if (initialTime && initialTime.length === 5) initialTime = `${initialTime}:00`;
+
+          const orgName = t.origin !== undefined ? (t.origin ? String(t.origin).trim() : null) : null;
+          const destName = t.destination !== undefined ? (t.destination ? String(t.destination).trim() : null) : null;
+
+          // Always update route record
+          await query(
+            `UPDATE routes SET 
+               initial_point = ?, 
+               initial_time = ?,
+               origin = COALESCE(?, origin),
+               destination = COALESCE(?, destination)
+             WHERE id = ?`,
+            [initialPoint, initialTime, orgName, destName, rId]
+          );
+
+          // Update boarding stop in stops table
+          let boardingTime = t.boarding_time !== undefined ? (t.boarding_time ? String(t.boarding_time).trim() : null) : null;
+          if (boardingTime && boardingTime.length === 5) boardingTime = `${boardingTime}:00`;
+
+          const firstStops = await query(
+            `SELECT id, sequence FROM stops WHERE route_id = ? ORDER BY sequence ASC LIMIT 1`,
+            [rId]
+          );
+
+          if (firstStops && firstStops.length > 0) {
+            const firstStopId = firstStops[0].id;
+            if (boardingTime) {
+              await query(`UPDATE stops SET scheduled_time = ? WHERE id = ?`, [boardingTime, firstStopId]);
+            }
+            if (orgName) {
+              await query(`UPDATE stops SET stop_name = ? WHERE id = ?`, [orgName, firstStopId]);
+            }
+          } else if (orgName) {
+            await query(
+              `INSERT INTO stops (route_id, stop_name, sequence, scheduled_time) VALUES (?, ?, 1, ?)`,
+              [rId, orgName, boardingTime || '08:00:00']
+            );
+          }
+
+          // Update end stop in stops table
+          let endTime = t.end_time !== undefined ? (t.end_time ? String(t.end_time).trim() : null) : null;
+          if (endTime && endTime.length === 5) endTime = `${endTime}:00`;
+
+          let endStopId = null;
+          if (destName) {
+            const matching = await query(
+              `SELECT id FROM stops WHERE route_id = ? AND LOWER(TRIM(stop_name)) = LOWER(?) LIMIT 1`,
+              [rId, destName]
+            );
+            if (matching && matching.length > 0) {
+              endStopId = matching[0].id;
+            }
+          }
+
+          if (!endStopId) {
+            const lastStops = await query(
+              `SELECT id FROM stops WHERE route_id = ? ORDER BY sequence DESC LIMIT 1`,
+              [rId]
+            );
+            if (lastStops && lastStops.length > 0) {
+              if (firstStops && firstStops.length > 0 && lastStops[0].id === firstStops[0].id) {
+                endStopId = null; // Do not overwrite origin as end stop if only 1 stop exists
+              } else {
+                endStopId = lastStops[0].id;
+              }
+            }
+          }
+
+          if (endStopId) {
+            if (endTime) {
+              await query(`UPDATE stops SET scheduled_time = ? WHERE id = ?`, [endTime, endStopId]);
+            }
+            if (destName) {
+              await query(`UPDATE stops SET stop_name = ? WHERE id = ?`, [destName, endStopId]);
+            }
+          } else if (destName) {
+            const maxSeqRes = await query(`SELECT MAX(sequence) AS max_seq FROM stops WHERE route_id = ?`, [rId]);
+            const nextSeq = ((maxSeqRes && maxSeqRes[0]?.max_seq) || 1) + 1;
+            await query(
+              `INSERT INTO stops (route_id, stop_name, sequence, scheduled_time) VALUES (?, ?, ?, ?)`,
+              [rId, destName, nextSeq, endTime || '08:20:00']
+            );
+          }
+
+          // Insert or update assignments table for all selected shifts of this trip
+          if (bId) {
+            const shiftsToAssign = Array.isArray(t.shifts) && t.shifts.length > 0 
+              ? t.shifts 
+              : [t.shift || sh];
+
+            for (const s of shiftsToAssign) {
+              await query(
+                `INSERT INTO assignments (route_id, shift, bus_id, driver_id)
+                 VALUES (?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE bus_id = VALUES(bus_id), driver_id = VALUES(driver_id)`,
+                [rId, s, bId, driverId]
+              );
+            }
+          }
+        }
+      }
+
+      // Sync trips for today
+      if (validBusIds.length > 0) {
+        try {
+          await query(
+            `UPDATE trips SET driver_id = ? WHERE bus_id IN (?) AND trip_date = CURDATE()`,
+            [driverId, validBusIds]
+          );
+        } catch (tErr) {
+          console.error('Trip sync error in driverMasterEdit:', tErr);
+        }
+      }
+
+      return res.json({ ok: true, message: 'Driver and multi-tab trips updated successfully.' });
+    }
+
+    // 2. Synchronize assignments table for multiple buses (Legacy / direct row edit)
     const shiftsToApply = (!shift || shift === 'both') ? ['morning1', 'evening1'] : [shift];
     
     // Normalize selectedBusIds: array of Numbers
@@ -467,7 +638,13 @@ exports.driverMasterAdd = async (req, res) => {
     const cleanRoute = route_id ? Number(route_id) : null;
     const cleanPhone = phone ? String(phone).trim() : null;
     const cleanLicense = license_number ? String(license_number).trim() : null;
-    const cleanExpiry = license_expiry ? String(license_expiry).trim() : null;
+    let cleanExpiry = null;
+    if (license_expiry) {
+      const expStr = String(license_expiry).trim();
+      const m = expStr.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) cleanExpiry = m[1];
+      else if (expStr && expStr !== 'null' && expStr !== 'undefined') cleanExpiry = expStr.slice(0, 10);
+    }
     const cleanStatus = status || 'active';
 
     // 1. Insert into drivers table
