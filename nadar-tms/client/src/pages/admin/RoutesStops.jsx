@@ -259,8 +259,12 @@ export default function RoutesStops() {
   const SHIFT_OPTIONS = [
     { key: 'morning1', label: 'Morning 1' },
     { key: 'morning2', label: 'Morning 2' },
+    { key: 'morning3', label: 'Morning 3' },
+    { key: 'morning4', label: 'Morning 4' },
     { key: 'evening1', label: 'Evening 1' },
     { key: 'evening2', label: 'Evening 2' },
+    { key: 'evening3', label: 'Evening 3' },
+    { key: 'evening4', label: 'Evening 4' },
   ];
 
   const routeHasShift = (r, s) => {
@@ -302,7 +306,7 @@ export default function RoutesStops() {
     { key: 'destination', label: 'Ending Point (Destination / Campus)', required: true, placeholder: 'e.g. NSCET CLG' },
     { key: 'total_distance', label: 'Distance (km)', type: 'number' },
     { key: 'institution_id', label: 'Institution', type: 'instref' },
-    { key: 'shift', label: 'Shift', type: 'select', options: ['morning1', 'morning2', 'evening1', 'evening2'], required: true }
+    { key: 'shift', label: 'Shift', type: 'select', options: ['morning1', 'morning2', 'morning3', 'morning4', 'evening1', 'evening2', 'evening3', 'evening4'], required: true }
   ];
 
   const STOP_FIELDS = [

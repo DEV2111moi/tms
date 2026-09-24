@@ -9,8 +9,12 @@ const SHIFT_MAP = {
   evening: '🌙 Evening',
   morning1: '☀️ Morning 1',
   morning2: '☀️ Morning 2',
+  morning3: '☀️ Morning 3',
+  morning4: '☀️ Morning 4',
   evening1: '🌙 Evening 1',
-  evening2: '🌙 Evening 2'
+  evening2: '🌙 Evening 2',
+  evening3: '🌙 Evening 3',
+  evening4: '🌙 Evening 4'
 };
 
 const PRESET_COMBINATIONS = [
@@ -18,11 +22,17 @@ const PRESET_COMBINATIONS = [
   { value: 'm1_e2', label: '☀️🌙 Morning 1 + Evening 2', shifts: ['morning1', 'evening2'] },
   { value: 'm2_e1', label: '☀️🌙 Morning 2 + Evening 1', shifts: ['morning2', 'evening1'] },
   { value: 'm2_e2', label: '☀️🌙 Morning 2 + Evening 2', shifts: ['morning2', 'evening2'] },
-  { value: 'all', label: '🔄 All 4 sessions (M1, M2, E1, E2)', shifts: ['morning1', 'morning2', 'evening1', 'evening2'] },
+  { value: 'all_m', label: '☀️ All 4 Morning (M1-M4)', shifts: ['morning1', 'morning2', 'morning3', 'morning4'] },
+  { value: 'all_e', label: '🌙 All 4 Evening (E1-E4)', shifts: ['evening1', 'evening2', 'evening3', 'evening4'] },
+  { value: 'all', label: '🔄 All 8 sessions (M1-M4, E1-E4)', shifts: ['morning1', 'morning2', 'morning3', 'morning4', 'evening1', 'evening2', 'evening3', 'evening4'] },
   { value: 'morning1', label: '☀️ Morning 1 only', shifts: ['morning1'] },
   { value: 'morning2', label: '☀️ Morning 2 only', shifts: ['morning2'] },
+  { value: 'morning3', label: '☀️ Morning 3 only', shifts: ['morning3'] },
+  { value: 'morning4', label: '☀️ Morning 4 only', shifts: ['morning4'] },
   { value: 'evening1', label: '🌙 Evening 1 only', shifts: ['evening1'] },
   { value: 'evening2', label: '🌙 Evening 2 only', shifts: ['evening2'] },
+  { value: 'evening3', label: '🌙 Evening 3 only', shifts: ['evening3'] },
+  { value: 'evening4', label: '🌙 Evening 4 only', shifts: ['evening4'] },
 ];
 
 const getSelectValue = (shifts) => {
@@ -526,7 +536,8 @@ export default function Assignments() {
     const statusBadge = hasBus ? (driverNames ? ` · 👤 ${driverNames}` : '') : ' · ⚠️ Unassigned';
     return {
       value: r.id,
-      label: `${r.route_code} — ${r.route_name}${statusBadge}`
+      label: `${r.route_code} — ${r.route_name}${statusBadge}`,
+      searchText: `${r.route_code} ${r.route_name || ''} ${r.stops_list || ''} ${driverNames}`
     };
   });
 
@@ -781,8 +792,12 @@ export default function Assignments() {
   const SHIFT_OPTIONS = [
     { key: 'morning1', label: 'Morning 1' },
     { key: 'morning2', label: 'Morning 2' },
+    { key: 'morning3', label: 'Morning 3' },
+    { key: 'morning4', label: 'Morning 4' },
     { key: 'evening1', label: 'Evening 1' },
     { key: 'evening2', label: 'Evening 2' },
+    { key: 'evening3', label: 'Evening 3' },
+    { key: 'evening4', label: 'Evening 4' },
   ];
 
   const getAssignShiftCount = (s) => {

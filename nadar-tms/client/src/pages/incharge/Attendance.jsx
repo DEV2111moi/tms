@@ -218,8 +218,12 @@ export default function Attendance() {
   const shiftsList = [
     { key: 'morning1', label: 'Morning 1', icon: '☀️' },
     { key: 'morning2', label: 'Morning 2', icon: '🌤️' },
+    { key: 'morning3', label: 'Morning 3', icon: '☀️' },
+    { key: 'morning4', label: 'Morning 4', icon: '🌤️' },
     { key: 'evening1', label: 'Evening 1', icon: '🌙' },
     { key: 'evening2', label: 'Evening 2', icon: '⭐' },
+    { key: 'evening3', label: 'Evening 3', icon: '🌙' },
+    { key: 'evening4', label: 'Evening 4', icon: '⭐' },
   ];
 
   return (

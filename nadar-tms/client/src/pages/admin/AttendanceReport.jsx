@@ -758,15 +758,21 @@ export default function AttendanceReport() {
             >
               All Shifts
             </button>
-            {['morning1', 'morning2', 'evening1', 'evening2'].map(sh => (
-              <button
-                key={sh}
-                className={`filter-chip ${rosterShiftFilter === sh ? 'active' : ''}`}
-                onClick={() => setRosterShiftFilter(sh)}
-              >
-                {sh === 'morning1' ? 'Morning 1' : sh === 'morning2' ? 'Morning 2' : sh === 'evening1' ? 'Evening 1' : 'Evening 2'}
-              </button>
-            ))}
+            {['morning1', 'morning2', 'morning3', 'morning4', 'evening1', 'evening2', 'evening3', 'evening4'].map(sh => {
+              const labelMap = {
+                morning1: 'Morning 1', morning2: 'Morning 2', morning3: 'Morning 3', morning4: 'Morning 4',
+                evening1: 'Evening 1', evening2: 'Evening 2', evening3: 'Evening 3', evening4: 'Evening 4'
+              };
+              return (
+                <button
+                  key={sh}
+                  className={`filter-chip ${rosterShiftFilter === sh ? 'active' : ''}`}
+                  onClick={() => setRosterShiftFilter(sh)}
+                >
+                  {labelMap[sh] || sh}
+                </button>
+              );
+            })}
           </div>
 
           {/* Table */}

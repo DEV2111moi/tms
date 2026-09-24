@@ -11,6 +11,7 @@ import Institutions from './pages/admin/Institutions';
 import Buses from './pages/admin/Buses';
 import Drivers from './pages/admin/Drivers';
 import DriverMasterEdit from './pages/admin/DriverMasterEdit';
+import DriverSalary from './pages/admin/DriverSalary';
 import Students from './pages/admin/Students';
 import RoutesStops from './pages/admin/RoutesStops';
 import Assignments from './pages/admin/Assignments';
@@ -55,6 +56,7 @@ export default function App() {
               <Route path="buses" element={<Buses />} />
               <Route path="drivers" element={<Drivers />} />
               <Route path="driver-master-edit" element={<DriverMasterEdit />} />
+              <Route path="driver-salary" element={<DriverSalary />} />
               <Route path="students" element={<Students />} />
               <Route path="routes" element={<RoutesStops />} />
               <Route path="assignments" element={<Assignments />} />

@@ -81,10 +81,14 @@ export default function Reports() {
     } else if (type === 'bus_wise') {
       download(`bus_wise_report_${data.from}_${data.to}.csv`, [
         '#', 'Bus Number', 'Institution', 'Total Trips', 'Total KM',
-        'Trip 1 (Morning 1) KM', 'Trip 1 (Morning 1) Trips',
-        'Trip 2 (Morning 2) KM', 'Trip 2 (Morning 2) Trips',
-        'Trip 3 (Evening 1) KM', 'Trip 3 (Evening 1) Trips',
-        'Trip 4 (Evening 2) KM', 'Trip 4 (Evening 2) Trips',
+        'Morning 1 KM', 'Morning 1 Trips',
+        'Morning 2 KM', 'Morning 2 Trips',
+        'Morning 3 KM', 'Morning 3 Trips',
+        'Morning 4 KM', 'Morning 4 Trips',
+        'Evening 1 KM', 'Evening 1 Trips',
+        'Evening 2 KM', 'Evening 2 Trips',
+        'Evening 3 KM', 'Evening 3 Trips',
+        'Evening 4 KM', 'Evening 4 Trips',
         'Routes Operated', 'Drivers'
       ], data.buses.map((b, i) => [
         i + 1,
@@ -96,24 +100,40 @@ export default function Reports() {
         b.morning1_trips,
         b.morning2_km,
         b.morning2_trips,
+        b.morning3_km,
+        b.morning3_trips,
+        b.morning4_km,
+        b.morning4_trips,
         b.evening1_km,
         b.evening1_trips,
         b.evening2_km,
         b.evening2_trips,
+        b.evening3_km,
+        b.evening3_trips,
+        b.evening4_km,
+        b.evening4_trips,
         b.routes || '',
         b.drivers || ''
       ]));
     } else if (type === 'distance') {
-      download(`distance_${data.from}_${data.to}.csv`, ['Bus', 'Institution', 'Route', 'Driver', 'Trip 1 (Morning 1)', 'Trip 2 (Morning 2)', 'Trip 3 (Evening 1)', 'Trip 4 (Evening 2)', 'Total KM'],
-        data.byBus.map(b => [
+      download(`distance_${data.from}_${data.to}.csv`, [
+        'Bus', 'Institution', 'Route', 'Driver', 
+        'Morning 1', 'Morning 2', 'Morning 3', 'Morning 4', 
+        'Evening 1', 'Evening 2', 'Evening 3', 'Evening 4', 
+        'Total KM'
+      ], data.byBus.map(b => [
           b.registration_number, 
           b.institution || '', 
           b.route_code !== '—' ? `${b.route_code} · ${b.route_name}` : '',
           b.driver_name || '',
           b.morning1_km > 0 ? `${b.morning1_km} km` : '',
           b.morning2_km > 0 ? `${b.morning2_km} km` : '',
+          b.morning3_km > 0 ? `${b.morning3_km} km` : '',
+          b.morning4_km > 0 ? `${b.morning4_km} km` : '',
           b.evening1_km > 0 ? `${b.evening1_km} km` : '',
           b.evening2_km > 0 ? `${b.evening2_km} km` : '',
+          b.evening3_km > 0 ? `${b.evening3_km} km` : '',
+          b.evening4_km > 0 ? `${b.evening4_km} km` : '',
           b.km
         ]));
     } else if (type === 'drivertrips') {
@@ -200,8 +220,12 @@ export default function Reports() {
                       <option value="">All shifts</option>
                       <option value="morning1">Morning 1</option>
                       <option value="morning2">Morning 2</option>
+                      <option value="morning3">Morning 3</option>
+                      <option value="morning4">Morning 4</option>
                       <option value="evening1">Evening 1</option>
                       <option value="evening2">Evening 2</option>
+                      <option value="evening3">Evening 3</option>
+                      <option value="evening4">Evening 4</option>
                       <option value="morning">Morning (Legacy)</option>
                       <option value="evening">Evening (Legacy)</option>
                     </select>
@@ -794,8 +818,12 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                 <th style={{ textAlign: 'right' }}>Total KM</th>
                 <th style={{ textAlign: 'center' }}>Morning 1</th>
                 <th style={{ textAlign: 'center' }}>Morning 2</th>
+                <th style={{ textAlign: 'center' }}>Morning 3</th>
+                <th style={{ textAlign: 'center' }}>Morning 4</th>
                 <th style={{ textAlign: 'center' }}>Evening 1</th>
                 <th style={{ textAlign: 'center' }}>Evening 2</th>
+                <th style={{ textAlign: 'center' }}>Evening 3</th>
+                <th style={{ textAlign: 'center' }}>Evening 4</th>
                 <th>Routes Operated</th>
                 <th>Drivers</th>
                 <th className="hide-on-print" style={{ textAlign: 'center' }}>Action</th>
@@ -804,7 +832,7 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
             <tbody>
               {filteredBuses.length === 0 ? (
                 <tr>
-                  <td colSpan="12" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-dim)' }}>
+                  <td colSpan="16" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-dim)' }}>
                     No buses found matching <b>"{search}"</b>. Try clearing your search or selecting "All Buses".
                   </td>
                 </tr>
@@ -874,6 +902,16 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                           ) : <span className="muted">—</span>}
                         </td>
                         <td style={{ textAlign: 'center' }} className="mono">
+                          {b.morning3_km > 0 ? (
+                            <span><b>{b.morning3_km} km</b> <span className="muted" style={{ fontSize: '10.5px' }}>({b.morning3_trips}t)</span></span>
+                          ) : <span className="muted">—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }} className="mono">
+                          {b.morning4_km > 0 ? (
+                            <span><b>{b.morning4_km} km</b> <span className="muted" style={{ fontSize: '10.5px' }}>({b.morning4_trips}t)</span></span>
+                          ) : <span className="muted">—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }} className="mono">
                           {b.evening1_km > 0 ? (
                             <span><b>{b.evening1_km} km</b> <span className="muted" style={{ fontSize: '10.5px' }}>({b.evening1_trips}t)</span></span>
                           ) : <span className="muted">—</span>}
@@ -881,6 +919,16 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                         <td style={{ textAlign: 'center' }} className="mono">
                           {b.evening2_km > 0 ? (
                             <span><b>{b.evening2_km} km</b> <span className="muted" style={{ fontSize: '10.5px' }}>({b.evening2_trips}t)</span></span>
+                          ) : <span className="muted">—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }} className="mono">
+                          {b.evening3_km > 0 ? (
+                            <span><b>{b.evening3_km} km</b> <span className="muted" style={{ fontSize: '10.5px' }}>({b.evening3_trips}t)</span></span>
+                          ) : <span className="muted">—</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }} className="mono">
+                          {b.evening4_km > 0 ? (
+                            <span><b>{b.evening4_km} km</b> <span className="muted" style={{ fontSize: '10.5px' }}>({b.evening4_trips}t)</span></span>
                           ) : <span className="muted">—</span>}
                         </td>
                         <td style={{ fontSize: '12px', maxWidth: '180px' }}>
@@ -907,7 +955,7 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                       {/* Expandable Accordion Row directly underneath this bus */}
                       {isSelected && (
                         <tr key={`trips-${b.bus_id || b.registration_number}`}>
-                          <td colSpan="12" style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '2px solid var(--marigold)', borderLeft: '4px solid var(--marigold)' }}>
+                          <td colSpan="16" style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '2px solid var(--marigold)', borderLeft: '4px solid var(--marigold)' }}>
                             <div style={{
                               display: 'flex',
                               justifyContent: 'space-between',
@@ -1083,7 +1131,7 @@ function DistanceReportView({ data }) {
       </div>
       <div className="table-wrap">
         <table className="tbl">
-          <thead><tr><th>Bus</th><th>Institution</th><th>Route</th><th>Driver</th><th>Trip 1 (Morning 1)</th><th>Trip 2 (Morning 2)</th><th>Trip 3 (Evening 1)</th><th>Trip 4 (Evening 2)</th><th>Total KM</th></tr></thead>
+          <thead><tr><th>Bus</th><th>Institution</th><th>Route</th><th>Driver</th><th>Morning 1</th><th>Morning 2</th><th>Morning 3</th><th>Morning 4</th><th>Evening 1</th><th>Evening 2</th><th>Evening 3</th><th>Evening 4</th><th>Total KM</th></tr></thead>
           <tbody>
             {filteredByBus.map((b, i) => {
               const hasOtherMorning1Driver = data.byBus.some(other => 
@@ -1096,6 +1144,16 @@ function DistanceReportView({ data }) {
                 other.driver_name !== b.driver_name && 
                 other.morning2_km > 0
               );
+              const hasOtherMorning3Driver = data.byBus.some(other => 
+                other.route_code === b.route_code && 
+                other.driver_name !== b.driver_name && 
+                other.morning3_km > 0
+              );
+              const hasOtherMorning4Driver = data.byBus.some(other => 
+                other.route_code === b.route_code && 
+                other.driver_name !== b.driver_name && 
+                other.morning4_km > 0
+              );
               const hasOtherEvening1Driver = data.byBus.some(other => 
                 other.route_code === b.route_code && 
                 other.driver_name !== b.driver_name && 
@@ -1105,6 +1163,16 @@ function DistanceReportView({ data }) {
                 other.route_code === b.route_code && 
                 other.driver_name !== b.driver_name && 
                 other.evening2_km > 0
+              );
+              const hasOtherEvening3Driver = data.byBus.some(other => 
+                other.route_code === b.route_code && 
+                other.driver_name !== b.driver_name && 
+                other.evening3_km > 0
+              );
+              const hasOtherEvening4Driver = data.byBus.some(other => 
+                other.route_code === b.route_code && 
+                other.driver_name !== b.driver_name && 
+                other.evening4_km > 0
               );
 
               return (
@@ -1142,6 +1210,34 @@ function DistanceReportView({ data }) {
                     ) : '—'}
                   </td>
                   <td>
+                    {b.morning3_km > 0 ? (
+                      <>
+                        <span className="mono">{b.morning3_km.toLocaleString('en-IN')} km</span>
+                        {b.morning3_start && b.morning3_end && (
+                          <div className="muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                            {b.morning3_start} ➔ {b.morning3_end}
+                          </div>
+                        )}
+                      </>
+                    ) : hasOtherMorning3Driver ? (
+                      <span style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: '11px' }}>(DIFFERENT DRIVER)</span>
+                    ) : '—'}
+                  </td>
+                  <td>
+                    {b.morning4_km > 0 ? (
+                      <>
+                        <span className="mono">{b.morning4_km.toLocaleString('en-IN')} km</span>
+                        {b.morning4_start && b.morning4_end && (
+                          <div className="muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                            {b.morning4_start} ➔ {b.morning4_end}
+                          </div>
+                        )}
+                      </>
+                    ) : hasOtherMorning4Driver ? (
+                      <span style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: '11px' }}>(DIFFERENT DRIVER)</span>
+                    ) : '—'}
+                  </td>
+                  <td>
                     {b.evening1_km > 0 ? (
                       <>
                         <span className="mono">{b.evening1_km.toLocaleString('en-IN')} km</span>
@@ -1166,6 +1262,34 @@ function DistanceReportView({ data }) {
                         )}
                       </>
                     ) : hasOtherEvening2Driver ? (
+                      <span style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: '11px' }}>(DIFFERENT DRIVER)</span>
+                    ) : '—'}
+                  </td>
+                  <td>
+                    {b.evening3_km > 0 ? (
+                      <>
+                        <span className="mono">{b.evening3_km.toLocaleString('en-IN')} km</span>
+                        {b.evening3_start && b.evening3_end && (
+                          <div className="muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                            {b.evening3_start} ➔ {b.evening3_end}
+                          </div>
+                        )}
+                      </>
+                    ) : hasOtherEvening3Driver ? (
+                      <span style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: '11px' }}>(DIFFERENT DRIVER)</span>
+                    ) : '—'}
+                  </td>
+                  <td>
+                    {b.evening4_km > 0 ? (
+                      <>
+                        <span className="mono">{b.evening4_km.toLocaleString('en-IN')} km</span>
+                        {b.evening4_start && b.evening4_end && (
+                          <div className="muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                            {b.evening4_start} ➔ {b.evening4_end}
+                          </div>
+                        )}
+                      </>
+                    ) : hasOtherEvening4Driver ? (
                       <span style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: '11px' }}>(DIFFERENT DRIVER)</span>
                     ) : '—'}
                   </td>

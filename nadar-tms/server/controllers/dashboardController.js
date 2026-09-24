@@ -129,19 +129,27 @@ exports.summary = async (req, res) => {
       const inchargesCount = inchargeRows[0] ? inchargeRows[0].total : 0;
 
       // 8. Shift breakdown for this campus
-      const SHIFT_KEYS = ['morning1', 'morning2', 'evening1', 'evening2'];
+      const SHIFT_KEYS = ['morning1', 'morning2', 'morning3', 'morning4', 'evening1', 'evening2', 'evening3', 'evening4'];
       const SHIFT_LABELS = {
         morning1: 'Morning 1 (Trip 1)',
         morning2: 'Morning 2 (Trip 2)',
-        evening1: 'Evening 1 (Trip 3)',
-        evening2: 'Evening 2 (Trip 4)',
+        morning3: 'Morning 3 (Trip 3)',
+        morning4: 'Morning 4 (Trip 4)',
+        evening1: 'Evening 1 (Trip 5)',
+        evening2: 'Evening 2 (Trip 6)',
+        evening3: 'Evening 3 (Trip 7)',
+        evening4: 'Evening 4 (Trip 8)',
       };
 
       const shiftDataMap = {
         morning1: { key: 'morning1', label: SHIFT_LABELS.morning1, shiftGroup: 'Morning', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
         morning2: { key: 'morning2', label: SHIFT_LABELS.morning2, shiftGroup: 'Morning', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
+        morning3: { key: 'morning3', label: SHIFT_LABELS.morning3, shiftGroup: 'Morning', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
+        morning4: { key: 'morning4', label: SHIFT_LABELS.morning4, shiftGroup: 'Morning', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
         evening1: { key: 'evening1', label: SHIFT_LABELS.evening1, shiftGroup: 'Evening', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
         evening2: { key: 'evening2', label: SHIFT_LABELS.evening2, shiftGroup: 'Evening', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
+        evening3: { key: 'evening3', label: SHIFT_LABELS.evening3, shiftGroup: 'Evening', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
+        evening4: { key: 'evening4', label: SHIFT_LABELS.evening4, shiftGroup: 'Evening', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
       };
 
       assignments.forEach(a => {
@@ -356,20 +364,28 @@ exports.summary = async (req, res) => {
       LEFT JOIN drivers d ON d.id = a.driver_id
     `);
 
-    // 6. Calculate Shift Stats (morning1, morning2, evening1, evening2)
-    const SHIFT_KEYS = ['morning1', 'morning2', 'evening1', 'evening2'];
+    // 6. Calculate Shift Stats (morning 1..4, evening 1..4)
+    const SHIFT_KEYS = ['morning1', 'morning2', 'morning3', 'morning4', 'evening1', 'evening2', 'evening3', 'evening4'];
     const SHIFT_LABELS = {
       morning1: 'Morning 1 (Trip 1)',
       morning2: 'Morning 2 (Trip 2)',
-      evening1: 'Evening 1 (Trip 3)',
-      evening2: 'Evening 2 (Trip 4)',
+      morning3: 'Morning 3 (Trip 3)',
+      morning4: 'Morning 4 (Trip 4)',
+      evening1: 'Evening 1 (Trip 5)',
+      evening2: 'Evening 2 (Trip 6)',
+      evening3: 'Evening 3 (Trip 7)',
+      evening4: 'Evening 4 (Trip 8)',
     };
 
     const shiftDataMap = {
       morning1: { key: 'morning1', label: SHIFT_LABELS.morning1, shiftGroup: 'Morning', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
       morning2: { key: 'morning2', label: SHIFT_LABELS.morning2, shiftGroup: 'Morning', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
+      morning3: { key: 'morning3', label: SHIFT_LABELS.morning3, shiftGroup: 'Morning', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
+      morning4: { key: 'morning4', label: SHIFT_LABELS.morning4, shiftGroup: 'Morning', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
       evening1: { key: 'evening1', label: SHIFT_LABELS.evening1, shiftGroup: 'Evening', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
       evening2: { key: 'evening2', label: SHIFT_LABELS.evening2, shiftGroup: 'Evening', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
+      evening3: { key: 'evening3', label: SHIFT_LABELS.evening3, shiftGroup: 'Evening', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
+      evening4: { key: 'evening4', label: SHIFT_LABELS.evening4, shiftGroup: 'Evening', routes: 0, buses: new Set(), drivers: new Set(), totalKm: 0 },
     };
 
     assignments.forEach(a => {

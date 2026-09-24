@@ -189,7 +189,17 @@ exports.list = (table) => async (req, res) => {
     if (table === 'routes') {
       let sql = `
         SELECT r.*,
-               COALESCE(i.short_name, i.name, '—') AS institution_name
+               COALESCE(i.short_name, i.name, '—') AS institution_name,
+               (
+                 SELECT GROUP_CONCAT(s.stop_name ORDER BY s.sequence ASC SEPARATOR ', ')
+                 FROM stops s
+                 WHERE s.route_id = r.id
+               ) AS stops_list,
+               (
+                 SELECT COUNT(*)
+                 FROM stops s
+                 WHERE s.route_id = r.id
+               ) AS total_stops
         FROM routes r
         LEFT JOIN institutions i ON i.id = r.institution_id
       `;

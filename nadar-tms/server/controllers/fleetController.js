@@ -52,8 +52,12 @@ exports.assign = async (req, res) => {
     shifts = ['morning2', 'evening1'];
   } else if (shift === 'm2_e2') {
     shifts = ['morning2', 'evening2'];
-  } else if (shift === 'all') {
-    shifts = ['morning1', 'morning2', 'evening1', 'evening2'];
+  } else if (shift === 'all_m') {
+    shifts = ['morning1', 'morning2', 'morning3', 'morning4'];
+  } else if (shift === 'all_e') {
+    shifts = ['evening1', 'evening2', 'evening3', 'evening4'];
+  } else if (shift === 'all' || shift === 'all_8') {
+    shifts = ['morning1', 'morning2', 'morning3', 'morning4', 'evening1', 'evening2', 'evening3', 'evening4'];
   } else if (shift) {
     shifts = [shift];
   } else {
@@ -85,6 +89,19 @@ exports.assign = async (req, res) => {
       }
 
       for (const sh of shifts) {
+        if (bus_id) {
+          await query(
+            `UPDATE assignments SET bus_id = NULL WHERE bus_id = ? AND shift = ? AND route_id != ?`,
+            [bus_id, sh, route_id]
+          );
+        }
+        if (driver_id) {
+          await query(
+            `UPDATE assignments SET driver_id = NULL WHERE driver_id = ? AND shift = ? AND route_id != ?`,
+            [driver_id, sh, route_id]
+          );
+        }
+
         await query(
           `INSERT INTO assignments (route_id, shift, bus_id, driver_id, incharge_id) VALUES (?,?,?,?,?)
            ON DUPLICATE KEY UPDATE bus_id=VALUES(bus_id), driver_id=VALUES(driver_id), incharge_id=COALESCE(VALUES(incharge_id), incharge_id)`,
@@ -97,6 +114,11 @@ exports.assign = async (req, res) => {
           );
         } catch (tErr) {}
       }
+
+      // Clean up orphaned assignments
+      try {
+        await query(`DELETE FROM assignments WHERE bus_id IS NULL AND driver_id IS NULL AND incharge_id IS NULL`);
+      } catch (dErr) {}
 
       // 2. CRITICAL: When driver is changed for a bus, update all assignments for that bus
       // so the bus stores ONLY the new driver (replaces old driver cleanly)
@@ -235,7 +257,17 @@ exports.refs = async (req, res) => {
                  (SELECT scheduled_time FROM stops WHERE route_id = r.id AND (LOWER(stop_name) LIKE '%clg%' OR LOWER(stop_name) LIKE '%school%' OR LOWER(stop_name) LIKE '%college%' OR LOWER(stop_name) LIKE '%campus%') ORDER BY sequence DESC LIMIT 1),
                  (SELECT scheduled_time FROM stops WHERE route_id = r.id ORDER BY sequence DESC LIMIT 1)
                ) AS end_time,
-               COALESCE(i.short_name, i.name, '—') AS institution_name
+               COALESCE(i.short_name, i.name, '—') AS institution_name,
+               (
+                 SELECT GROUP_CONCAT(s.stop_name ORDER BY s.sequence ASC SEPARATOR ', ')
+                 FROM stops s
+                 WHERE s.route_id = r.id
+               ) AS stops_list,
+               (
+                 SELECT COUNT(*)
+                 FROM stops s
+                 WHERE s.route_id = r.id
+               ) AS total_stops
         FROM routes r
         LEFT JOIN institutions i ON i.id = r.institution_id
         ORDER BY r.route_code
@@ -457,6 +489,16 @@ exports.driverMasterEdit = async (req, res) => {
               : [t.shift || sh];
 
             for (const s of shiftsToAssign) {
+              // Clear this bus from any other route on shift s
+              await query(
+                `UPDATE assignments SET bus_id = NULL WHERE bus_id = ? AND shift = ? AND route_id != ?`,
+                [bId, s, rId]
+              );
+              // Clear this driver from any other route on shift s
+              await query(
+                `UPDATE assignments SET driver_id = NULL WHERE driver_id = ? AND shift = ? AND route_id != ?`,
+                [driverId, s, rId]
+              );
               await query(
                 `INSERT INTO assignments (route_id, shift, bus_id, driver_id)
                  VALUES (?, ?, ?, ?)
@@ -468,6 +510,11 @@ exports.driverMasterEdit = async (req, res) => {
         }
       }
 
+      // Clean up orphaned assignments that have neither bus nor driver nor incharge
+      try {
+        await query(`DELETE FROM assignments WHERE bus_id IS NULL AND driver_id IS NULL AND incharge_id IS NULL`);
+      } catch (dErr) {}
+
       // Sync trips for today
       if (validBusIds.length > 0) {
         try {
@@ -478,6 +525,14 @@ exports.driverMasterEdit = async (req, res) => {
         } catch (tErr) {
           console.error('Trip sync error in driverMasterEdit:', tErr);
         }
+      }
+
+      // Auto calculate and sync trip_logs immediately
+      try {
+        const { autoLogTrips } = require('./reportController');
+        if (typeof autoLogTrips === 'function') await autoLogTrips();
+      } catch (aErr) {
+        console.error('Failed to run autoLogTrips after driverMasterEdit:', aErr);
       }
 
       return res.json({ ok: true, message: 'Driver and multi-tab trips updated successfully.' });

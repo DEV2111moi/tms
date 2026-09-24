@@ -96,6 +96,22 @@ const api = {
 
   // Upload
   upload: (name, data) => call('/upload', { method: 'POST', body: JSON.stringify({ name, data }) }),
+
+  // Driver Salary & Bata
+  listSalaries: (params = {}) => {
+    const qs = [];
+    if (params.month) qs.push('month=' + encodeURIComponent(params.month));
+    if (params.institution_id) qs.push('institution_id=' + encodeURIComponent(params.institution_id));
+    if (params.status) qs.push('status=' + encodeURIComponent(params.status));
+    if (params.search) qs.push('search=' + encodeURIComponent(params.search));
+    if (params.driver_id) qs.push('driver_id=' + encodeURIComponent(params.driver_id));
+    return call(`/salaries${qs.length ? '?' + qs.join('&') : ''}`);
+  },
+  getSalary: (id) => call(`/salaries/${id}`),
+  saveSalary: (data, id) => call(`/salaries${id ? '/' + id : ''}`, { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) }),
+  delSalary: (id) => call(`/salaries/${id}`, { method: 'DELETE' }),
+  autoGenerateSalaries: (body) => call('/salaries/auto-generate', { method: 'POST', body: JSON.stringify(body) }),
+  bulkMarkPaid: (body) => call('/salaries/bulk-mark-paid', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export default api;

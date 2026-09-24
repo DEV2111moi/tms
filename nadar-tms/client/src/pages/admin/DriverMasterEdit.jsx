@@ -502,11 +502,12 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
   const q = query.toLowerCase().trim();
   const matchedRoutes = routes.filter(r => {
     if (!q) return true;
-    return (r.route_code || '').toLowerCase().includes(q) ||
-           (r.route_name || '').toLowerCase().includes(q) ||
-           (r.name || '').toLowerCase().includes(q) ||
-           (r.origin || '').toLowerCase().includes(q) ||
-           (r.destination || '').toLowerCase().includes(q);
+    const matchesCode = (r.route_code || '').toLowerCase().includes(q);
+    const matchesName = (r.route_name || '').toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q);
+    const matchesOrigin = (r.origin || '').toLowerCase().includes(q);
+    const matchesDest = (r.destination || '').toLowerCase().includes(q);
+    const matchesStops = (r.stops_list || '').toLowerCase().includes(q);
+    return matchesCode || matchesName || matchesOrigin || matchesDest || matchesStops;
   });
 
   const sortedMatches = [...matchedRoutes].sort((a, b) => {
@@ -516,6 +517,21 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
       if (aMatch && !bMatch) return -1;
       if (!aMatch && bMatch) return 1;
     }
+
+    if (q) {
+      // Direct route_code match prioritized
+      const aCode = (a.route_code || '').toLowerCase().includes(q);
+      const bCode = (b.route_code || '').toLowerCase().includes(q);
+      if (aCode && !bCode) return -1;
+      if (!aCode && bCode) return 1;
+
+      // Then route_name match
+      const aName = (a.route_name || a.name || '').toLowerCase().includes(q);
+      const bName = (b.route_name || b.name || '').toLowerCase().includes(q);
+      if (aName && !bName) return -1;
+      if (!aName && bName) return 1;
+    }
+
     return (a.route_code || '').localeCompare(b.route_code || '');
   });
 
@@ -565,7 +581,7 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
             setQuery('');
           }}
           onKeyDown={handleKeyDown}
-          placeholder={selectedRoute ? selectedRoute.route_code : "Search route code (e.g. 111, USILAMPATTI)..."}
+          placeholder={selectedRoute ? selectedRoute.route_code : "Search by route code, name, or stop name (e.g. Odaipatti, Bodi, 601)..."}
           style={{
             flex: 1,
             border: 'none',
@@ -621,7 +637,7 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
             cursor: 'pointer',
             boxShadow: '0 1px 2px rgba(5, 150, 105, 0.2)'
           }}
-          title="Search and select route"
+          title="Search by route code, name or bus stop"
         >
           <span>🔍</span>
           <span>Search</span>
@@ -636,47 +652,57 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
             top: 'calc(100% + 3px)',
             left: 0,
             width: '100%',
-            minWidth: 280,
-            maxHeight: 230,
+            minWidth: 360,
+            maxWidth: 540,
+            maxHeight: 280,
             overflowY: 'auto',
             background: '#ffffff',
             border: '1.5px solid #059669',
             borderRadius: 6,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-            zIndex: 150
+            boxShadow: '0 10px 28px rgba(0,0,0,0.18)',
+            zIndex: 99999
           }}
         >
-          <div style={{ padding: '5px 8px', fontSize: 10.5, fontWeight: 700, color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>PRESS ENTER TO SELECT:</span>
+          <div style={{ padding: '6px 10px', fontSize: 10.5, fontWeight: 700, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>
+              {sortedMatches.length} matching route{sortedMatches.length === 1 ? '' : 's'} {q ? `for "${query}"` : '(searches routes & stops)'}
+            </span>
             <span
               onClick={() => selectRoute('')}
-              style={{ color: '#ef4444', cursor: 'pointer', fontWeight: 600 }}
+              style={{ color: '#ef4444', cursor: 'pointer', fontWeight: 700, background: '#fee2e2', padding: '1px 6px', borderRadius: 3 }}
             >
               Standby (No Route)
             </span>
           </div>
 
           {sortedMatches.length === 0 ? (
-            <div style={{ padding: '10px 12px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
-              No matching routes found
+            <div style={{ padding: '14px 16px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+              No routes or stops matching "<strong>{query}</strong>"
             </div>
           ) : (
             sortedMatches.map((r, i) => {
               const isSelected = selectedRouteId && String(r.id) === String(selectedRouteId);
               const isCampusRoute = activeInstId && String(r.institution_id) === String(activeInstId);
+
+              // Check if query matched any intermediate stops
+              const matchingStops = q && r.stops_list
+                ? r.stops_list.split(',').map(s => s.trim()).filter(s => s.toLowerCase().includes(q))
+                : [];
+
               return (
                 <div
                   key={r.id}
                   onClick={() => selectRoute(r.id)}
                   style={{
-                    padding: '7px 10px',
+                    padding: '8px 12px',
                     fontSize: 12,
                     cursor: 'pointer',
                     borderBottom: '1px solid #f1f5f9',
                     background: isSelected ? '#ecfdf5' : (i === 0 && query ? '#f8fafc' : 'transparent'),
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 2
+                    gap: 3,
+                    transition: 'background 0.15s ease'
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = '#ecfdf5'}
                   onMouseLeave={e => e.currentTarget.style.background = (isSelected ? '#ecfdf5' : (i === 0 && query ? '#f8fafc' : 'transparent'))}
@@ -685,7 +711,12 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
                     <b className="mono" style={{ color: '#047857', fontSize: 12.5 }}>🛣️ {r.route_code}</b>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       {isSelected && (
-                        <span style={{ fontSize: 11, color: '#059669', fontWeight: 800 }}>✓ Selected</span>
+                        <span style={{ fontSize: 10.5, color: '#059669', fontWeight: 800 }}>✓ Selected</span>
+                      )}
+                      {r.total_stops > 0 && (
+                        <span style={{ fontSize: 9.5, background: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                          🚏 {r.total_stops} stops
+                        </span>
                       )}
                       {isCampusRoute && (
                         <span style={{ fontSize: 9.5, background: '#dcfce7', color: '#15803d', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>
@@ -694,14 +725,62 @@ function RouteSearchPicker({ routes = [], selectedRouteId, onChange, activeInstI
                       )}
                     </div>
                   </div>
+
                   {(r.route_name || r.name) && (
-                    <div style={{ fontSize: 11.5, color: '#334155', fontWeight: 600 }}>
+                    <div style={{ fontSize: 12, color: '#1e293b', fontWeight: 700 }}>
                       {r.route_name || r.name}
                     </div>
                   )}
+
                   {(r.origin || r.destination) && (
-                    <div style={{ fontSize: 10.5, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>
                       {r.origin || 'Start'} ➔ {r.destination || 'Campus'}
+                    </div>
+                  )}
+
+                  {/* Matching Stop Badge (shown when user searches a stop name) */}
+                  {matchingStops.length > 0 && (
+                    <div style={{
+                      fontSize: 10.5,
+                      background: '#fef3c7',
+                      color: '#92400e',
+                      border: '1px solid #fde68a',
+                      borderRadius: 4,
+                      padding: '2px 7px',
+                      marginTop: 2,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      fontWeight: 700,
+                      alignSelf: 'flex-start'
+                    }}>
+                      <span>📍 Matching Stop:</span>
+                      <span style={{ color: '#b45309', textDecoration: 'underline' }}>
+                        {matchingStops.join(', ')}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Full Intermediate Stops Sequence */}
+                  {r.stops_list && (
+                    <div
+                      title={`All Stops along this route: ${r.stops_list}`}
+                      style={{
+                        fontSize: 10,
+                        color: '#64748b',
+                        marginTop: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <span style={{ color: '#0284c7', fontWeight: 700, flexShrink: 0 }}>🚏 Stops:</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.stops_list}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -885,8 +964,12 @@ function InstSearchPicker({ institutions = [], selectedInstId, onChange }) {
 const SHIFT_MAP = {
   morning1: '☀️ Morning 1',
   morning2: '☀️ Morning 2',
+  morning3: '☀️ Morning 3',
+  morning4: '☀️ Morning 4',
   evening1: '🌙 Evening 1',
-  evening2: '🌙 Evening 2'
+  evening2: '🌙 Evening 2',
+  evening3: '🌙 Evening 3',
+  evening4: '🌙 Evening 4'
 };
 
 const PRESET_COMBINATIONS = [
@@ -894,11 +977,17 @@ const PRESET_COMBINATIONS = [
   { value: 'm1_e2', label: '☀️ 🌙 Morning 1 + Evening 2', shifts: ['morning1', 'evening2'] },
   { value: 'm2_e1', label: '☀️ 🌙 Morning 2 + Evening 1', shifts: ['morning2', 'evening1'] },
   { value: 'm2_e2', label: '☀️ 🌙 Morning 2 + Evening 2', shifts: ['morning2', 'evening2'] },
-  { value: 'all', label: '🔄 All 4 sessions (M1, M2, E1, E2)', shifts: ['morning1', 'morning2', 'evening1', 'evening2'] },
+  { value: 'all_m', label: '☀️ All 4 Morning sessions (M1, M2, M3, M4)', shifts: ['morning1', 'morning2', 'morning3', 'morning4'] },
+  { value: 'all_e', label: '🌙 All 4 Evening sessions (E1, E2, E3, E4)', shifts: ['evening1', 'evening2', 'evening3', 'evening4'] },
+  { value: 'all', label: '🔄 All 8 sessions (M1-M4, E1-E4)', shifts: ['morning1', 'morning2', 'morning3', 'morning4', 'evening1', 'evening2', 'evening3', 'evening4'] },
   { value: 'morning1', label: '☀️ Morning 1 only', shifts: ['morning1'] },
   { value: 'morning2', label: '☀️ Morning 2 only', shifts: ['morning2'] },
+  { value: 'morning3', label: '☀️ Morning 3 only', shifts: ['morning3'] },
+  { value: 'morning4', label: '☀️ Morning 4 only', shifts: ['morning4'] },
   { value: 'evening1', label: '🌙 Evening 1 only', shifts: ['evening1'] },
   { value: 'evening2', label: '🌙 Evening 2 only', shifts: ['evening2'] },
+  { value: 'evening3', label: '🌙 Evening 3 only', shifts: ['evening3'] },
+  { value: 'evening4', label: '🌙 Evening 4 only', shifts: ['evening4'] },
 ];
 
 const getSelectValue = (shifts) => {
@@ -1350,8 +1439,15 @@ export default function DriverMasterEdit() {
       (d.name || '').toLowerCase().includes(q) ||
       (d.assigned_bus_numbers || '').toLowerCase().includes(q) ||
       (d.assigned_route_code || '').toLowerCase().includes(q) ||
+      (d.assigned_route_name || '').toLowerCase().includes(q) ||
       (d.institution_name || '').toLowerCase().includes(q) ||
-      (d.phone || '').toLowerCase().includes(q);
+      (d.phone || '').toLowerCase().includes(q) ||
+      (q && refs.routes?.some(r => {
+        const isDriverRoute = d.current_route_ids
+          ? d.current_route_ids.split(',').map(s => s.trim()).includes(String(r.id))
+          : (String(r.id) === String(d.current_route_id || d.route_id));
+        return isDriverRoute && (r.stops_list || '').toLowerCase().includes(q);
+      }));
 
     const matchesInst = instFilter === 'ALL' ||
       String(d.current_institution_id) === String(instFilter) ||
@@ -2444,7 +2540,10 @@ export default function DriverMasterEdit() {
                             borderRadius: 10,
                             marginLeft: 3
                           }}>
-                            {(trip.shifts || [trip.shift || 'morning1']).map(s => s === 'morning1' ? 'M1' : s === 'morning2' ? 'M2' : s === 'evening1' ? 'E1' : 'E2').join('+')}
+                            {(trip.shifts || [trip.shift || 'morning1']).map(s => {
+                              const sm = { morning1: 'M1', morning2: 'M2', morning3: 'M3', morning4: 'M4', evening1: 'E1', evening2: 'E2', evening3: 'E3', evening4: 'E4' };
+                              return sm[s] || s;
+                            }).join('+')}
                           </span>
                         </span>
                         {driverTrips.length > 1 && (
@@ -2542,8 +2641,12 @@ export default function DriverMasterEdit() {
                         {[
                           { key: 'morning1', label: 'Morning 1', icon: '☀️' },
                           { key: 'morning2', label: 'Morning 2', icon: '☀️' },
+                          { key: 'morning3', label: 'Morning 3', icon: '☀️' },
+                          { key: 'morning4', label: 'Morning 4', icon: '☀️' },
                           { key: 'evening1', label: 'Evening 1', icon: '🌙' },
-                          { key: 'evening2', label: 'Evening 2', icon: '🌙' }
+                          { key: 'evening2', label: 'Evening 2', icon: '🌙' },
+                          { key: 'evening3', label: 'Evening 3', icon: '🌙' },
+                          { key: 'evening4', label: 'Evening 4', icon: '🌙' }
                         ].map(({ key, label, icon }) => {
                           const isSelected = (currentTrip.shifts || [currentTrip.shift || 'morning1']).includes(key);
                           return (

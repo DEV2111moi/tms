@@ -72,14 +72,34 @@ async function autoLogTrips() {
       const tzOffset = d.getTimezoneOffset() * 60000;
       const targetDateStr = new Date(d.getTime() - tzOffset).toISOString().slice(0, 10);
 
-      // Get all assignments with route details
-      const assignments = await query(`
+      // Get all assignments with route details, prioritizing assignments that have a driver assigned
+      const rawAssignments = await query(`
         SELECT a.bus_id, a.driver_id, a.route_id, a.shift,
                r.route_code, r.route_name, r.total_distance, r.origin, r.destination
         FROM assignments a
         JOIN routes r ON r.id = a.route_id
         WHERE a.bus_id IS NOT NULL
+        ORDER BY (a.driver_id IS NOT NULL) DESC, a.id DESC
       `);
+
+      // Deduplicate so each (bus_id, shift) is processed once with the most relevant assignment
+      const seen = new Set();
+      const assignments = [];
+      for (const a of rawAssignments) {
+        const key = `${a.bus_id}_${a.shift}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          assignments.push(a);
+        }
+      }
+
+      // Sort shifts in chronological sequence so odometer advances continuously
+      const shiftOrder = {
+        morning: 1, morning1: 1, morning2: 2, morning3: 3, morning4: 4,
+        evening: 5, evening1: 5, evening2: 6, evening3: 7, evening4: 8,
+        night: 9
+      };
+      assignments.sort((a, b) => (shiftOrder[a.shift] || 99) - (shiftOrder[b.shift] || 99));
 
       for (const assign of assignments) {
         // Find scheduled start and end times based on route stops
@@ -90,14 +110,36 @@ async function autoLogTrips() {
         `, [assign.route_id]);
 
         const isMorning = String(assign.shift || '').startsWith('morning');
-        const defaultStart = isMorning ? '07:30:00' : '16:00:00';
-        const defaultEnd = isMorning ? '09:30:00' : '18:00:00';
+        let defaultStart = '07:30:00';
+        let defaultEnd = '09:30:00';
+        if (assign.shift === 'morning2') {
+          defaultStart = '08:30:00';
+          defaultEnd = '10:30:00';
+        } else if (assign.shift === 'morning3') {
+          defaultStart = '09:30:00';
+          defaultEnd = '11:30:00';
+        } else if (assign.shift === 'morning4') {
+          defaultStart = '10:30:00';
+          defaultEnd = '12:30:00';
+        } else if (assign.shift === 'evening1' || assign.shift === 'evening') {
+          defaultStart = '15:30:00';
+          defaultEnd = '17:30:00';
+        } else if (assign.shift === 'evening2') {
+          defaultStart = '16:30:00';
+          defaultEnd = '18:30:00';
+        } else if (assign.shift === 'evening3') {
+          defaultStart = '17:30:00';
+          defaultEnd = '19:30:00';
+        } else if (assign.shift === 'evening4') {
+          defaultStart = '18:30:00';
+          defaultEnd = '20:30:00';
+        }
 
         const start_t = (stopsInfo[0] && stopsInfo[0].start_t) || defaultStart;
         const end_t = (stopsInfo[0] && stopsInfo[0].end_t) || null;
 
-        // Sensible shift cutoff: morning shifts finish by 09:30 AM, evening shifts by 06:00 PM
-        const effectiveEnd = (isMorning && end_t && end_t > '12:00:00') ? defaultEnd : (end_t || defaultEnd);
+        // Sensible shift cutoff
+        const effectiveEnd = (isMorning && end_t && end_t > '13:00:00') ? defaultEnd : (end_t || defaultEnd);
 
         // If checking for today, ensure current time is past the shift's end time
         if (offset === 0) {
@@ -108,29 +150,6 @@ async function autoLogTrips() {
           }
         }
 
-        // Check if trip log already exists for this bus, date, and shift
-        const existing = await query(`
-          SELECT id, start_km, end_km FROM trip_logs
-          WHERE bus_id = ? AND log_date = ? AND shift = ?
-          LIMIT 1
-        `, [assign.bus_id, targetDateStr, assign.shift]);
-
-        if (existing.length > 0) {
-          // If the existing log was saved with 0 distance (start_km === end_km), but the route now has distance, update it!
-          const dist = Number(assign.total_distance || 0);
-          if (dist > 0 && Number(existing[0].start_km) === Number(existing[0].end_km)) {
-            const newEnd = Number(existing[0].start_km) + dist;
-            await query(`
-              UPDATE trip_logs
-              SET end_km = ?,
-                  start_stop = CASE WHEN start_stop IS NULL OR start_stop = 'Start' THEN ? ELSE start_stop END,
-                  end_stop = CASE WHEN end_stop IS NULL OR end_stop = 'End' THEN ? ELSE end_stop END
-              WHERE id = ?
-            `, [newEnd, assign.origin || 'Start', assign.destination || 'End', existing[0].id]);
-          }
-          continue;
-        }
-
         let linkedUserId = null;
         if (assign.driver_id) {
           const driverUser = await query(`
@@ -139,52 +158,107 @@ async function autoLogTrips() {
           linkedUserId = (driverUser[0] && driverUser[0].user_id) || null;
         }
 
-          // Determine start_km: last logged end_km for this bus, or current bus odometer
-          const lastTrip = await query(`
-            SELECT end_km FROM trip_logs
-            WHERE bus_id = ? AND end_km IS NOT NULL
-            ORDER BY log_date DESC, end_time DESC, id DESC
-            LIMIT 1
-          `, [assign.bus_id]);
+        // Check if trip log already exists for this bus, date, and shift
+        const existing = await query(`
+          SELECT id, route_id, driver_id, start_km, end_km, start_stop, end_stop FROM trip_logs
+          WHERE bus_id = ? AND log_date = ? AND shift = ?
+          LIMIT 1
+        `, [assign.bus_id, targetDateStr, assign.shift]);
 
-          let start_km = 0;
-          if (lastTrip.length > 0 && lastTrip[0].end_km != null) {
-            start_km = Number(lastTrip[0].end_km);
-          } else {
-            const busOdom = await query(`
-              SELECT current_odometer_km FROM buses WHERE id = ?
-            `, [assign.bus_id]);
-            start_km = Number((busOdom[0] && busOdom[0].current_odometer_km) || 0);
+        if (existing.length > 0) {
+          const ex = existing[0];
+          const dist = Math.round(Number(assign.total_distance || 0));
+
+          let shouldUpdate = false;
+          let newRouteId = ex.route_id;
+          let newDriverId = ex.driver_id;
+          let newStartStop = ex.start_stop;
+          let newEndStop = ex.end_stop;
+          let newEndKm = ex.end_km;
+
+          // If route was mismatched or updated in assignments
+          if (ex.route_id !== assign.route_id) {
+            newRouteId = assign.route_id;
+            newStartStop = assign.origin || 'Start';
+            newEndStop = assign.destination || 'End';
+            if (dist > 0 && ex.start_km != null) {
+              newEndKm = Number(ex.start_km) + dist;
+            }
+            shouldUpdate = true;
           }
 
-          const dist = Number(assign.total_distance || 0);
-          const end_km = start_km + dist;
+          // If linked user is available now
+          if (linkedUserId && ex.driver_id !== linkedUserId) {
+            newDriverId = linkedUserId;
+            shouldUpdate = true;
+          }
 
-          // Insert trip log
-          await query(`
-            INSERT INTO trip_logs 
-            (bus_id, route_id, driver_id, log_date, shift, start_time, start_km, end_time, end_km, start_stop, end_stop)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `, [
-            assign.bus_id,
-            assign.route_id,
-            linkedUserId,
-            targetDateStr,
-            assign.shift,
-            `${targetDateStr} ${start_t || defaultStart}`,
-            start_km,
-            `${targetDateStr} ${effectiveEnd || defaultEnd}`,
-            end_km,
-            assign.origin || 'Start',
-            assign.destination || 'End'
-          ]);
+          // If existing distance was 0 but route has distance
+          if (dist > 0 && Number(ex.start_km) === Number(ex.end_km)) {
+            newEndKm = Number(ex.start_km) + dist;
+            shouldUpdate = true;
+          }
 
-          // Update bus odometer in buses table
-          await query(`
-            UPDATE buses
-            SET current_odometer_km = ?
-            WHERE id = ?
-          `, [end_km, assign.bus_id]);
+          if (shouldUpdate) {
+            await query(`
+              UPDATE trip_logs
+              SET route_id = ?,
+                  driver_id = ?,
+                  start_stop = ?,
+                  end_stop = ?,
+                  end_km = ?
+              WHERE id = ?
+            `, [newRouteId, newDriverId, newStartStop, newEndStop, newEndKm, ex.id]);
+          }
+          continue;
+        }
+
+        // Determine start_km: last logged end_km for this bus, or current bus odometer
+        const lastTrip = await query(`
+          SELECT end_km FROM trip_logs
+          WHERE bus_id = ? AND end_km IS NOT NULL
+          ORDER BY log_date DESC, end_time DESC, id DESC
+          LIMIT 1
+        `, [assign.bus_id]);
+
+        let start_km = 0;
+        if (lastTrip.length > 0 && lastTrip[0].end_km != null) {
+          start_km = Number(lastTrip[0].end_km);
+        } else {
+          const busOdom = await query(`
+            SELECT current_odometer_km FROM buses WHERE id = ?
+          `, [assign.bus_id]);
+          start_km = Number((busOdom[0] && busOdom[0].current_odometer_km) || 0);
+        }
+
+        const dist = Math.round(Number(assign.total_distance || 0));
+        const end_km = start_km + dist;
+
+        // Insert trip log
+        await query(`
+          INSERT INTO trip_logs 
+          (bus_id, route_id, driver_id, log_date, shift, start_time, start_km, end_time, end_km, start_stop, end_stop)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          assign.bus_id,
+          assign.route_id,
+          linkedUserId,
+          targetDateStr,
+          assign.shift,
+          `${targetDateStr} ${start_t || defaultStart}`,
+          start_km,
+          `${targetDateStr} ${effectiveEnd || defaultEnd}`,
+          end_km,
+          assign.origin || 'Start',
+          assign.destination || 'End'
+        ]);
+
+        // Update bus odometer in buses table
+        await query(`
+          UPDATE buses
+          SET current_odometer_km = ?
+          WHERE id = ?
+        `, [end_km, assign.bus_id]);
       }
     }
   } catch (err) {
@@ -206,7 +280,7 @@ exports.distance = async (req, res) => {
       `SELECT tl.log_date AS date, SUM(tl.end_km - tl.start_km) AS km, COUNT(tl.id) AS trips
        FROM trip_logs tl 
        JOIN buses b ON b.id = tl.bus_id 
-       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift LIMIT 1))
+       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift ORDER BY (a2.driver_id IS NOT NULL) DESC, a2.id DESC LIMIT 1))
        WHERE ${cond}
        GROUP BY tl.log_date ORDER BY tl.log_date`, params);
     
@@ -228,6 +302,16 @@ exports.distance = async (req, res) => {
               MAX(CASE WHEN tl.shift = 'morning2' THEN tl.start_stop END) AS morning2_start,
               MAX(CASE WHEN tl.shift = 'morning2' THEN tl.end_stop END) AS morning2_end,
               
+              -- Morning 3
+              SUM(CASE WHEN tl.shift = 'morning3' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning3_km,
+              MAX(CASE WHEN tl.shift = 'morning3' THEN tl.start_stop END) AS morning3_start,
+              MAX(CASE WHEN tl.shift = 'morning3' THEN tl.end_stop END) AS morning3_end,
+
+              -- Morning 4
+              SUM(CASE WHEN tl.shift = 'morning4' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning4_km,
+              MAX(CASE WHEN tl.shift = 'morning4' THEN tl.start_stop END) AS morning4_start,
+              MAX(CASE WHEN tl.shift = 'morning4' THEN tl.end_stop END) AS morning4_end,
+
               -- Evening 1
               SUM(CASE WHEN tl.shift IN ('evening1', 'evening') THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening1_km,
               MAX(CASE WHEN tl.shift IN ('evening1', 'evening') THEN tl.start_stop END) AS evening1_start,
@@ -238,14 +322,29 @@ exports.distance = async (req, res) => {
               MAX(CASE WHEN tl.shift = 'evening2' THEN tl.start_stop END) AS evening2_start,
               MAX(CASE WHEN tl.shift = 'evening2' THEN tl.end_stop END) AS evening2_end,
 
+              -- Evening 3
+              SUM(CASE WHEN tl.shift = 'evening3' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening3_km,
+              MAX(CASE WHEN tl.shift = 'evening3' THEN tl.start_stop END) AS evening3_start,
+              MAX(CASE WHEN tl.shift = 'evening3' THEN tl.end_stop END) AS evening3_end,
+
+              -- Evening 4
+              SUM(CASE WHEN tl.shift = 'evening4' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening4_km,
+              MAX(CASE WHEN tl.shift = 'evening4' THEN tl.start_stop END) AS evening4_start,
+              MAX(CASE WHEN tl.shift = 'evening4' THEN tl.end_stop END) AS evening4_end,
+
               COUNT(tl.id) AS trips,
               SUM(tl.end_km - tl.start_km) AS km
        FROM trip_logs tl
        JOIN buses b ON b.id = tl.bus_id
-       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift LIMIT 1))
+       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift ORDER BY (a2.driver_id IS NOT NULL) DESC, a2.id DESC LIMIT 1))
        LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b.institution_id)
        LEFT JOIN users u ON u.id = tl.driver_id
-       LEFT JOIN drivers dr ON dr.id = (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND (tl.route_id IS NULL OR a3.route_id = tl.route_id) LIMIT 1)
+       LEFT JOIN drivers dr ON dr.id = COALESCE(
+         (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND a3.route_id = tl.route_id AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+         (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+         (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+         (SELECT d2.id FROM drivers d2 WHERE d2.route_id = tl.route_id ORDER BY d2.id DESC LIMIT 1)
+       )
        WHERE ${cond}
        GROUP BY b.id, b.registration_number, i.id, i.short_name, r.id, r.route_code, r.route_name, dr.name, u.name
        ORDER BY km DESC`, params);
@@ -254,7 +353,7 @@ exports.distance = async (req, res) => {
       `SELECT COALESCE(i.short_name,'Unassigned') AS institution, COUNT(tl.id) AS trips, SUM(tl.end_km - tl.start_km) AS km
        FROM trip_logs tl 
        JOIN buses b ON b.id = tl.bus_id 
-       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift LIMIT 1))
+       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift ORDER BY (a2.driver_id IS NOT NULL) DESC, a2.id DESC LIMIT 1))
        LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b.institution_id)
        WHERE ${cond}
        GROUP BY i.short_name ORDER BY km DESC`, params);
@@ -265,8 +364,12 @@ exports.distance = async (req, res) => {
       trips: Number(r.trips || 0),
       morning1_km: Number(r.morning1_km || 0),
       morning2_km: Number(r.morning2_km || 0),
+      morning3_km: Number(r.morning3_km || 0),
+      morning4_km: Number(r.morning4_km || 0),
       evening1_km: Number(r.evening1_km || 0),
-      evening2_km: Number(r.evening2_km || 0)
+      evening2_km: Number(r.evening2_km || 0),
+      evening3_km: Number(r.evening3_km || 0),
+      evening4_km: Number(r.evening4_km || 0)
     }));
     res.json({ from, to, days: num(days), byBus: num(byBus), byInstitution: num(byInstitution) });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not build the distance report.' }); }
@@ -299,6 +402,14 @@ exports.busWise = async (req, res) => {
              SUM(CASE WHEN tl.shift = 'morning2' THEN 1 ELSE 0 END) AS morning2_trips,
              SUM(CASE WHEN tl.shift = 'morning2' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning2_km,
              
+             -- Morning 3
+             SUM(CASE WHEN tl.shift = 'morning3' THEN 1 ELSE 0 END) AS morning3_trips,
+             SUM(CASE WHEN tl.shift = 'morning3' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning3_km,
+
+             -- Morning 4
+             SUM(CASE WHEN tl.shift = 'morning4' THEN 1 ELSE 0 END) AS morning4_trips,
+             SUM(CASE WHEN tl.shift = 'morning4' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS morning4_km,
+
              -- Evening 1
              SUM(CASE WHEN tl.shift IN ('evening1', 'evening') THEN 1 ELSE 0 END) AS evening1_trips,
              SUM(CASE WHEN tl.shift IN ('evening1', 'evening') THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening1_km,
@@ -306,15 +417,28 @@ exports.busWise = async (req, res) => {
              -- Evening 2
              SUM(CASE WHEN tl.shift = 'evening2' THEN 1 ELSE 0 END) AS evening2_trips,
              SUM(CASE WHEN tl.shift = 'evening2' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening2_km,
+
+             -- Evening 3
+             SUM(CASE WHEN tl.shift = 'evening3' THEN 1 ELSE 0 END) AS evening3_trips,
+             SUM(CASE WHEN tl.shift = 'evening3' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening3_km,
+
+             -- Evening 4
+             SUM(CASE WHEN tl.shift = 'evening4' THEN 1 ELSE 0 END) AS evening4_trips,
+             SUM(CASE WHEN tl.shift = 'evening4' THEN (tl.end_km - tl.start_km) ELSE 0 END) AS evening4_km,
              
              COALESCE(GROUP_CONCAT(DISTINCT r.route_code ORDER BY r.route_code SEPARATOR ', '), '—') AS routes,
              COALESCE(GROUP_CONCAT(DISTINCT COALESCE(dr.name, u.name) ORDER BY COALESCE(dr.name, u.name) SEPARATOR ', '), '—') AS drivers
       FROM trip_logs tl
       JOIN buses b ON b.id = tl.bus_id
-      LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift LIMIT 1))
+      LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift ORDER BY (a2.driver_id IS NOT NULL) DESC, a2.id DESC LIMIT 1))
       LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b.institution_id)
       LEFT JOIN users u ON u.id = tl.driver_id
-      LEFT JOIN drivers dr ON dr.id = (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND (tl.route_id IS NULL OR a3.route_id = tl.route_id) LIMIT 1)
+      LEFT JOIN drivers dr ON dr.id = COALESCE(
+        (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND a3.route_id = tl.route_id AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+        (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+        (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+        (SELECT d2.id FROM drivers d2 WHERE d2.route_id = tl.route_id ORDER BY d2.id DESC LIMIT 1)
+      )
       WHERE ${cond}
       GROUP BY b.id, b.registration_number
       ORDER BY total_km DESC, total_trips DESC
@@ -339,10 +463,15 @@ exports.busWise = async (req, res) => {
              COALESCE(dr.name, u.name, '—') AS driver_name
       FROM trip_logs tl
       JOIN buses b ON b.id = tl.bus_id
-      LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift LIMIT 1))
+      LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift ORDER BY (a2.driver_id IS NOT NULL) DESC, a2.id DESC LIMIT 1))
       LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b.institution_id)
       LEFT JOIN users u ON u.id = tl.driver_id
-      LEFT JOIN drivers dr ON dr.id = (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND (tl.route_id IS NULL OR a3.route_id = tl.route_id) LIMIT 1)
+      LEFT JOIN drivers dr ON dr.id = COALESCE(
+        (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND a3.route_id = tl.route_id AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+        (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+        (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+        (SELECT d2.id FROM drivers d2 WHERE d2.route_id = tl.route_id ORDER BY d2.id DESC LIMIT 1)
+      )
       WHERE ${cond}
       ORDER BY tl.log_date DESC, tl.id DESC
     `, params);
@@ -358,10 +487,18 @@ exports.busWise = async (req, res) => {
         morning1_km: Number(b.morning1_km || 0),
         morning2_trips: Number(b.morning2_trips || 0),
         morning2_km: Number(b.morning2_km || 0),
+        morning3_trips: Number(b.morning3_trips || 0),
+        morning3_km: Number(b.morning3_km || 0),
+        morning4_trips: Number(b.morning4_trips || 0),
+        morning4_km: Number(b.morning4_km || 0),
         evening1_trips: Number(b.evening1_trips || 0),
         evening1_km: Number(b.evening1_km || 0),
         evening2_trips: Number(b.evening2_trips || 0),
         evening2_km: Number(b.evening2_km || 0),
+        evening3_trips: Number(b.evening3_trips || 0),
+        evening3_km: Number(b.evening3_km || 0),
+        evening4_trips: Number(b.evening4_trips || 0),
+        evening4_km: Number(b.evening4_km || 0),
       })),
       trips: trips.map(t => ({
         ...t,

@@ -135,6 +135,15 @@ function NavIcon({ name, className = "nav-icon-svg" }) {
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
         </svg>
       );
+    case 'salary':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <line x1="2" y1="10" x2="22" y2="10" />
+          <circle cx="16" cy="15" r="1.5" fill="currentColor" />
+          <path d="M6 14h4" />
+        </svg>
+      );
     case 'logout':
       return (
         <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -177,6 +186,7 @@ const GROUPS_ADMIN = [
       { to: '/admin/buses', icon: 'bus', label: 'Buses' },
       { to: '/admin/drivers', icon: 'driver', label: 'Drivers' },
       { to: '/admin/driver-master-edit', icon: 'edit', label: 'Driver Master Edit' },
+      { to: '/admin/driver-salary', icon: 'salary', label: 'Driver Salary & Bata' },
       { to: '/admin/users', icon: 'user', label: 'Logins' },
     ],
   },
@@ -220,12 +230,13 @@ const GROUPS_INST = [
     ],
   },
   {
-    title: 'Fleet View',
+    title: 'Fleet & Payroll',
     items: [
       { to: '/admin/routes', icon: 'route', label: 'Routes (view)' },
       { to: '/admin/buses', icon: 'bus', label: 'Buses (view)' },
       { to: '/admin/drivers', icon: 'driver', label: 'Drivers (view)' },
       { to: '/admin/driver-master-edit', icon: 'edit', label: 'Driver Master Edit' },
+      { to: '/admin/driver-salary', icon: 'salary', label: 'Driver Salary & Bata' },
     ],
   },
 ];
@@ -238,10 +249,11 @@ const GROUPS_EXEC = [
     ],
   },
   {
-    title: 'Attendance & Audit',
+    title: 'Attendance, Audit & Payroll',
     items: [
       { to: '/admin/attendance-report', icon: 'attendance', label: 'Attendance Report' },
       { to: '/admin/reports', icon: 'report', label: 'Reports' },
+      { to: '/admin/driver-salary', icon: 'salary', label: 'Driver Salaries & Bata' },
       { to: '/admin/diesel', icon: 'fuel', label: 'Diesel Usage' },
       { to: '/admin/maintenance', icon: 'wrench', label: 'Maintenance' },
       { to: '/admin/tyres', icon: 'tyre', label: 'Tyres' },

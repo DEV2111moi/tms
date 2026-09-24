@@ -718,6 +718,43 @@ ALTER TABLE `trip_logs`
 --
 ALTER TABLE `tyres`
   ADD CONSTRAINT `tyres_ibfk_1` FOREIGN KEY (`bus_id`) REFERENCES `buses` (`id`) ON DELETE SET NULL;
+--
+-- Table structure for table `driver_salaries`
+--
+CREATE TABLE IF NOT EXISTS `driver_salaries` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `driver_id` int(11) NOT NULL,
+  `institution_id` int(11) DEFAULT NULL,
+  `salary_month` varchar(7) NOT NULL,
+  `working_days` int(11) NOT NULL DEFAULT 26,
+  `present_days` decimal(4,1) NOT NULL DEFAULT 26.0,
+  `total_trips` int(11) NOT NULL DEFAULT 0,
+  `basic_salary` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `daily_bata_rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `bata_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `special_bata` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `overtime_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `other_allowances` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `gross_salary` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `advance_deduction` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `epf_deduction` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `esi_deduction` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `other_deductions` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `net_salary` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `payment_status` enum('pending','paid','partially_paid') NOT NULL DEFAULT 'pending',
+  `payment_date` date DEFAULT NULL,
+  `payment_mode` enum('cash','bank_transfer','cheque','upi') NOT NULL DEFAULT 'bank_transfer',
+  `transaction_ref` varchar(100) DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_driver_month` (`driver_id`,`salary_month`),
+  KEY `idx_institution_id` (`institution_id`),
+  KEY `idx_salary_month` (`salary_month`),
+  CONSTRAINT `fk_driver_salaries_driver` FOREIGN KEY (`driver_id`) REFERENCES `drivers` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

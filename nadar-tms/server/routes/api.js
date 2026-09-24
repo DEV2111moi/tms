@@ -12,6 +12,7 @@ const users = require('../controllers/userController');
 const rep = require('../controllers/reportController');
 const notifs = require('../controllers/notificationController');
 const upload = require('../controllers/uploadController');
+const salary = require('../controllers/salaryController');
 
 // ---- Auth (public) ----
 router.post('/auth/login', auth.login);
@@ -80,5 +81,14 @@ router.post('/upload', authenticate, requireRole('admin', 'institution'), upload
 router.get('/notifications', authenticate, notifs.list);
 router.get('/fuel/bus/:busId', authenticate, requireRole('admin', 'executive'), driver.busFuel);
 router.get('/attendance/daily/:date', authenticate, requireRole('admin', 'institution'), att.daily);
+
+// ---- Driver Salary & Bata Management ----
+router.get('/salaries', authenticate, requireRole('admin', 'executive', 'institution'), salary.list);
+router.get('/salaries/:id', authenticate, requireRole('admin', 'executive', 'institution'), salary.getById);
+router.post('/salaries', authenticate, requireRole('admin', 'institution'), salary.save);
+router.put('/salaries/:id', authenticate, requireRole('admin', 'institution'), salary.save);
+router.delete('/salaries/:id', authenticate, requireRole('admin', 'institution'), salary.remove);
+router.post('/salaries/auto-generate', authenticate, requireRole('admin', 'institution'), salary.autoGenerate);
+router.post('/salaries/bulk-mark-paid', authenticate, requireRole('admin', 'institution'), salary.bulkMarkPaid);
 
 module.exports = router;
