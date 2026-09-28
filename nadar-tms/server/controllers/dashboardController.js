@@ -354,14 +354,17 @@ exports.summary = async (req, res) => {
     // 5. Assignments
     const assignments = await query(`
       SELECT a.id, a.route_id, a.shift, a.bus_id, a.driver_id, a.incharge_id,
-             b.registration_number, d.name AS driver_name,
+             b.registration_number, d.name AS driver_name, d.phone AS driver_phone,
+             u.name AS incharge_name, u.phone AS incharge_phone,
              r.route_code, r.route_name, COALESCE(r.total_distance, 0) AS total_distance,
-             r.institution_id, COALESCE(i.short_name, i.name, 'Central') AS institution_name
+             r.institution_id, COALESCE(i.short_name, i.name, 'Central') AS institution_name,
+             i.short_name AS institution_short_name
       FROM assignments a
       JOIN routes r ON r.id = a.route_id
       LEFT JOIN institutions i ON i.id = r.institution_id
       LEFT JOIN buses b ON b.id = a.bus_id
       LEFT JOIN drivers d ON d.id = a.driver_id
+      LEFT JOIN users u ON u.id = a.incharge_id
     `);
 
     // 6. Calculate Shift Stats (morning 1..4, evening 1..4)
@@ -538,8 +541,167 @@ exports.summary = async (req, res) => {
       assignments.reduce((sum, a) => sum + Number(a.total_distance || 0), 0) * 10
     ) / 10;
 
+    // 11. Student Attendance & Roster for Admin / Central view
+    const targetDate = req.query.date || new Date().toISOString().slice(0, 10);
+
+    let students = [];
+    try {
+      students = await query(`
+        SELECT s.id, s.student_id, s.name, s.class_grade, s.route_id, s.stop_id, s.institution_id,
+               COALESCE(s.parent_mobile, s.guardian_phone, '—') AS parent_phone,
+               COALESCE(st.stop_name, '—') AS stop_name
+        FROM students s
+        LEFT JOIN stops st ON st.id = s.stop_id
+      `);
+    } catch (err) {
+      console.error('Error querying all students for admin dashboard:', err);
+    }
+
+    const studentsByRoute = {};
+    students.forEach(s => {
+      if (s.route_id) {
+        studentsByRoute[s.route_id] = (studentsByRoute[s.route_id] || 0) + 1;
+      }
+    });
+
+    let attendanceToday = [];
+    try {
+      attendanceToday = await query(`
+        SELECT a.id, a.trip_id, a.student_id, a.stop_id, a.status, a.boarding_time,
+               s.name AS student_name, s.class_grade,
+               COALESCE(s.parent_mobile, s.guardian_phone, '—') AS parent_phone,
+               r.route_code, r.route_name, r.institution_id,
+               COALESCE(i.short_name, i.name, 'Central') AS institution_name,
+               COALESCE(st.stop_name, '—') AS stop_name
+        FROM attendance a
+        JOIN students s ON s.id = a.student_id
+        JOIN trips t ON t.id = a.trip_id
+        JOIN routes r ON r.id = t.route_id
+        LEFT JOIN institutions i ON i.id = r.institution_id
+        LEFT JOIN stops st ON st.id = a.stop_id
+        WHERE a.attendance_date = ?
+      `, [targetDate]);
+    } catch (err) {
+      console.error('Error querying attendance for admin dashboard:', err);
+    }
+
+    const boardedToday = attendanceToday.filter(a => a.status === 'present').length;
+    const absentToday = attendanceToday.filter(a => a.status === 'absent').length;
+    const totalMarked = boardedToday + absentToday;
+    const attendanceRate = totalMarked > 0 ? Math.round((boardedToday / totalMarked) * 100) : 0;
+
+    const absentStudentsList = attendanceToday
+      .filter(a => a.status === 'absent')
+      .map(a => ({
+        studentId: a.student_id,
+        name: a.student_name,
+        classGrade: a.class_grade || '—',
+        routeCode: a.route_code,
+        institution_id: a.institution_id,
+        institution_name: a.institution_name,
+        stopName: a.stop_name,
+        parentPhone: a.parent_phone || '—',
+      }));
+
+    let todayTripsForRoster = [];
+    try {
+      todayTripsForRoster = await query(`
+        SELECT t.id AS trip_id, t.route_id, t.shift, t.status,
+               b.registration_number, d.name AS driver_name, u.name AS incharge_name
+        FROM trips t
+        JOIN routes r ON r.id = t.route_id
+        LEFT JOIN buses b ON b.id = t.bus_id
+        LEFT JOIN drivers d ON d.id = t.driver_id
+        LEFT JOIN users u ON u.id = t.incharge_id
+        WHERE t.trip_date = ?
+      `, [targetDate]);
+    } catch (err) {
+      console.error('Error querying trips for roster:', err);
+    }
+
+    const tripByRouteShift = {};
+    todayTripsForRoster.forEach(t => {
+      tripByRouteShift[`${t.route_id}_${t.shift}`] = t;
+    });
+
+    const attendanceByTrip = {};
+    attendanceToday.forEach(a => {
+      if (!attendanceByTrip[a.trip_id]) {
+        attendanceByTrip[a.trip_id] = { present: 0, absent: 0 };
+      }
+      if (a.status === 'present') attendanceByTrip[a.trip_id].present += 1;
+      if (a.status === 'absent') attendanceByTrip[a.trip_id].absent += 1;
+    });
+
+    const campusRoster = assignments.map(a => {
+      const tripKey = `${a.route_id}_${a.shift}`;
+      const trip = tripByRouteShift[tripKey];
+      const tripAtt = trip ? (attendanceByTrip[trip.trip_id] || { present: 0, absent: 0 }) : null;
+      const enrolled = studentsByRoute[a.route_id] || 0;
+      const boarded = tripAtt ? tripAtt.present : 0;
+      const absent = tripAtt ? tripAtt.absent : 0;
+      const attRate = enrolled > 0 ? Math.round((boarded / enrolled) * 100) : 0;
+
+      let submissionStatus = 'no_incharge';
+      let statusLabel = 'No Incharge';
+      if (trip && trip.status === 'completed') {
+        submissionStatus = 'submitted';
+        statusLabel = 'Submitted';
+      } else if (trip && trip.status === 'running') {
+        submissionStatus = 'in_transit';
+        statusLabel = 'In Transit';
+      } else if (a.incharge_id) {
+        submissionStatus = 'pending';
+        statusLabel = 'Pending Submission';
+      } else {
+        submissionStatus = 'no_incharge';
+        statusLabel = 'No Incharge';
+      }
+
+      return {
+        id: a.id,
+        route_id: a.route_id,
+        route_code: a.route_code,
+        route_name: a.route_name,
+        shift: a.shift,
+        bus_id: a.bus_id,
+        registration_number: a.registration_number || '—',
+        driver_id: a.driver_id,
+        driver_name: a.driver_name || '—',
+        driver_phone: a.driver_phone || '—',
+        incharge_id: a.incharge_id,
+        incharge_name: a.incharge_name || '—',
+        incharge_phone: a.incharge_phone || '—',
+        total_distance: a.total_distance,
+        institution_id: a.institution_id,
+        institution_name: a.institution_name,
+        institution_short_name: a.institution_short_name || a.institution_name,
+        enrolledStudents: enrolled,
+        boardedCount: boarded,
+        absentCount: absent,
+        attendanceRate: attRate,
+        attendanceStatus: statusLabel,
+        submissionStatus,
+        hasIncharge: !!a.incharge_id,
+        trip_id: trip ? trip.trip_id : null,
+        trip_status: trip ? trip.status : 'scheduled',
+      };
+    });
+
+    const pendingSubmissionCount = campusRoster.filter(r => r.submissionStatus === 'pending').length;
+    const submittedCount = campusRoster.filter(r => r.submissionStatus === 'submitted').length;
+    const inTransitCount = campusRoster.filter(r => r.submissionStatus === 'in_transit').length;
+    const noInchargeCount = campusRoster.filter(r => r.submissionStatus === 'no_incharge').length;
+
+    const inchargesList = await query(`
+      SELECT id, name, phone, email, institution_id FROM users
+      WHERE role = 'incharge'
+      ORDER BY name
+    `);
+
     res.json({
       isInstitution: false,
+      selectedDate: targetDate,
       kpis: {
         totalBuses: Number(busStats.total || 0),
         activeBuses: Number(busStats.active || 0),
@@ -548,16 +710,29 @@ exports.summary = async (req, res) => {
         activeDrivers: Number(driverStats.active || 0),
         inactiveDrivers: Number(driverStats.inactive || 0),
         totalRoutes: routes.length,
+        routesCount: routes.length,
         assignedRoutesCount: assignedRoutesSet.size,
         unassignedRoutesCount: unassignedList.length,
         totalDailyKm: totalDailyDistance,
         fcAlertsTotal: complianceAlerts.length,
         fcExpiredCount: expiredCount,
         fcExpiringSoonCount: expiringSoonCount,
+        totalStudents: students.length,
+        boardedToday,
+        absentToday,
+        attendanceRate,
+        pendingSubmissionCount,
+        submittedCount,
+        inTransitCount,
+        noInchargeCount,
       },
       shiftOverview,
       unassignedRoutes: unassignedList,
       institutionSummary: instSummary,
+      institutions,
+      campusRoster,
+      absentStudentsList,
+      inchargesList,
       complianceSummary: {
         totalAlerts: complianceAlerts.length,
         expiredCount,

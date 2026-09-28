@@ -7,6 +7,37 @@ import { useToast } from '../../components/UI/Toast';
 import { useAuth } from '../../context/AuthContext';
 import { exportDriverShiftBackupPdf } from '../../utils/driverBackupPdf';
 
+function DrvIcon({ name, size = 16, color = 'currentColor', style = {} }) {
+  const icons = {
+    user: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    bus: <><rect x="3" y="4" width="18" height="15" rx="3"/><circle cx="7.5" cy="16" r="1.5"/><circle cx="16.5" cy="16" r="1.5"/><path d="M3 10h18"/><path d="M7 4v3"/><path d="M17 4v3"/></>,
+    check: <path d="M20 6L9 17l-5-5"/>,
+    alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+    shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+    file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
+    print: <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
+    download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+    plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    badge: <><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><line x1="15" y1="8" x2="17" y2="8"/><line x1="15" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="17" y2="16"/></>,
+  };
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ verticalAlign: 'middle', flexShrink: 0, ...style }}
+    >
+      {icons[name] || icons.user}
+    </svg>
+  );
+}
+
 const COLUMNS = [
   {
     key: 'sno',
@@ -34,7 +65,7 @@ const COLUMNS = [
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 4,
+                gap: 5,
                 background: '#eff6ff',
                 color: '#1d4ed8',
                 border: '1px solid #bfdbfe',
@@ -45,7 +76,7 @@ const COLUMNS = [
                 fontFamily: 'JetBrains Mono, monospace'
               }}
             >
-              <span style={{ fontSize: 11 }}>🚌</span> {b}
+              <DrvIcon name="bus" size={12} color="#1d4ed8" /> {b}
             </span>
           ))}
         </div>
@@ -938,8 +969,8 @@ export default function Drivers() {
     <>
       <div className="page-head">
         <div>
-          <div className="page-title">Drivers</div>
-          <div className="page-sub">{filteredItems.length} driver(s)</div>
+          <div className="page-title">Drivers & Pilots</div>
+          <div className="page-sub">Driver roster, bus mapping, licence compliance, and shift schedules</div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
@@ -953,12 +984,12 @@ export default function Drivers() {
               color: '#ffffff',
               border: 'none',
               fontWeight: 700,
-              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)',
+              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
               cursor: 'pointer'
             }}
             title="Download / Print Assigned Drivers Report (Bus, Route & Duty Mapped)"
           >
-            <span>📋</span> Assigned Report (PDF)
+            <DrvIcon name="file" size={14} color="#fff" /> Assigned Report (PDF)
           </button>
 
           <button
@@ -972,12 +1003,12 @@ export default function Drivers() {
               color: '#ffffff',
               border: 'none',
               fontWeight: 700,
-              boxShadow: '0 2px 6px rgba(245, 158, 11, 0.3)',
+              boxShadow: '0 2px 6px rgba(245, 158, 11, 0.25)',
               cursor: 'pointer'
             }}
             title="Download / Print Unassigned & Standby Drivers Report"
           >
-            <span>⚠️</span> Unassigned Report (PDF)
+            <DrvIcon name="alert" size={14} color="#fff" /> Unassigned (PDF)
           </button>
 
           <button
@@ -991,7 +1022,7 @@ export default function Drivers() {
             }}
             title="Direct print / Save all driver details as PDF"
           >
-            <span>🖨️</span> All Drivers (PDF)
+            <DrvIcon name="print" size={14} color="currentColor" /> All Drivers (PDF)
           </button>
 
           <button
@@ -1005,38 +1036,111 @@ export default function Drivers() {
               color: '#ffffff',
               border: 'none',
               fontWeight: 700,
-              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)',
+              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.25)',
               cursor: 'pointer'
             }}
             title="Download / Print Complete Driver Backup (Driver, Bus, Campus, Route & Morning/Evening Shifts)"
           >
-            <span>💾</span> Driver Shift Backup (PDF)
+            <DrvIcon name="download" size={14} color="#fff" /> Shift Backup (PDF)
           </button>
 
           {canEdit && (
-            <button className="btn btn-sm btn-primary" onClick={() => setEditing({})}>
-              + Add Driver
+            <button 
+              className="btn btn-sm btn-primary" 
+              onClick={() => setEditing({ status: 'active', gender: 'male' })}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+            >
+              <DrvIcon name="plus" size={15} color="#fff" /> Add Driver
             </button>
           )}
         </div>
       </div>
 
       <div className="page-body">
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
-          <input
-            type="text"
-            className="fselect"
-            placeholder="🔍 Search name, bus, route, license, mobile..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            style={{ maxWidth: 300 }}
-          />
+        {/* KPI Summary Ribbon */}
+        <div className="att-kpi-ribbon">
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--purple">
+              <DrvIcon name="user" size={22} color="#7c6cfc" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val">{totalCount}</div>
+              <div className="att-kpi-label">Total Drivers</div>
+              <div className="att-kpi-sub">Registered staff</div>
+            </div>
+          </div>
+
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--green">
+              <DrvIcon name="check" size={22} color="#10b981" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#10b981' }}>{activeCount}</div>
+              <div className="att-kpi-label">Active Drivers</div>
+              <div className="att-kpi-sub">{totalCount > 0 ? `${Math.round((activeCount / totalCount) * 100)}% roster active` : '—'}</div>
+            </div>
+          </div>
+
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--blue">
+              <DrvIcon name="bus" size={22} color="#3b82f6" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#3b82f6' }}>{assignedCount}</div>
+              <div className="att-kpi-label">Assigned to Bus</div>
+              <div className="att-kpi-sub">Regular duty assigned</div>
+            </div>
+          </div>
+
+          <div className={`att-kpi-card ${unassignedCount > 0 ? 'att-kpi-card--warn' : ''}`}>
+            <div className="att-kpi-icon att-kpi-icon--amber">
+              <DrvIcon name="badge" size={22} color="#f59e0b" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: unassignedCount > 0 ? '#d97706' : '#64748b' }}>
+                {unassignedCount}
+              </div>
+              <div className="att-kpi-label">Standby / Unassigned</div>
+              <div className="att-kpi-sub">{unassignedCount > 0 ? 'Available for reliever duty' : 'All drivers mapped'}</div>
+            </div>
+          </div>
+
+          <div className={`att-kpi-card ${expiringOrExpiredCount > 0 ? 'att-kpi-card--alert' : ''}`}>
+            <div className="att-kpi-icon att-kpi-icon--red">
+              <DrvIcon name="shield" size={22} color="#ef4444" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: expiringOrExpiredCount > 0 ? '#ef4444' : '#64748b' }}>
+                {expiringOrExpiredCount}
+              </div>
+              <div className="att-kpi-label">Licence Due / Expired</div>
+              <div className="att-kpi-sub">{expiringOrExpiredCount > 0 ? 'Renewal required' : 'All licences valid'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Toolbar & Filters */}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 260, maxWidth: 360 }}>
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+              <DrvIcon name="search" size={15} color="#94a3b8" />
+            </span>
+            <input
+              type="text"
+              className="fselect"
+              placeholder="Search name, bus, route, license, mobile..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ width: '100%', paddingLeft: 34, height: 38 }}
+            />
+          </div>
+
           {refs.institutions?.length > 0 && (
             <select
               className="fselect"
               value={instFilter}
               onChange={e => handleInstChange(e.target.value)}
-              style={{ maxWidth: 260, fontWeight: 600 }}
+              style={{ maxWidth: 260, fontWeight: 600, height: 38 }}
             >
               <option value="all">All Fleet Drivers</option>
               {refs.institutions.map(i => (
@@ -1051,16 +1155,16 @@ export default function Drivers() {
             className="fselect"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            style={{ maxWidth: 220, fontWeight: 600 }}
+            style={{ maxWidth: 220, fontWeight: 600, height: 38 }}
           >
             <option value="all">All Status ({items.length})</option>
-            <option value="assigned">📋 Assigned Only ({assignedCount})</option>
-            <option value="unassigned">⚠️ Unassigned Standby ({unassignedCount})</option>
+            <option value="assigned">Assigned Only ({assignedCount})</option>
+            <option value="unassigned">Unassigned Standby ({unassignedCount})</option>
           </select>
 
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              Showing <b>{filteredItems.length}</b> of {items.length}
+              Showing <b>{filteredItems.length}</b> of {items.length} drivers
             </span>
           </div>
         </div>
@@ -1071,8 +1175,8 @@ export default function Drivers() {
           onEdit={canEdit ? setEditing : undefined}
           onDelete={canEdit ? handleDel : undefined}
           onPdf={handlePrintSingleDriver}
-          emptyIcon="🪪"
-          emptyText="No drivers found."
+          emptyIcon="👤"
+          emptyText="No drivers found matching your criteria."
         />
       </div>
 
