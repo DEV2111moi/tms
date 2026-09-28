@@ -192,22 +192,27 @@ const GROUPS_ADMIN = [
     ],
   },
   {
-    title: 'Core Management',
+    title: 'Master Setup',
     items: [
       { to: '/admin/institutions', icon: 'institution', label: 'Institutions' },
       { to: '/admin/buses', icon: 'bus', label: 'Buses' },
       { to: '/admin/spare', icon: 'spare', label: 'Spare' },
       { to: '/admin/drivers', icon: 'driver', label: 'Drivers' },
-      { to: '/admin/driver-master-edit', icon: 'edit', label: 'Driver Master Edit' },
-      { to: '/admin/driver-salary', icon: 'salary', label: 'Driver Salary & Bata' },
+      { to: '/admin/routes', icon: 'route', label: 'Routes & Stops' },
       { to: '/admin/users', icon: 'user', label: 'Logins' },
     ],
   },
   {
     title: 'Operations',
     items: [
-      { to: '/admin/routes', icon: 'route', label: 'Routes & Stops' },
       { to: '/admin/assignments', icon: 'link', label: 'Assign Route' },
+      { to: '/admin/driver-master-edit', icon: 'edit', label: 'Driver Master Edit' },
+    ],
+  },
+  {
+    title: 'Payroll & Accounts',
+    items: [
+      { to: '/admin/driver-salary', icon: 'salary', label: 'Driver Salary & Bata' },
     ],
   },
   {
@@ -235,21 +240,26 @@ const GROUPS_INST = [
     ],
   },
   {
-    title: 'Campus Incharge',
-    items: [
-      { to: '/admin/students', icon: 'student', label: 'Students' },
-      { to: '/admin/users', icon: 'user', label: 'Bus Incharge Logins' },
-      { to: '/admin/assignments', icon: 'link', label: 'Assign Incharge' },
-    ],
-  },
-  {
-    title: 'Fleet & Payroll',
+    title: 'Master Data',
     items: [
       { to: '/admin/routes', icon: 'route', label: 'Routes (view)' },
       { to: '/admin/buses', icon: 'bus', label: 'Buses (view)' },
       { to: '/admin/spare', icon: 'spare', label: 'Spare' },
       { to: '/admin/drivers', icon: 'driver', label: 'Drivers (view)' },
+    ],
+  },
+  {
+    title: 'Operations & Incharge',
+    items: [
+      { to: '/admin/students', icon: 'student', label: 'Students' },
+      { to: '/admin/users', icon: 'user', label: 'Bus Incharge Logins' },
+      { to: '/admin/assignments', icon: 'link', label: 'Assign Incharge' },
       { to: '/admin/driver-master-edit', icon: 'edit', label: 'Driver Master Edit' },
+    ],
+  },
+  {
+    title: 'Payroll & Accounts',
+    items: [
       { to: '/admin/driver-salary', icon: 'salary', label: 'Driver Salary & Bata' },
     ],
   },
@@ -263,12 +273,22 @@ const GROUPS_EXEC = [
     ],
   },
   {
-    title: 'Attendance, Audit & Payroll',
+    title: 'Attendance & Audit',
     items: [
       { to: '/admin/attendance-report', icon: 'attendance', label: 'Attendance Report' },
       { to: '/admin/reports', icon: 'report', label: 'Reports' },
       { to: '/admin/spare', icon: 'spare', label: 'Spare' },
+    ],
+  },
+  {
+    title: 'Payroll & Accounts',
+    items: [
       { to: '/admin/driver-salary', icon: 'salary', label: 'Driver Salaries & Bata' },
+    ],
+  },
+  {
+    title: 'Fleet & Maintenance',
+    items: [
       { to: '/admin/diesel', icon: 'fuel', label: 'Diesel Usage' },
       { to: '/admin/maintenance', icon: 'wrench', label: 'Maintenance' },
       { to: '/admin/tyres', icon: 'tyre', label: 'Tyres' },
@@ -356,18 +376,8 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Sidebar Footer with user badge and quick links */}
+      {/* Sidebar Footer with user badge */}
       <div className="sidebar-foot">
-        {role === 'admin' && (
-          <NavLink to="/incharge" className="foot-action-link" title="Open Attendance Portal">
-            <div className="foot-action-content">
-              <NavIcon name="attendance" />
-              <span>Open Attendance</span>
-            </div>
-            <NavIcon name="external" className="foot-action-arrow" />
-          </NavLink>
-        )}
-
         <div className="sidebar-user-card">
           <div className="sidebar-user-avatar">
             {getInitials(user?.name)}

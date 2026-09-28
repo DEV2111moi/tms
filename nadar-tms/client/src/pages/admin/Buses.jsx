@@ -5,583 +5,60 @@ import FormModal from '../../components/UI/FormModal';
 import { useToast } from '../../components/UI/Toast';
 import { useAuth } from '../../context/AuthContext';
 
-export default function Buses() {
-  const [items, setItems] = useState([]);
-  const [editing, setEditing] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [refs, setRefs] = useState({});
-  const [instFilter, setInstFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
-  
-  // Breakdown & Substitution Modal state
-  const [breakdownModal, setBreakdownModal] = useState(null);
-  const [savingSub, setSavingSub] = useState(false);
-
-  const toast = useToast();
-  const { user } = useAuth();
-  const canEdit = user?.role === 'admin';
-
-  const load = (inst, dateVal = selectedDate) => {
-    setLoading(true);
-    const filter = (inst && inst !== 'all') 
-      ? { institution_id: inst, date: dateVal } 
-      : { institution_id: 'all', date: dateVal };
-
-    api.listRes('buses', filter).then(d => {
-      setItems(d.items || []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+function BusIcon({ name, size = 16, color = 'currentColor', style = {} }) {
+  const icons = {
+    bus: <><rect x="3" y="4" width="18" height="15" rx="3"/><circle cx="7.5" cy="16" r="1.5"/><circle cx="16.5" cy="16" r="1.5"/><path d="M3 10h18"/><path d="M7 4v3"/><path d="M17 4v3"/></>,
+    check: <path d="M20 6L9 17l-5-5"/>,
+    alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+    tools: <><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>,
+    route: <><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/></>,
+    shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+    plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    building: <><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="22.01"/><line x1="15" y1="22" x2="15" y2="22.01"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><line x1="9" y1="18" x2="9" y2="18.01"/><line x1="15" y1="18" x2="15" y2="18.01"/></>,
   };
-
-  useEffect(() => {
-    api.refs().then(r => setRefs(r || {})).catch(() => {});
-    const initialInst = user?.role === 'institution' && user.institution_id ? String(user.institution_id) : 'all';
-    setInstFilter(initialInst);
-    load(initialInst, selectedDate);
-  }, []);
-
-  const handleInstChange = (v) => { 
-    setInstFilter(v); 
-    load(v, selectedDate); 
-  };
-
-  const handleDateChange = (d) => {
-    setSelectedDate(d);
-    load(instFilter, d);
-  };
-
-  const handleSave = async (data, id) => {
-    const cleanData = { ...data };
-    ['fc_expiry', 'insurance_expiry', 'permit_expiry', 'puc_expiry', 'purchase_date'].forEach(k => {
-      if (k in cleanData) {
-        const v = cleanData[k];
-        if (!v) cleanData[k] = null;
-        else if (typeof v === 'string') {
-          const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
-          cleanData[k] = m ? m[1] : null;
-        }
-      }
-    });
-    await api.saveRes('buses', cleanData, id);
-    toast(id ? 'Saved' : 'Added');
-    load(instFilter, selectedDate);
-  };
-
-  const handleDel = async (item) => { 
-    if (!confirm('Delete this bus?')) return; 
-    await api.delRes('buses', item.id); 
-    toast('Deleted'); 
-    load(instFilter, selectedDate); 
-  };
-
-  // Helper to extract driver id and name for any bus
-  const getBusDriverInfo = (busId) => {
-    if (!busId) return { id: '', name: '' };
-    const busItem = items.find(b => String(b.id) === String(busId));
-    const refBus = (refs.buses || []).find(b => String(b.id) === String(busId));
-
-    let driverId = busItem?.current_driver_id || refBus?.driver_id || '';
-    let driverName = (busItem?.driver_name && busItem.driver_name !== '—')
-      ? busItem.driver_name
-      : (refBus?.driver_name && refBus.driver_name !== '—') ? refBus.driver_name : '';
-
-    if (driverName && driverName.includes(',')) {
-      driverName = driverName.split(',')[0].trim();
-    }
-
-    if (!driverId && driverName && refs.drivers) {
-      const dMatch = refs.drivers.find(d =>
-        d.name?.trim().toLowerCase() === driverName.toLowerCase() ||
-        driverName.toLowerCase().includes(d.name?.trim().toLowerCase())
-      );
-      if (dMatch) {
-        driverId = dMatch.id;
-        driverName = dMatch.name;
-      }
-    }
-
-    if (driverId && !driverName && refs.drivers) {
-      const dMatch = refs.drivers.find(d => String(d.id) === String(driverId));
-      if (dMatch) driverName = dMatch.name;
-    }
-
-    if (!driverId && busItem?.route_id && refs.drivers) {
-      const dMatch = refs.drivers.find(d => String(d.route_id) === String(busItem.route_id));
-      if (dMatch) {
-        driverId = dMatch.id;
-        driverName = dMatch.name;
-      }
-    }
-
-    return { id: driverId ? String(driverId) : '', name: driverName || '' };
-  };
-
-  // Open breakdown / substitute modal
-  const openBreakdownModal = (bus) => {
-    const primaryRouteId = (bus.assigned_route_ids && bus.assigned_route_ids.split(',')[0]) || bus.route_id || '';
-    const origDriverInfo = getBusDriverInfo(bus.id);
-    setBreakdownModal({
-      bus,
-      sub_date: selectedDate,
-      original_bus_id: bus.id,
-      route_id: primaryRouteId,
-      original_driver_id: origDriverInfo.id || bus.current_driver_id || '',
-      substitute_bus_id: bus.substitute_bus_id || '',
-      substitute_driver_id: bus.substitute_driver_id || origDriverInfo.id || '',
-      shifts: bus.breakdown_shifts || 'all',
-      reason: bus.breakdown_reason || 'Engine breakdown',
-      notes: bus.breakdown_notes || ''
-    });
-  };
-
-  // Save breakdown & substitute assignment
-  const handleSaveSubstitution = async (e) => {
-    e.preventDefault();
-    if (!breakdownModal.substitute_bus_id) {
-      toast('Please select a substitute / alternate bus.');
-      return;
-    }
-    setSavingSub(true);
-    try {
-      await api.createSubstitution({
-        sub_date: breakdownModal.sub_date,
-        original_bus_id: breakdownModal.original_bus_id,
-        route_id: breakdownModal.route_id || null,
-        original_driver_id: breakdownModal.original_driver_id || null,
-        substitute_bus_id: breakdownModal.substitute_bus_id,
-        substitute_driver_id: breakdownModal.substitute_driver_id || null,
-        shifts: breakdownModal.shifts || 'all',
-        reason: breakdownModal.reason || 'Breakdown',
-        is_extra_trip: 0,
-        notes: breakdownModal.notes || ''
-      });
-      toast(`Bus ${breakdownModal.bus.registration_number} marked as breakdown. Alternate bus dispatched.`);
-      setBreakdownModal(null);
-      load(instFilter, selectedDate);
-    } catch (err) {
-      toast(err.message || 'Could not save substitution');
-    } finally {
-      setSavingSub(false);
-    }
-  };
-
-  // Resolve breakdown and restore original bus
-  const handleResolveBreakdown = async (subId, busNumber) => {
-    if (!confirm(`Is bus ${busNumber} ready to return to its regular route?`)) return;
-    try {
-      await api.resolveSubstitution(subId);
-      toast(`✅ Bus ${busNumber} is ready! Successfully restored to its original route.`);
-      load(instFilter, selectedDate);
-    } catch (err) {
-      toast(err.message || 'Could not resolve breakdown');
-    }
-  };
-
-  // Table Columns
-  const COLUMNS = useMemo(() => [
-    { 
-      key: 'registration_number', 
-      label: 'Reg. Number', 
-      render: (v) => (
-        <span className="mono" style={{ fontWeight: 700, fontSize: 13 }}>{v}</span>
-      )
-    },
-    { 
-      key: 'assigned_route_code', 
-      label: 'Assigned Route', 
-      render: (v) => (
-        <span className="mono" style={{ fontWeight: 600 }}>{v || '—'}</span>
-      )
-    },
-    { 
-      key: 'driver_name', 
-      label: 'Driver Name', 
-      render: (v) => v && v !== '—' ? (
-        <span style={{ fontWeight: 600, color: 'var(--navy-2, #1e293b)' }}>{v}</span>
-      ) : (
-        <span style={{ color: 'var(--text-dim, #94a3b8)' }}>—</span>
-      )
-    },
-    { key: 'bus_model', label: 'Model' },
-    { key: 'capacity', label: 'Seats', mono: true },
-    { 
-      key: 'status', 
-      label: 'Status', 
-      render: (v, item) => item.is_breakdown ? (
-        <span className="tag" style={{ background: '#fee2e2', color: '#b91c1c', fontWeight: 700, border: '1px solid #fecaca' }}>
-          breakdown
-        </span>
-      ) : (
-        <span className={`tag ${v === 'active' ? 'tag--ok' : v === 'repair' ? 'tag--warn' : 'tag--off'}`}>{v || '—'}</span>
-      )
-    },
-    { key: 'fc_expiry', label: 'FC Expiry', date: true },
-    { key: 'insurance_expiry', label: 'Insurance Expiry', date: true },
-  ], []);
-
-  // Filter items by search query
-  const filteredItems = items.filter(item => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
-    return (
-      (item.registration_number || '').toLowerCase().includes(query) ||
-      (item.assigned_route_code || '').toLowerCase().includes(query) ||
-      (item.assigned_route_name || '').toLowerCase().includes(query) ||
-      (item.driver_name || '').toLowerCase().includes(query) ||
-      (item.substitute_bus_number || '').toLowerCase().includes(query) ||
-      (item.substitute_driver_name || '').toLowerCase().includes(query) ||
-      (item.bus_model || '').toLowerCase().includes(query) ||
-      (item.bus_name || '').toLowerCase().includes(query) ||
-      (item.bus_code || '').toLowerCase().includes(query)
-    );
-  });
-
-
-
-  const breakdownCount = items.filter(i => i.is_breakdown).length;
-
   return (
-    <>
-      <div className="page-head">
-        <div>
-          <div className="page-title">Buses</div>
-          <div className="page-sub">
-            {filteredItems.length} bus(es) {breakdownCount > 0 ? `· 🚨 ${breakdownCount} active incident(s)` : ''}
-          </div>
-        </div>
-        {canEdit && <button className="btn btn-sm btn-primary" onClick={() => setEditing({})}>+ Add Bus</button>}
-      </div>
-
-      <div className="page-body">
-        {/* Breakdown Alert Banner */}
-        {breakdownCount > 0 && (
-          <div style={{
-            background: '#fef2f2',
-            border: '1.5px solid #f87171',
-            borderRadius: 8,
-            padding: '10px 16px',
-            marginBottom: 14,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            color: '#991b1b',
-            fontWeight: 600,
-            fontSize: 13
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16 }}>🚨</span>
-              <span>
-                <b>{breakdownCount} bus(es)</b> reported broken down on <b>{selectedDate}</b>. Substitute buses are dispatched and marked with extra trips below.
-              </span>
-            </div>
-            <span style={{ fontSize: 12, background: '#fee2e2', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
-              Live Daily Substitution Active
-            </span>
-          </div>
-        )}
-
-        {/* Filter Toolbar */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
-          {/* Instant Search Bar */}
-          <input
-            type="text"
-            className="fselect"
-            placeholder="🔍 Search registration, route, driver, model..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            style={{ maxWidth: 300 }}
-          />
-
-          {/* Date Picker (Daily Basis) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#ffffff', padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>📅 Date:</span>
-            <input
-              type="date"
-              className="finput"
-              value={selectedDate}
-              onChange={e => handleDateChange(e.target.value)}
-              style={{ height: 28, padding: '2px 6px', fontSize: 12, border: 'none', background: 'transparent', fontWeight: 600 }}
-            />
-          </div>
-
-          {/* Campus Filter */}
-          {refs.institutions?.length > 0 && (
-            <select
-              className="fselect"
-              value={instFilter}
-              onChange={e => handleInstChange(e.target.value)}
-              style={{ maxWidth: 280, fontWeight: 600 }}
-            >
-              <option value="all">All Fleet Buses</option>
-              {refs.institutions.map(i => (
-                <option key={i.id} value={String(i.id)}>
-                  {i.short_name || i.name} {String(i.id) === String(user?.institution_id) ? '(My Campus)' : ''}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {/* Buses Table */}
-        <DataTable
-          columns={COLUMNS}
-          data={filteredItems}
-          onEdit={canEdit ? setEditing : undefined}
-          onDelete={canEdit ? handleDel : undefined}
-          emptyIcon="🚌"
-          emptyText="No buses found."
-        />
-      </div>
-
-      {/* Standard Bus Profile Modal (Admin only) */}
-      {editing !== null && (
-        <FormModal
-          title="Bus"
-          fields={FIELDS}
-          initial={editing}
-          onSave={handleSave}
-          onClose={() => setEditing(null)}
-          refs={refs}
-        />
-      )}
-
-      {/* Daily Breakdown & Substitute Assignment Modal */}
-      {breakdownModal && (
-        <div className="modal-backdrop" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.65)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: 16
-        }}>
-          <div className="card" style={{
-            width: '100%',
-            maxWidth: 540,
-            background: '#ffffff',
-            borderRadius: 12,
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
-            overflow: 'hidden',
-            padding: 0
-          }}>
-            {/* Modal Header */}
-            <div style={{
-              background: '#991b1b',
-              color: '#ffffff',
-              padding: '16px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
-                  🚨 Report Bus Breakdown & Assign Substitute
-                </h3>
-                <div style={{ fontSize: 12, opacity: 0.9, marginTop: 2 }}>
-                  Daily emergency assignment for route continuation
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setBreakdownModal(null)}
-                style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleSaveSubstitution} style={{ padding: '20px' }}>
-              {/* Breakdown Bus Info Banner */}
-              <div style={{
-                background: '#fef2f2',
-                border: '1.5px solid #fecaca',
-                padding: '10px 14px',
-                borderRadius: 8,
-                marginBottom: 16,
-                fontSize: 13
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span>Breakdown Bus: <strong style={{ color: '#b91c1c' }}>{breakdownModal.bus.registration_number}</strong></span>
-                  <span>Route: <strong>{breakdownModal.bus.assigned_route_code || '—'}</strong></span>
-                </div>
-                <div style={{ color: '#475569', fontSize: 12 }}>
-                  Current Driver: <b>{breakdownModal.bus.driver_name || '—'}</b>
-                </div>
-              </div>
-
-              {/* Form Fields */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <div>
-                  <label className="flabel"><span>Date</span></label>
-                  <input
-                    type="date"
-                    className="finput"
-                    value={breakdownModal.sub_date}
-                    onChange={e => setBreakdownModal({ ...breakdownModal, sub_date: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="flabel"><span>Breakdown Issue</span></label>
-                  <select
-                    className="fselect"
-                    value={breakdownModal.reason}
-                    onChange={e => setBreakdownModal({ ...breakdownModal, reason: e.target.value })}
-                  >
-                    <option value="Engine breakdown">Engine breakdown</option>
-                    <option value="Puncture / Tyre burst">Puncture / Tyre burst</option>
-                    <option value="Accident / Collision">Accident / Collision</option>
-                    <option value="Mechanical / Gear failure">Mechanical / Gear failure</option>
-                    <option value="AC / Electrical failure">AC / Electrical failure</option>
-                    <option value="Routine repair / Maintenance">Routine repair / Maintenance</option>
-                    <option value="Other emergency issue">Other emergency issue</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Substitute Bus Selection */}
-              <div style={{ marginBottom: 12 }}>
-                <label className="flabel">
-                  <span style={{ fontWeight: 700, color: '#0369a1' }}>👉 Select Alternate / Replacement Bus: *</span>
-                </label>
-                <select
-                  className="fselect"
-                  value={breakdownModal.substitute_bus_id}
-                  onChange={e => {
-                    const chosenBusId = e.target.value;
-                    const subDriver = getBusDriverInfo(chosenBusId);
-                    const origDriver = getBusDriverInfo(breakdownModal.original_bus_id);
-                    const defaultDriverId = subDriver.id || origDriver.id || breakdownModal.original_driver_id || '';
-
-                    setBreakdownModal(prev => ({
-                      ...prev,
-                      substitute_bus_id: chosenBusId,
-                      substitute_driver_id: defaultDriverId
-                    }));
-                  }}
-                  required
-                  style={{ border: '2px solid #0284c7', background: '#f0f9ff', fontWeight: 600 }}
-                >
-                  <option value="">-- Choose available substitute bus --</option>
-                  {items
-                    .filter(b => b.id !== breakdownModal.original_bus_id && !b.is_breakdown)
-                    .map(b => (
-                      <option key={b.id} value={b.id}>
-                        {b.registration_number} ({b.bus_model || 'Bus'}, Seats: {b.capacity}) {b.assigned_route_code ? `· Normally ${b.assigned_route_code}` : '· (Spare Bus)'} {b.driver_name && b.driver_name !== '—' ? `· Driver: ${b.driver_name}` : ''}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              {/* Substitute Driver Selection with Prioritized Order */}
-              {(() => {
-                const selectedSubBus = items.find(b => String(b.id) === String(breakdownModal.substitute_bus_id));
-                const subDriverInfo = getBusDriverInfo(breakdownModal.substitute_bus_id);
-                const origDriverInfo = getBusDriverInfo(breakdownModal.original_bus_id);
-
-                const selectedBusDriverId = subDriverInfo.id;
-                const selectedBusDriverName = subDriverInfo.name;
-
-                const origDriverId = origDriverInfo.id || breakdownModal.original_driver_id;
-                const origDriverName = origDriverInfo.name || breakdownModal.bus?.driver_name || null;
-
-                const otherDrivers = (refs.drivers || []).filter(d => 
-                  String(d.id) !== String(selectedBusDriverId) && 
-                  String(d.id) !== String(origDriverId)
-                );
-
-                return (
-                  <div style={{ marginBottom: 12 }}>
-                    <label className="flabel">
-                      <span style={{ fontWeight: 700, color: '#1e293b' }}>Driver Operating Alternate Bus:</span>
-                    </label>
-                    <select
-                      className="fselect"
-                      value={breakdownModal.substitute_driver_id}
-                      onChange={e => {
-                        setBreakdownModal(prev => ({
-                          ...prev,
-                          substitute_driver_id: e.target.value
-                        }));
-                      }}
-                      style={{ fontWeight: 600 }}
-                    >
-                      <option value="">-- Select Driver --</option>
-
-                      {/* 1. Selected Bus Driver (Top in order) */}
-                      {selectedBusDriverId && selectedBusDriverName && (
-                        <option value={selectedBusDriverId} style={{ fontWeight: 'bold', color: '#1d4ed8', background: '#eff6ff' }}>
-                          ⭐ {selectedBusDriverName} (Driver of Alternate Bus - {selectedSubBus?.registration_number || 'Selected Bus'})
-                        </option>
-                      )}
-
-                      {/* 2. Original Bus Driver (Second in order) */}
-                      {origDriverId && origDriverName && String(origDriverId) !== String(selectedBusDriverId) && (
-                        <option value={origDriverId} style={{ fontWeight: 'bold', color: '#b45309', background: '#fefce8' }}>
-                          🔄 {origDriverName} (Original Driver of Breakdown Bus - {breakdownModal.bus?.registration_number || 'Breakdown Bus'})
-                        </option>
-                      )}
-
-                      {/* 3. All Other Drivers */}
-                      {otherDrivers.length > 0 && (
-                        <optgroup label="──────── All Other Drivers ────────">
-                          {otherDrivers.map(d => (
-                            <option key={d.id} value={d.id}>
-                              {d.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
-                  </div>
-                );
-              })()}
-
-              {/* Notes */}
-              <div style={{ marginBottom: 18 }}>
-                <label className="flabel"><span>Notes / Remarks (Optional):</span></label>
-                <input
-                  type="text"
-                  className="finput"
-                  placeholder="e.g. Broken down near bypass, towed to garage."
-                  value={breakdownModal.notes}
-                  onChange={e => setBreakdownModal({ ...breakdownModal, notes: e.target.value })}
-                />
-              </div>
-
-              {/* Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setBreakdownModal(null)}
-                  disabled={savingSub}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  style={{ background: '#b91c1c', borderColor: '#991b1b' }}
-                  disabled={savingSub}
-                >
-                  {savingSub ? 'Saving...' : '🚨 Confirm Breakdown & Dispatch Sub'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ verticalAlign: 'middle', flexShrink: 0, ...style }}
+    >
+      {icons[name] || icons.bus}
+    </svg>
   );
 }
+
+function checkFcStatus(dateStr) {
+  if (!dateStr) return { status: 'none', label: '—' };
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return { status: 'none', label: '—' };
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return { status: 'expired', label: `Expired (${Math.abs(diffDays)}d ago)`, isAlert: true };
+    if (diffDays <= 60) return { status: 'due', label: `Due in ${diffDays}d`, isWarn: true };
+    return { status: 'valid', label: 'Valid' };
+  } catch {
+    return { status: 'none', label: '—' };
+  }
+}
+
+const COLUMNS = [
+  { key: 'registration_number', label: 'Reg. Number', mono: true },
+  { key: 'assigned_route_code', label: 'Assigned Route', mono: true },
+  { key: 'bus_model', label: 'Model' },
+  { key: 'capacity', label: 'Seats', mono: true },
+  { key: 'status', label: 'Status', tag: true },
+  { key: 'fc_expiry', label: 'FC Expiry', date: true },
+  { key: 'insurance_expiry', label: 'Insurance Expiry', date: true },
+];
 
 const FIELDS = [
   { key: 'registration_number', label: 'Registration Number', required: true },
@@ -613,3 +90,261 @@ const FIELDS = [
   { key: 'current_odometer_km', label: 'Odometer (km)', type: 'number' },
   { key: 'ownership_type', label: 'Ownership', type: 'select', options: ['owned', 'leased', 'contract'] },
 ];
+
+export default function Buses() {
+  const [items, setItems] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refs, setRefs] = useState({});
+  const [instFilter, setInstFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const toast = useToast();
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin';
+
+  const load = (inst) => {
+    setLoading(true);
+    const filter = (inst && inst !== 'all') ? { institution_id: inst } : { institution_id: 'all' };
+    api.listRes('buses', filter).then(d => {
+      setItems(d.items || []);
+      setLoading(false);
+    });
+  };
+
+  useEffect(() => {
+    api.refs().then(r => setRefs(r)).catch(() => {});
+    const initialInst = user?.role === 'institution' && user.institution_id ? String(user.institution_id) : 'all';
+    setInstFilter(initialInst);
+    load(initialInst);
+  }, []);
+
+  const handleInstChange = (v) => { setInstFilter(v); load(v); };
+
+  const handleSave = async (data, id) => {
+    const cleanData = { ...data };
+    ['fc_expiry', 'insurance_expiry', 'permit_expiry', 'puc_expiry', 'purchase_date'].forEach(k => {
+      if (k in cleanData) {
+        const v = cleanData[k];
+        if (!v) cleanData[k] = null;
+        else if (typeof v === 'string') {
+          const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
+          cleanData[k] = m ? m[1] : null;
+        }
+      }
+    });
+    await api.saveRes('buses', cleanData, id);
+    toast(id ? 'Saved' : 'Added');
+    load(instFilter);
+  };
+
+  const handleDel = async (item) => { 
+    if (!confirm('Delete this bus?')) return; 
+    await api.delRes('buses', item.id); 
+    toast('Deleted'); 
+    load(instFilter); 
+  };
+
+  // KPIs
+  const stats = useMemo(() => {
+    const total = items.length;
+    let active = 0;
+    let inRepair = 0;
+    let assigned = 0;
+    let fcDue = 0;
+
+    items.forEach(b => {
+      const st = (b.status || '').toLowerCase();
+      if (st === 'active') active++;
+      if (st === 'repair' || st === 'inactive') inRepair++;
+      if (b.assigned_route_code || b.route_id) assigned++;
+      const fc = checkFcStatus(b.fc_expiry);
+      if (fc.isAlert || fc.isWarn) fcDue++;
+    });
+
+    return { total, active, inRepair, assigned, fcDue };
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    return items.filter(item => {
+      const st = (item.status || '').toLowerCase();
+      if (statusFilter === 'active' && st !== 'active') return false;
+      if (statusFilter === 'repair' && st !== 'repair') return false;
+      if (statusFilter === 'inactive' && st !== 'inactive') return false;
+      if (statusFilter === 'assigned' && !item.assigned_route_code && !item.route_id) return false;
+      if (statusFilter === 'unassigned' && (item.assigned_route_code || item.route_id)) return false;
+
+      const query = searchQuery.toLowerCase().trim();
+      if (!query) return true;
+      return (
+        (item.registration_number || '').toLowerCase().includes(query) ||
+        (item.assigned_route_code || '').toLowerCase().includes(query) ||
+        (item.assigned_route_name || '').toLowerCase().includes(query) ||
+        (item.bus_model || '').toLowerCase().includes(query) ||
+        (item.bus_name || '').toLowerCase().includes(query) ||
+        (item.bus_code || '').toLowerCase().includes(query) ||
+        (item.institution_name || '').toLowerCase().includes(query)
+      );
+    });
+  }, [items, statusFilter, searchQuery]);
+
+  if (loading) return <div className="loading-center"><div className="spinner" /> Loading...</div>;
+
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <div className="page-title">Fleet & Buses</div>
+          <div className="page-sub">Vehicle asset registry, compliance tracking, and route assignments</div>
+        </div>
+        {canEdit && (
+          <button 
+            className="btn btn-sm btn-primary" 
+            onClick={() => setEditing({ status: 'active', vehicle_type: 'bus', fuel_type: 'diesel' })}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+          >
+            <BusIcon name="plus" size={15} color="#fff" /> Add Bus
+          </button>
+        )}
+      </div>
+
+      <div className="page-body">
+        {/* KPI Summary Ribbon */}
+        <div className="att-kpi-ribbon">
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--purple">
+              <BusIcon name="bus" size={22} color="#7c6cfc" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val">{stats.total}</div>
+              <div className="att-kpi-label">Total Fleet</div>
+              <div className="att-kpi-sub">Registered vehicles</div>
+            </div>
+          </div>
+
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--green">
+              <BusIcon name="check" size={22} color="#10b981" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#10b981' }}>{stats.active}</div>
+              <div className="att-kpi-label">Active & Ready</div>
+              <div className="att-kpi-sub">{stats.total > 0 ? `${Math.round((stats.active / stats.total) * 100)}% available` : '—'}</div>
+            </div>
+          </div>
+
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--blue">
+              <BusIcon name="route" size={22} color="#3b82f6" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#3b82f6' }}>{stats.assigned}</div>
+              <div className="att-kpi-label">Assigned Routes</div>
+              <div className="att-kpi-sub">{stats.total - stats.assigned} standby / spare</div>
+            </div>
+          </div>
+
+          <div className={`att-kpi-card ${stats.inRepair > 0 ? 'att-kpi-card--warn' : ''}`}>
+            <div className="att-kpi-icon att-kpi-icon--amber">
+              <BusIcon name="tools" size={22} color="#f59e0b" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: stats.inRepair > 0 ? '#d97706' : '#64748b' }}>
+                {stats.inRepair}
+              </div>
+              <div className="att-kpi-label">In Maintenance</div>
+              <div className="att-kpi-sub">{stats.inRepair > 0 ? 'Under repair/inactive' : 'Fleet operational'}</div>
+            </div>
+          </div>
+
+          <div className={`att-kpi-card ${stats.fcDue > 0 ? 'att-kpi-card--alert' : ''}`}>
+            <div className="att-kpi-icon att-kpi-icon--red">
+              <BusIcon name="shield" size={22} color="#ef4444" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: stats.fcDue > 0 ? '#ef4444' : '#64748b' }}>
+                {stats.fcDue}
+              </div>
+              <div className="att-kpi-label">FC / Compliance Due</div>
+              <div className="att-kpi-sub">{stats.fcDue > 0 ? 'Attention required' : 'All certificates valid'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Toolbar & Filters */}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 260, maxWidth: 360 }}>
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+              <BusIcon name="search" size={15} color="#94a3b8" />
+            </span>
+            <input
+              type="text"
+              className="fselect"
+              placeholder="Search registration, route, model..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ width: '100%', paddingLeft: 34, height: 38 }}
+            />
+          </div>
+
+          {refs.institutions?.length > 0 && (
+            <select
+              className="fselect"
+              value={instFilter}
+              onChange={e => handleInstChange(e.target.value)}
+              style={{ maxWidth: 280, fontWeight: 600, height: 38 }}
+            >
+              <option value="all">All Fleet Buses</option>
+              {refs.institutions.map(i => (
+                <option key={i.id} value={String(i.id)}>
+                  {i.short_name || i.name} {String(i.id) === String(user?.institution_id) ? '(My Campus)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <select
+            className="fselect"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            style={{ maxWidth: 200, fontWeight: 600, height: 38 }}
+          >
+            <option value="all">All Status ({items.length})</option>
+            <option value="active">Active Only ({stats.active})</option>
+            <option value="repair">In Repair ({items.filter(b => (b.status || '').toLowerCase() === 'repair').length})</option>
+            <option value="inactive">Inactive ({items.filter(b => (b.status || '').toLowerCase() === 'inactive').length})</option>
+            <option value="assigned">Assigned ({stats.assigned})</option>
+            <option value="unassigned">Unassigned ({stats.total - stats.assigned})</option>
+          </select>
+
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              Showing <b>{filteredItems.length}</b> of {items.length} buses
+            </span>
+          </div>
+        </div>
+
+        <DataTable 
+          columns={COLUMNS} 
+          data={filteredItems} 
+          onEdit={canEdit ? setEditing : undefined} 
+          onDelete={canEdit ? handleDel : undefined} 
+          emptyIcon="🚌" 
+          emptyText="No buses found matching your criteria." 
+        />
+      </div>
+
+      {editing !== null && (
+        <FormModal 
+          title="Bus" 
+          fields={FIELDS} 
+          initial={editing} 
+          onSave={handleSave} 
+          onClose={() => setEditing(null)} 
+          refs={refs} 
+        />
+      )}
+    </>
+  );
+}
+

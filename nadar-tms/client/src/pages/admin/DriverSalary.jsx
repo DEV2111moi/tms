@@ -11,7 +11,48 @@ import {
   formatDate
 } from '../../utils/salaryPdf';
 
-// =========================================================================
+function SalIcon({ name, size = 16, color = 'currentColor', style = {} }) {
+  const icons = {
+    wallet: <><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><circle cx="18" cy="14" r="2"/></>,
+    cash: <><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></>,
+    coins: <><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/></>,
+    user: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    badge: <><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><line x1="15" y1="8" x2="17" y2="8"/><line x1="15" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="17" y2="16"/></>,
+    bus: <><rect x="3" y="4" width="18" height="15" rx="3"/><circle cx="7.5" cy="16" r="1.5"/><circle cx="16.5" cy="16" r="1.5"/><path d="M3 10h18"/><path d="M7 4v3"/><path d="M17 4v3"/></>,
+    route: <><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/></>,
+    phone: <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></>,
+    search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+    plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    check: <path d="M20 6L9 17l-5-5"/>,
+    clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+    alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+    minus: <><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></>,
+    edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
+    trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
+    print: <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
+    building: <><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="22.01"/><line x1="15" y1="22" x2="15" y2="22.01"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><line x1="9" y1="18" x2="9" y2="18.01"/><line x1="15" y1="18" x2="15" y2="18.01"/></>,
+    calendar: <><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
+    creditCard: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></>,
+    save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>
+  };
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ verticalAlign: 'middle', flexShrink: 0, ...style }}
+    >
+      {icons[name] || icons.wallet}
+    </svg>
+  );
+}
+
 // =========================================================================
 // DriverSearchPicker: Search Tab for Drivers (Excludes already entered drivers)
 // =========================================================================
@@ -53,7 +94,6 @@ function DriverSearchPicker({
     const entered = [];
 
     drivers.forEach(d => {
-      // If editing an existing salary record, the current driver is treated as available
       const isAlreadyInMonth = existingDriverIds && (existingDriverIds.has(Number(d.id)) || existingDriverIds.has(String(d.id)));
       const isCurrentlyEdited = currentEditingId && String(d.id) === String(selectedDriverId);
 
@@ -130,7 +170,7 @@ function DriverSearchPicker({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', flex: 1 }}>
-          <span style={{ fontSize: 15 }}>👤</span>
+          <SalIcon name="user" size={16} color="#64748b" />
           {selectedDriver ? (
             <div style={{ textAlign: 'left', lineHeight: 1.25, overflow: 'hidden' }}>
               <div style={{
@@ -143,14 +183,29 @@ function DriverSearchPicker({
                 {selectedDriver.name}
                 {!currentEditingId && existingDriverIds && (existingDriverIds.has(Number(selectedDriver.id)) || existingDriverIds.has(String(selectedDriver.id))) && (
                   <span style={{ fontSize: 10, color: '#dc2626', marginLeft: 6, fontWeight: 700 }}>
-                    (Already Entered!)
+                    (Already Entered)
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 10.5, color: '#64748b', display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 1 }}>
-                {selectedDriver.employee_code && <span>🪪 {selectedDriver.employee_code}</span>}
-                {selectedDriver.assigned_bus_numbers && <span style={{ color: '#0284c7', fontWeight: 700 }}>🚌 {selectedDriver.assigned_bus_numbers}</span>}
-                <span>📞 {selectedDriver.phone || 'No phone'}</span>
+              <div style={{ fontSize: 10.5, color: '#64748b', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 1, alignItems: 'center' }}>
+                {selectedDriver.employee_code && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <SalIcon name="badge" size={11} color="#64748b" />
+                    <span>{selectedDriver.employee_code}</span>
+                  </span>
+                )}
+                {selectedDriver.assigned_bus_numbers && (
+                  <span style={{ color: '#0284c7', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <SalIcon name="bus" size={11} color="#0284c7" />
+                    <span>{selectedDriver.assigned_bus_numbers}</span>
+                  </span>
+                )}
+                {selectedDriver.phone && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <SalIcon name="phone" size={11} color="#64748b" />
+                    <span>{selectedDriver.phone}</span>
+                  </span>
+                )}
               </div>
             </div>
           ) : (
@@ -176,7 +231,8 @@ function DriverSearchPicker({
                 gap: 4
               }}
             >
-              🔍 Search
+              <SalIcon name="search" size={11} color="#0369a1" />
+              <span>Search</span>
             </span>
           )}
           <span style={{ fontSize: 10, color: '#64748b' }}>{isOpen ? '▲' : '▼'}</span>
@@ -203,7 +259,7 @@ function DriverSearchPicker({
         >
           {/* Search Box Tab */}
           <div style={{ padding: '8px 10px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: 14 }}>🔍</span>
+            <SalIcon name="search" size={14} color="#64748b" />
             <input
               ref={inputRef}
               type="text"
@@ -239,8 +295,9 @@ function DriverSearchPicker({
                 {q ? (
                   <div>No unentered drivers matching "<strong>{query}</strong>"</div>
                 ) : (
-                  <div style={{ color: '#16a34a', fontWeight: 700, padding: 8 }}>
-                    🎉 All active drivers have already been entered for this month!
+                  <div style={{ color: '#16a34a', fontWeight: 700, padding: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <SalIcon name="check" size={14} color="#16a34a" />
+                    <span>All active drivers have already been entered for this month!</span>
                   </div>
                 )}
               </div>
@@ -272,10 +329,23 @@ function DriverSearchPicker({
                       <div style={{ fontWeight: 800, color: isSelected ? '#166534' : '#0f172a', fontSize: 12.5 }}>
                         {d.name} {isSelected && '✓'}
                       </div>
-                      <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {d.employee_code && <span>🪪 {d.employee_code}</span>}
-                        <span>📞 {d.phone || 'No phone'}</span>
-                        {d.assigned_bus_numbers && <span style={{ color: '#0284c7', fontWeight: 700 }}>🚌 {d.assigned_bus_numbers}</span>}
+                      <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        {d.employee_code && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <SalIcon name="badge" size={10} color="#64748b" />
+                            <span>{d.employee_code}</span>
+                          </span>
+                        )}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <SalIcon name="phone" size={10} color="#64748b" />
+                          <span>{d.phone || 'No phone'}</span>
+                        </span>
+                        {d.assigned_bus_numbers && (
+                          <span style={{ color: '#0284c7', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <SalIcon name="bus" size={10} color="#0284c7" />
+                            <span>{d.assigned_bus_numbers}</span>
+                          </span>
+                        )}
                       </div>
                     </div>
                     {d.institution_name && (
@@ -303,7 +373,10 @@ function DriverSearchPicker({
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
-                  <span>⛔ Already Entered for this Month ({filteredEntered.length})</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <SalIcon name="alert" size={12} color="#991b1b" />
+                    <span>Already Entered for this Month ({filteredEntered.length})</span>
+                  </span>
                   <span style={{ fontSize: 9, fontWeight: 700, color: '#b91c1c' }}>Not Selectable</span>
                 </div>
                 {filteredEntered.map(d => (
@@ -330,9 +403,17 @@ function DriverSearchPicker({
                       <div style={{ fontWeight: 700, color: '#475569', fontSize: 12 }}>
                         {d.name}
                       </div>
-                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', gap: 6 }}>
-                        <span>📞 {d.phone || 'No phone'}</span>
-                        {d.assigned_bus_numbers && <span>🚌 {d.assigned_bus_numbers}</span>}
+                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1, display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <SalIcon name="phone" size={10} color="#94a3b8" />
+                          <span>{d.phone || 'No phone'}</span>
+                        </span>
+                        {d.assigned_bus_numbers && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <SalIcon name="bus" size={10} color="#94a3b8" />
+                            <span>{d.assigned_bus_numbers}</span>
+                          </span>
+                        )}
                       </div>
                     </div>
                     <span style={{
@@ -726,8 +807,9 @@ export default function DriverSalary() {
       <div className="page-head" style={{ marginBottom: 16 }}>
         <div>
           <div className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span>💼 Driver Salary & Daily Bata Management</span>
-            <span style={{ fontSize: 13, background: '#e0f2fe', color: '#0369a1', padding: '2px 10px', borderRadius: 12, fontWeight: 700 }}>
+            <SalIcon name="wallet" size={24} color="#7c6cfc" />
+            <span>Driver Salary & Daily Bata Management</span>
+            <span className="tag" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', fontSize: 11, fontWeight: 700 }}>
               {formatMonthYear(selectedMonth)}
             </span>
           </div>
@@ -736,98 +818,104 @@ export default function DriverSalary() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="dashboard-head-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <button
-            className="btn btn-sm btn-outline"
+            className="btn btn-secondary"
             onClick={handlePrintSummary}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, borderColor: '#16a34a', color: '#16a34a' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, padding: '7px 14px' }}
           >
-            📄 Download Summary (PDF)
+            <SalIcon name="download" size={14} color="currentColor" />
+            <span>Download Summary (PDF)</span>
           </button>
 
           <button
-            className="btn btn-sm btn-primary"
+            className="btn btn-primary"
             onClick={() => openEditModal(null)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, padding: '7px 14px' }}
           >
-            + New Salary Entry
+            <SalIcon name="plus" size={14} color="#fff" />
+            <span>New Salary Entry</span>
           </button>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. KPI METRICS CARDS BANNER                                               */}
+      {/* 2. KPI METRICS CARDS BANNER (Ribbon Layout)                              */}
       {/* ========================================================================= */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-        gap: 12,
-        marginBottom: 20
-      }}>
+      <div className="att-kpi-ribbon">
         {/* Total Net Payout */}
-        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid #16a34a', background: 'linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Total Net Payout
+        <div className="att-kpi-card">
+          <div className="att-kpi-icon att-kpi-icon--green">
+            <SalIcon name="cash" size={20} color="#10b981" />
           </div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: '#15803d', marginTop: 4, fontFamily: 'monospace' }}>
-            {formatCurrency(stats.total_net || 0)}
-          </div>
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-            Gross: {formatCurrency(stats.total_gross || 0)}
+          <div className="att-kpi-body">
+            <div className="att-kpi-val" style={{ color: '#10b981' }}>
+              {formatCurrency(stats.total_net || 0)}
+            </div>
+            <div className="att-kpi-label">Total Net Payout</div>
+            <div className="att-kpi-sub">
+              Gross: {formatCurrency(stats.total_gross || 0)}
+            </div>
           </div>
         </div>
 
         {/* Total Bata Disbursed */}
-        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid #f59e0b', background: 'linear-gradient(180deg, #ffffff 0%, #fffbeb 100%)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Total Bata Disbursed
+        <div className="att-kpi-card">
+          <div className="att-kpi-icon att-kpi-icon--amber">
+            <SalIcon name="coins" size={20} color="#f59e0b" />
           </div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: '#d97706', marginTop: 4, fontFamily: 'monospace' }}>
-            {formatCurrency(stats.total_bata || 0)}
-          </div>
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-            Daily duty & special outstation bata
+          <div className="att-kpi-body">
+            <div className="att-kpi-val" style={{ color: '#f59e0b' }}>
+              {formatCurrency(stats.total_bata || 0)}
+            </div>
+            <div className="att-kpi-label">Total Bata Disbursed</div>
+            <div className="att-kpi-sub">Daily duty & special outstation bata</div>
           </div>
         </div>
 
         {/* Basic Salaries */}
-        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid #0284c7', background: 'linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Total Basic Salaries
+        <div className="att-kpi-card">
+          <div className="att-kpi-icon att-kpi-icon--blue">
+            <SalIcon name="user" size={20} color="#3b82f6" />
           </div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: '#0284c7', marginTop: 4, fontFamily: 'monospace' }}>
-            {formatCurrency(stats.total_basic || 0)}
-          </div>
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-            For {stats.total_drivers || items.length} Driver(s)
+          <div className="att-kpi-body">
+            <div className="att-kpi-val" style={{ color: '#3b82f6' }}>
+              {formatCurrency(stats.total_basic || 0)}
+            </div>
+            <div className="att-kpi-label">Total Basic Salaries</div>
+            <div className="att-kpi-sub">For {stats.total_drivers || items.length} Driver(s)</div>
           </div>
         </div>
 
         {/* Total Deductions */}
-        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid #ef4444', background: 'linear-gradient(180deg, #ffffff 0%, #fef2f2 100%)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Total Deductions
+        <div className="att-kpi-card">
+          <div className="att-kpi-icon att-kpi-icon--red">
+            <SalIcon name="minus" size={20} color="#ef4444" />
           </div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: '#dc2626', marginTop: 4, fontFamily: 'monospace' }}>
-            {formatCurrency(stats.total_deductions || 0)}
-          </div>
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-            Advances, EPF, ESI & penalties
+          <div className="att-kpi-body">
+            <div className="att-kpi-val" style={{ color: '#ef4444' }}>
+              {formatCurrency(stats.total_deductions || 0)}
+            </div>
+            <div className="att-kpi-label">Total Deductions</div>
+            <div className="att-kpi-sub">Advances, EPF, ESI & penalties</div>
           </div>
         </div>
 
-        {/* Disbursement Status */}
-        <div className="card" style={{ padding: '14px 18px', borderLeft: '4px solid #8b5cf6', background: 'linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Payment Status
+        {/* Payment Status */}
+        <div className="att-kpi-card">
+          <div className="att-kpi-icon att-kpi-icon--purple">
+            <SalIcon name="clock" size={20} color="#7c6cfc" />
           </div>
-          <div style={{ fontSize: 20, fontWeight: 900, color: '#7c3aed', marginTop: 4 }}>
-            <span style={{ color: '#16a34a' }}>{stats.paid_count || 0} Paid</span>
-            <span style={{ color: '#94a3b8', margin: '0 4px' }}>/</span>
-            <span style={{ color: '#ea580c' }}>{stats.pending_count || 0} Pending</span>
-          </div>
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-            {stats.total_drivers ? `${Math.round(((stats.paid_count || 0) / stats.total_drivers) * 100)}% disbursed` : '0%'}
+          <div className="att-kpi-body">
+            <div className="att-kpi-val" style={{ fontSize: 18, color: '#7c6cfc' }}>
+              <span style={{ color: '#10b981' }}>{stats.paid_count || 0} Paid</span>
+              <span style={{ color: '#94a3b8', margin: '0 4px' }}>/</span>
+              <span style={{ color: '#f59e0b' }}>{stats.pending_count || 0} Pending</span>
+            </div>
+            <div className="att-kpi-label">Payment Status</div>
+            <div className="att-kpi-sub">
+              {stats.total_drivers ? `${Math.round(((stats.paid_count || 0) / stats.total_drivers) * 100)}% disbursed` : '0% disbursed'}
+            </div>
           </div>
         </div>
       </div>
@@ -839,26 +927,26 @@ export default function DriverSalary() {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Month Picker */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <label style={{ fontSize: 11.5, fontWeight: 700, color: '#475569' }}>Month:</label>
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Month:</label>
             <input
               type="month"
               className="finput"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              style={{ padding: '5px 10px', fontSize: 12, fontWeight: 700, width: 145 }}
+              style={{ padding: '5px 10px', fontSize: 12, fontWeight: 700, width: 145, height: 34 }}
             />
           </div>
 
           {/* Campus Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <label style={{ fontSize: 11.5, fontWeight: 700, color: '#475569' }}>Campus:</label>
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Campus:</label>
             <select
               className="fselect"
               value={instFilter}
               onChange={(e) => setInstFilter(e.target.value)}
-              style={{ padding: '5px 10px', fontSize: 12, width: 220 }}
+              style={{ padding: '5px 10px', fontSize: 12, width: 220, height: 34 }}
             >
-              <option value="ALL">🏢 All Campuses / Institutions</option>
+              <option value="ALL">All Campuses / Institutions</option>
               {institutions.map(inst => (
                 <option key={inst.id} value={inst.id}>
                   {inst.short_name ? `${inst.short_name} — ${inst.name}` : inst.name}
@@ -869,29 +957,34 @@ export default function DriverSalary() {
 
           {/* Payment Status Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <label style={{ fontSize: 11.5, fontWeight: 700, color: '#475569' }}>Status:</label>
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Status:</label>
             <select
               className="fselect"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ padding: '5px 10px', fontSize: 12, width: 140 }}
+              style={{ padding: '5px 10px', fontSize: 12, width: 140, height: 34 }}
             >
               <option value="all">All Status</option>
-              <option value="paid">✅ Paid Only</option>
-              <option value="pending">⏳ Pending Only</option>
+              <option value="paid">Paid Only</option>
+              <option value="pending">Pending Only</option>
             </select>
           </div>
 
           {/* Search Box */}
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <input
-              type="text"
-              className="finput"
-              placeholder="🔍 Search driver name, bus no, mobile, license..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ padding: '6px 12px', fontSize: 12, width: '100%' }}
-            />
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <span style={{ position: 'absolute', left: 10, pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                <SalIcon name="search" size={13} color="#94a3b8" />
+              </span>
+              <input
+                type="text"
+                className="finput"
+                placeholder="Search driver name, bus no, mobile, license..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ padding: '6px 12px 6px 30px', fontSize: 12.5, width: '100%', height: 34 }}
+              />
+            </div>
           </div>
 
           {/* Bulk Mark Paid Button */}
@@ -899,9 +992,10 @@ export default function DriverSalary() {
             <button
               className="btn btn-sm btn-primary"
               onClick={() => setShowBulkPaidModal(true)}
-              style={{ background: '#16a34a', border: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ background: '#16a34a', border: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34 }}
             >
-              💳 Mark {selectedIds.length} as Paid
+              <SalIcon name="creditCard" size={13} color="#fff" />
+              <span>Mark {selectedIds.length} as Paid</span>
             </button>
           )}
         </div>
@@ -912,20 +1006,32 @@ export default function DriverSalary() {
       {/* ========================================================================= */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
+          <div style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
             <div className="spinner" style={{ margin: '0 auto 12px' }} />
             Loading salary records for {formatMonthYear(selectedMonth)}...
           </div>
         ) : filteredItems.length === 0 ? (
-          <div style={{ padding: 48, textAlign: 'center' }}>
-            <div style={{ fontSize: 42, marginBottom: 8 }}>💼</div>
-            <h3 style={{ margin: '0 0 6px 0', color: '#1e293b' }}>No Salary Records Found</h3>
-            <p style={{ margin: '0 0 16px 0', color: '#64748b', fontSize: 13 }}>
-              No salary entries have been created for {formatMonthYear(selectedMonth)}.
+          <div style={{ padding: '60px 24px', textAlign: 'center' }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%', background: '#ede9fe',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px'
+            }}>
+              <SalIcon name="wallet" size={32} color="#7c6cfc" />
+            </div>
+            <h3 style={{ margin: '0 0 6px 0', color: '#0f172a', fontFamily: 'Oswald', fontSize: 20 }}>
+              No Salary Records Found
+            </h3>
+            <p style={{ margin: '0 0 18px 0', color: '#64748b', fontSize: 13, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
+              No salary entries have been created for {formatMonthYear(selectedMonth)}. Click below to create the first entry for this month.
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button className="btn btn-sm btn-primary" onClick={() => openEditModal(null)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                + Enter Driver Salary
+              <button
+                className="btn btn-primary"
+                onClick={() => openEditModal(null)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 18px', fontWeight: 700 }}
+              >
+                <SalIcon name="plus" size={14} color="#fff" />
+                <span>Enter Driver Salary</span>
               </button>
             </div>
           </div>
@@ -982,9 +1088,17 @@ export default function DriverSalary() {
                         <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 13 }}>
                           {item.driver_name}
                         </div>
-                        <div style={{ fontSize: 10.5, color: '#64748b', display: 'flex', gap: 8, marginTop: 2 }}>
-                          <span>🪪 {item.employee_code || `DRV-${item.driver_id}`}</span>
-                          <span>📞 {item.driver_phone || '—'}</span>
+                        <div style={{ fontSize: 11, color: '#64748b', display: 'flex', gap: 10, marginTop: 2, alignItems: 'center' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <SalIcon name="badge" size={11} color="#64748b" />
+                            <span>{item.employee_code || `DRV-${item.driver_id}`}</span>
+                          </span>
+                          {item.driver_phone && item.driver_phone !== '—' && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              <SalIcon name="phone" size={11} color="#64748b" />
+                              <span>{item.driver_phone}</span>
+                            </span>
+                          )}
                         </div>
                         {item.extra_trips_count > 0 && (
                           <div style={{ marginTop: 3 }}>
@@ -1005,21 +1119,25 @@ export default function DriverSalary() {
                         )}
                       </td>
                       <td>
-                        <div style={{ fontWeight: 700, color: '#0284c7' }}>
-                          🚌 {item.assigned_bus_numbers || '—'}
+                        <div style={{ fontWeight: 700, color: '#0284c7', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <SalIcon name="bus" size={12} color="#0284c7" />
+                          <span>{item.assigned_bus_numbers || '—'}</span>
                         </div>
-                        <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>
-                          🚩 {item.assigned_route_codes ? `${item.assigned_route_codes}` : 'General / Spare'}
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 1, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <SalIcon name="route" size={11} color="#64748b" />
+                          <span>{item.assigned_route_codes ? `${item.assigned_route_codes}` : 'General / Spare'}</span>
                         </div>
                       </td>
-                      <td style={{ fontSize: 11, color: '#334155' }}>
-                        {item.institution_name || '—'}
+                      <td style={{ fontSize: 11.5, color: '#334155' }}>
+                        <span className="tag" style={{ background: '#f1f5f9', color: '#475569', fontSize: 11, fontWeight: 700 }}>
+                          {item.institution_name || 'Central'}
+                        </span>
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <div style={{ fontWeight: 800, color: '#1e293b' }}>
                           {item.present_days} / {item.working_days}
                         </div>
-                        <div style={{ fontSize: 9.5, color: '#64748b' }}>duty days</div>
+                        <div style={{ fontSize: 10, color: '#64748b' }}>duty days</div>
                       </td>
                       <td style={{ textAlign: 'right' }} className="mono">
                         {basic.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -1028,7 +1146,7 @@ export default function DriverSalary() {
                         <div style={{ fontWeight: 800, color: '#b45309', fontSize: 12 }}>
                           ₹ {totalBata.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </div>
-                        <div style={{ fontSize: 9, color: '#b45309' }}>
+                        <div style={{ fontSize: 9.5, color: '#b45309' }}>
                           (@ ₹{parseFloat(item.daily_bata_rate || 0)}/day{spBata > 0 ? ` + ₹${spBata} sp` : ''})
                         </div>
                       </td>
@@ -1046,7 +1164,9 @@ export default function DriverSalary() {
                       <td style={{ textAlign: 'center' }}>
                         <span
                           style={{
-                            display: 'inline-block',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
                             padding: '3px 8px',
                             borderRadius: 12,
                             fontSize: 10,
@@ -1057,10 +1177,11 @@ export default function DriverSalary() {
                             border: `1px solid ${isPaid ? '#86efac' : '#fde047'}`
                           }}
                         >
-                          {isPaid ? 'PAID' : 'PENDING'}
+                          <SalIcon name={isPaid ? 'check' : 'clock'} size={10} color={isPaid ? '#166534' : '#854d0e'} />
+                          <span>{isPaid ? 'PAID' : 'PENDING'}</span>
                         </span>
                         {isPaid && item.payment_mode && (
-                          <div style={{ fontSize: 9, color: '#64748b', marginTop: 2, textTransform: 'capitalize' }}>
+                          <div style={{ fontSize: 9.5, color: '#64748b', marginTop: 2, textTransform: 'capitalize' }}>
                             {item.payment_mode.replace('_', ' ')}
                           </div>
                         )}
@@ -1071,17 +1192,19 @@ export default function DriverSalary() {
                             className="btn btn-xs btn-outline"
                             onClick={() => handlePrintSlip(item)}
                             title="Download / Print Payslip PDF"
-                            style={{ color: '#0284c7', borderColor: '#bae6fd', padding: '3px 7px' }}
+                            style={{ color: '#0284c7', borderColor: '#bae6fd', padding: '3px 7px', display: 'inline-flex', alignItems: 'center', gap: 3 }}
                           >
-                            🖨️ Slip
+                            <SalIcon name="print" size={11} color="#0284c7" />
+                            <span>Slip</span>
                           </button>
                           <button
                             className="btn btn-xs btn-outline"
                             onClick={() => openEditModal(item)}
                             title="Edit Details"
-                            style={{ padding: '3px 7px' }}
+                            style={{ padding: '3px 7px', display: 'inline-flex', alignItems: 'center', gap: 3 }}
                           >
-                            ✏️ Edit
+                            <SalIcon name="edit" size={11} color="currentColor" />
+                            <span>Edit</span>
                           </button>
                           <button
                             className="btn btn-xs btn-outline"
@@ -1089,7 +1212,7 @@ export default function DriverSalary() {
                             title="Delete Entry"
                             style={{ color: '#dc2626', borderColor: '#fecaca', padding: '3px 7px' }}
                           >
-                            🗑️
+                            <SalIcon name="trash" size={11} color="#dc2626" />
                           </button>
                         </div>
                       </td>
@@ -1124,8 +1247,10 @@ export default function DriverSalary() {
                   form="salaryForm"
                   className="btn btn-sm btn-primary"
                   disabled={saving || !editItem.driver_id || (!editItem.id && modalEnteredDriverIds && (modalEnteredDriverIds.has(Number(editItem.driver_id)) || modalEnteredDriverIds.has(String(editItem.driver_id))))}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
-                  {saving ? 'Saving...' : '💾 Save Salary Entry'}
+                  <SalIcon name="save" size={13} color="#fff" />
+                  <span>{saving ? 'Saving...' : 'Save Salary Entry'}</span>
                 </button>
               </div>
             </div>
@@ -1146,8 +1271,9 @@ export default function DriverSalary() {
                   disabled={!!editItem.id}
                 />
                 {!editItem.id && editItem.driver_id && modalEnteredDriverIds && (modalEnteredDriverIds.has(Number(editItem.driver_id)) || modalEnteredDriverIds.has(String(editItem.driver_id))) && (
-                  <div style={{ color: '#dc2626', fontSize: 11, fontWeight: 700, marginTop: 4 }}>
-                    ⛔ This driver already has a salary entry for {formatMonthYear(editItem.salary_month)}. Duplicate not allowed.
+                  <div style={{ color: '#dc2626', fontSize: 11, fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <SalIcon name="alert" size={12} color="#dc2626" />
+                    <span>This driver already has a salary entry for {formatMonthYear(editItem.salary_month)}. Duplicate not allowed.</span>
                   </div>
                 )}
               </label>
@@ -1180,8 +1306,9 @@ export default function DriverSalary() {
 
             {/* Row 2: Attendance & Duty Days */}
             <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a8a', marginBottom: 8, textTransform: 'uppercase' }}>
-                📅 Duty & Attendance Details
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#1e3a8a', marginBottom: 8, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <SalIcon name="calendar" size={13} color="#1e3a8a" />
+                <span>Duty & Attendance Details</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
                 <label className="flabel">
@@ -1229,8 +1356,9 @@ export default function DriverSalary() {
 
             {/* Row 3: Earnings & Bata Section */}
             <div style={{ background: '#fffbeb', padding: 12, borderRadius: 8, border: '1px solid #fde68a' }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#b45309', marginBottom: 8, textTransform: 'uppercase' }}>
-                🍛 Earnings & Driver Bata Breakdown
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#b45309', marginBottom: 8, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <SalIcon name="coins" size={13} color="#b45309" />
+                <span>Earnings & Driver Bata Breakdown</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
                 <label className="flabel">
@@ -1313,8 +1441,9 @@ export default function DriverSalary() {
 
             {/* Row 4: Deductions Section */}
             <div style={{ background: '#fef2f2', padding: 12, borderRadius: 8, border: '1px solid #fecaca' }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#b91c1c', marginBottom: 8, textTransform: 'uppercase' }}>
-                ✂️ Deductions & Recoveries
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#b91c1c', marginBottom: 8, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <SalIcon name="minus" size={13} color="#b91c1c" />
+                <span>Deductions & Recoveries</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
                 <label className="flabel">
@@ -1395,9 +1524,9 @@ export default function DriverSalary() {
                   value={editItem.payment_status}
                   onChange={(e) => setEditItem({ ...editItem, payment_status: e.target.value })}
                 >
-                  <option value="pending">⏳ Pending</option>
-                  <option value="paid">✅ Paid</option>
-                  <option value="partially_paid">⚠️ Partially Paid</option>
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
+                  <option value="partially_paid">Partially Paid</option>
                 </select>
               </label>
 
