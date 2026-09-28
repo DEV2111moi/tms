@@ -112,19 +112,50 @@ exports.list = (table) => async (req, res) => {
 
     // ---- Enhanced Buses view with assignments & route linking (Grouped & Deduplicated) ----
     if (table === 'buses') {
+      const targetDate = req.query.date || new Date().toLocaleDateString('en-CA');
       let sql = `
         SELECT b.id, b.registration_number, b.bus_model, b.capacity, b.status,
                b.fc_expiry, b.insurance_expiry, b.permit_expiry, b.puc_expiry,
                b.bus_code, b.bus_name, b.vehicle_type, b.institution_id,
+               GROUP_CONCAT(DISTINCT r.id ORDER BY r.route_code SEPARATOR ',') AS assigned_route_ids,
                GROUP_CONCAT(DISTINCT r.route_code ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_code,
                GROUP_CONCAT(DISTINCT r.route_name ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_name,
-               COALESCE(MAX(i.short_name), MAX(i.name), '—') AS institution_name
+               COALESCE(
+                 NULLIF(GROUP_CONCAT(DISTINCT d.name ORDER BY d.name SEPARATOR ', '), ''),
+                 (SELECT td.name FROM trips t JOIN drivers td ON td.id = t.driver_id WHERE t.bus_id = b.id ORDER BY t.id DESC LIMIT 1),
+                 '—'
+               ) AS driver_name,
+               COALESCE(MAX(a.driver_id), (SELECT td.id FROM trips t JOIN drivers td ON td.id = t.driver_id WHERE t.bus_id = b.id ORDER BY t.id DESC LIMIT 1)) AS current_driver_id,
+               COALESCE(MAX(i.short_name), MAX(i.name), '—') AS institution_name,
+
+               -- Daily Breakdown / Substitution info for requested date
+               MAX(ds.id) AS substitution_id,
+               MAX(ds.sub_date) AS substitution_date,
+               MAX(ds.reason) AS breakdown_reason,
+               MAX(ds.is_extra_trip) AS is_extra_trip,
+               MAX(ds.shifts) AS breakdown_shifts,
+               MAX(ds.notes) AS breakdown_notes,
+               MAX(ds.status) AS substitution_status,
+               MAX(sb.id) AS substitute_bus_id,
+               MAX(sb.registration_number) AS substitute_bus_number,
+               MAX(sb.bus_model) AS substitute_bus_model,
+               MAX(sb.capacity) AS substitute_capacity,
+               MAX(sd.id) AS substitute_driver_id,
+               MAX(sd.name) AS substitute_driver_name,
+               (CASE WHEN MAX(ds.id) IS NOT NULL AND MAX(ds.status) = 'active' THEN 1 ELSE 0 END) AS is_breakdown
         FROM buses b
         LEFT JOIN assignments a ON a.bus_id = b.id
         LEFT JOIN routes r ON r.id = a.route_id
+        LEFT JOIN drivers d ON d.id = a.driver_id
         LEFT JOIN institutions i ON i.id = COALESCE(b.institution_id, r.institution_id)
+        LEFT JOIN daily_substitutions ds ON ds.id = COALESCE(
+          (SELECT ds2.id FROM daily_substitutions ds2 WHERE ds2.original_bus_id = b.id AND ds2.status = 'active' ORDER BY ds2.id DESC LIMIT 1),
+          (SELECT ds3.id FROM daily_substitutions ds3 WHERE ds3.original_bus_id = b.id AND ds3.sub_date = ? ORDER BY ds3.id DESC LIMIT 1)
+        )
+        LEFT JOIN buses sb ON sb.id = ds.substitute_bus_id
+        LEFT JOIN drivers sd ON sd.id = ds.substitute_driver_id
       `;
-      const params = [];
+      const params = [targetDate];
       const whereConditions = [];
 
       if (req.query.route_id) {
@@ -142,7 +173,7 @@ exports.list = (table) => async (req, res) => {
 
       sql += ` GROUP BY b.id ORDER BY b.registration_number`;
       const items = await query(sql, params);
-      return res.json({ items });
+      return res.json({ items, date: targetDate });
     }
 
     // ---- Enhanced Drivers view with assignments & route linking (Grouped & Deduplicated) ----

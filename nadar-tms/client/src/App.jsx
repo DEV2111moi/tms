@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/admin/Dashboard';
 import Institutions from './pages/admin/Institutions';
 import Buses from './pages/admin/Buses';
+import Spare from './pages/admin/Spare';
 import Drivers from './pages/admin/Drivers';
 import DriverMasterEdit from './pages/admin/DriverMasterEdit';
 import DriverSalary from './pages/admin/DriverSalary';
@@ -54,6 +55,7 @@ export default function App() {
               <Route index element={<Dashboard />} />
               <Route path="institutions" element={<Institutions />} />
               <Route path="buses" element={<Buses />} />
+              <Route path="spare" element={<Spare />} />
               <Route path="drivers" element={<Drivers />} />
               <Route path="driver-master-edit" element={<DriverMasterEdit />} />
               <Route path="driver-salary" element={<DriverSalary />} />

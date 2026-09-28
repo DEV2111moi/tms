@@ -101,7 +101,36 @@ async function autoLogTrips() {
       };
       assignments.sort((a, b) => (shiftOrder[a.shift] || 99) - (shiftOrder[b.shift] || 99));
 
+      // Get all active / daily substitutions for this date
+      const daySubs = await query(`
+        SELECT ds.*,
+               b_orig.registration_number AS orig_bus_number,
+               b_sub.registration_number AS sub_bus_number
+        FROM daily_substitutions ds
+        JOIN buses b_orig ON b_orig.id = ds.original_bus_id
+        JOIN buses b_sub ON b_sub.id = ds.substitute_bus_id
+        WHERE (ds.sub_date = ? OR ds.status = 'active')
+      `, [targetDateStr]);
+
       for (const assign of assignments) {
+        // Check if assigned bus was broken down and substituted
+        const sub = daySubs.find(s => 
+          Number(s.original_bus_id) === Number(assign.bus_id) && 
+          (s.shifts === 'all' || !s.shifts || s.shifts === assign.shift)
+        );
+
+        const targetBusId = sub ? sub.substitute_bus_id : assign.bus_id;
+        const effectiveDriverId = sub ? (sub.substitute_driver_id || assign.driver_id) : assign.driver_id;
+
+        // If trip was previously logged under broken-down bus, update to substitute bus
+        if (sub) {
+          await query(`
+            UPDATE trip_logs 
+            SET bus_id = ?
+            WHERE bus_id = ? AND log_date = ? AND shift = ?
+          `, [targetBusId, assign.bus_id, targetDateStr, assign.shift]);
+        }
+
         // Find scheduled start and end times based on route stops
         const stopsInfo = await query(`
           SELECT MIN(scheduled_time) AS start_t, MAX(scheduled_time) AS end_t
@@ -151,10 +180,10 @@ async function autoLogTrips() {
         }
 
         let linkedUserId = null;
-        if (assign.driver_id) {
+        if (effectiveDriverId) {
           const driverUser = await query(`
             SELECT user_id FROM drivers WHERE id = ?
-          `, [assign.driver_id]);
+          `, [effectiveDriverId]);
           linkedUserId = (driverUser[0] && driverUser[0].user_id) || null;
         }
 
@@ -163,7 +192,7 @@ async function autoLogTrips() {
           SELECT id, route_id, driver_id, start_km, end_km, start_stop, end_stop FROM trip_logs
           WHERE bus_id = ? AND log_date = ? AND shift = ?
           LIMIT 1
-        `, [assign.bus_id, targetDateStr, assign.shift]);
+        `, [targetBusId, targetDateStr, assign.shift]);
 
         if (existing.length > 0) {
           const ex = existing[0];
@@ -219,7 +248,7 @@ async function autoLogTrips() {
           WHERE bus_id = ? AND end_km IS NOT NULL
           ORDER BY log_date DESC, end_time DESC, id DESC
           LIMIT 1
-        `, [assign.bus_id]);
+        `, [targetBusId]);
 
         let start_km = 0;
         if (lastTrip.length > 0 && lastTrip[0].end_km != null) {
@@ -227,7 +256,7 @@ async function autoLogTrips() {
         } else {
           const busOdom = await query(`
             SELECT current_odometer_km FROM buses WHERE id = ?
-          `, [assign.bus_id]);
+          `, [targetBusId]);
           start_km = Number((busOdom[0] && busOdom[0].current_odometer_km) || 0);
         }
 
@@ -240,7 +269,7 @@ async function autoLogTrips() {
           (bus_id, route_id, driver_id, log_date, shift, start_time, start_km, end_time, end_km, start_stop, end_stop)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-          assign.bus_id,
+          targetBusId,
           assign.route_id,
           linkedUserId,
           targetDateStr,
@@ -258,7 +287,7 @@ async function autoLogTrips() {
           UPDATE buses
           SET current_odometer_km = ?
           WHERE id = ?
-        `, [end_km, assign.bus_id]);
+        `, [end_km, targetBusId]);
       }
     }
   } catch (err) {
@@ -357,6 +386,41 @@ exports.distance = async (req, res) => {
        LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b.institution_id)
        WHERE ${cond}
        GROUP BY i.short_name ORDER BY km DESC`, params);
+
+    // Fetch substitutions for distance report
+    const substitutions = await query(`
+      SELECT ds.id,
+             ds.sub_date,
+             ds.original_bus_id,
+             b_orig.registration_number AS original_bus_number,
+             COALESCE(dr_orig.name, '—') AS original_driver_name,
+             ds.substitute_bus_id,
+             b_sub.registration_number AS substitute_bus_number,
+             COALESCE(dr_sub.name, '—') AS substitute_driver_name,
+             ds.route_id,
+             COALESCE(r.route_code, '—') AS route_code,
+             COALESCE(r.route_name, '—') AS route_name,
+             ds.shifts,
+             ds.reason,
+             ds.status,
+             ds.notes
+      FROM daily_substitutions ds
+      JOIN buses b_orig ON b_orig.id = ds.original_bus_id
+      JOIN buses b_sub ON b_sub.id = ds.substitute_bus_id
+      LEFT JOIN routes r ON r.id = ds.route_id
+      LEFT JOIN drivers dr_orig ON dr_orig.id = ds.original_driver_id
+      LEFT JOIN drivers dr_sub ON dr_sub.id = ds.substitute_driver_id
+      WHERE (ds.sub_date BETWEEN ? AND ? OR ds.status = 'active')
+        AND (? IS NULL OR r.institution_id = ? OR b_orig.institution_id = ? OR b_sub.institution_id = ?)
+        AND (? IS NULL OR b_orig.id = ? OR b_sub.id = ?)
+      ORDER BY ds.sub_date DESC, ds.id DESC
+    `, [from, to, inst, inst, inst, inst, busId, busId, busId]);
+
+    // Attach breakdowns and cover duties to each bus in distance report
+    byBus.forEach(b => {
+      b.breakdowns = substitutions.filter(s => Number(s.original_bus_id) === Number(b.bus_id));
+      b.cover_duties = substitutions.filter(s => Number(s.substitute_bus_id) === Number(b.bus_id));
+    });
     
     const num = (a) => a.map((r) => ({ 
       ...r, 
@@ -369,9 +433,11 @@ exports.distance = async (req, res) => {
       evening1_km: Number(r.evening1_km || 0),
       evening2_km: Number(r.evening2_km || 0),
       evening3_km: Number(r.evening3_km || 0),
-      evening4_km: Number(r.evening4_km || 0)
+      evening4_km: Number(r.evening4_km || 0),
+      breakdowns: r.breakdowns || [],
+      cover_duties: r.cover_duties || []
     }));
-    res.json({ from, to, days: num(days), byBus: num(byBus), byInstitution: num(byInstitution) });
+    res.json({ from, to, days: num(days), byBus: num(byBus), byInstitution: num(byInstitution), substitutions });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not build the distance report.' }); }
 };
 
@@ -476,6 +542,119 @@ exports.busWise = async (req, res) => {
       ORDER BY tl.log_date DESC, tl.id DESC
     `, params);
 
+    // Fetch all substitutions in the date range (or active substitutions)
+    const substitutions = await query(`
+      SELECT ds.id,
+             ds.sub_date,
+             ds.original_bus_id,
+             b_orig.registration_number AS original_bus_number,
+             COALESCE(dr_orig.name, '—') AS original_driver_name,
+             ds.substitute_bus_id,
+             b_sub.registration_number AS substitute_bus_number,
+             COALESCE(dr_sub.name, '—') AS substitute_driver_name,
+             ds.route_id,
+             COALESCE(r.route_code, '—') AS route_code,
+             COALESCE(r.route_name, '—') AS route_name,
+             ds.shifts,
+             ds.reason,
+             ds.status,
+             ds.notes,
+             ds.created_at,
+             ds.updated_at
+      FROM daily_substitutions ds
+      JOIN buses b_orig ON b_orig.id = ds.original_bus_id
+      JOIN buses b_sub ON b_sub.id = ds.substitute_bus_id
+      LEFT JOIN routes r ON r.id = ds.route_id
+      LEFT JOIN drivers dr_orig ON dr_orig.id = ds.original_driver_id
+      LEFT JOIN drivers dr_sub ON dr_sub.id = ds.substitute_driver_id
+      WHERE (ds.sub_date BETWEEN ? AND ? OR ds.status = 'active')
+        AND (? IS NULL OR r.institution_id = ? OR b_orig.institution_id = ? OR b_sub.institution_id = ?)
+        AND (? IS NULL OR b_orig.id = ? OR b_sub.id = ?)
+      ORDER BY ds.sub_date DESC, ds.id DESC
+    `, [from, to, inst, inst, inst, inst, busId, busId, busId]);
+
+    // Ensure all buses involved in substitutions also exist in the buses list even if they logged 0 trips
+    const busMap = new Map();
+    buses.forEach(b => busMap.set(Number(b.bus_id), b));
+
+    for (const s of substitutions) {
+      if (!busMap.has(Number(s.original_bus_id))) {
+        const bInfo = await query(`
+          SELECT b.id AS bus_id, b.registration_number, COALESCE(i.short_name, '—') AS institution
+          FROM buses b LEFT JOIN institutions i ON i.id = b.institution_id WHERE b.id = ?
+        `, [s.original_bus_id]);
+        if (bInfo.length > 0) {
+          const newB = {
+            bus_id: bInfo[0].bus_id,
+            registration_number: bInfo[0].registration_number,
+            institution: bInfo[0].institution,
+            total_trips: 0,
+            total_km: 0,
+            morning1_trips: 0, morning1_km: 0,
+            morning2_trips: 0, morning2_km: 0,
+            morning3_trips: 0, morning3_km: 0,
+            morning4_trips: 0, morning4_km: 0,
+            evening1_trips: 0, evening1_km: 0,
+            evening2_trips: 0, evening2_km: 0,
+            evening3_trips: 0, evening3_km: 0,
+            evening4_trips: 0, evening4_km: 0,
+            routes: s.route_code || '—',
+            drivers: s.original_driver_name || '—'
+          };
+          busMap.set(Number(s.original_bus_id), newB);
+          buses.push(newB);
+        }
+      }
+      if (!busMap.has(Number(s.substitute_bus_id))) {
+        const bInfo = await query(`
+          SELECT b.id AS bus_id, b.registration_number, COALESCE(i.short_name, '—') AS institution
+          FROM buses b LEFT JOIN institutions i ON i.id = b.institution_id WHERE b.id = ?
+        `, [s.substitute_bus_id]);
+        if (bInfo.length > 0) {
+          const newB = {
+            bus_id: bInfo[0].bus_id,
+            registration_number: bInfo[0].registration_number,
+            institution: bInfo[0].institution,
+            total_trips: 0,
+            total_km: 0,
+            morning1_trips: 0, morning1_km: 0,
+            morning2_trips: 0, morning2_km: 0,
+            morning3_trips: 0, morning3_km: 0,
+            morning4_trips: 0, morning4_km: 0,
+            evening1_trips: 0, evening1_km: 0,
+            evening2_trips: 0, evening2_km: 0,
+            evening3_trips: 0, evening3_km: 0,
+            evening4_trips: 0, evening4_km: 0,
+            routes: s.route_code || '—',
+            drivers: s.substitute_driver_name || '—'
+          };
+          busMap.set(Number(s.substitute_bus_id), newB);
+          buses.push(newB);
+        }
+      }
+    }
+
+    // Attach breakdowns and cover duties to each bus
+    buses.forEach(b => {
+      b.breakdowns = substitutions.filter(s => Number(s.original_bus_id) === Number(b.bus_id));
+      b.cover_duties = substitutions.filter(s => Number(s.substitute_bus_id) === Number(b.bus_id));
+    });
+
+    // Tag trips with substitution metadata if applicable
+    trips.forEach(t => {
+      const match = substitutions.find(s => 
+        Number(s.substitute_bus_id) === Number(t.bus_id) &&
+        (s.sub_date === t.date || s.status === 'active') &&
+        (Number(s.route_id) === Number(t.route_id) || s.route_code === t.route_code)
+      );
+      if (match) {
+        t.is_substitution = true;
+        t.original_bus_number = match.original_bus_number;
+        t.original_bus_id = match.original_bus_id;
+        t.substitution_reason = match.reason;
+      }
+    });
+
     res.json({
       from,
       to,
@@ -499,17 +678,69 @@ exports.busWise = async (req, res) => {
         evening3_km: Number(b.evening3_km || 0),
         evening4_trips: Number(b.evening4_trips || 0),
         evening4_km: Number(b.evening4_km || 0),
+        breakdowns: b.breakdowns || [],
+        cover_duties: b.cover_duties || []
       })),
       trips: trips.map(t => ({
         ...t,
         km: Number(t.km || 0),
         start_km: Number(t.start_km || 0),
         end_km: Number(t.end_km || 0)
-      }))
+      })),
+      substitutions
     });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Could not build the bus-wise report.' });
+  }
+};
+
+// GET /api/reports/substitutions
+exports.substitutions = async (req, res) => {
+  const { from, to, inst, busId } = range(req);
+  try {
+    const substitutions = await query(`
+      SELECT ds.id,
+             ds.sub_date,
+             ds.original_bus_id,
+             b_orig.registration_number AS original_bus_number,
+             b_orig.bus_model AS original_bus_model,
+             COALESCE(dr_orig.name, '—') AS original_driver_name,
+             COALESCE(dr_orig.phone, '') AS original_driver_phone,
+             ds.substitute_bus_id,
+             b_sub.registration_number AS substitute_bus_number,
+             b_sub.bus_model AS substitute_bus_model,
+             b_sub.capacity AS substitute_capacity,
+             COALESCE(dr_sub.name, '—') AS substitute_driver_name,
+             COALESCE(dr_sub.phone, '') AS substitute_driver_phone,
+             ds.route_id,
+             COALESCE(r.route_code, '—') AS route_code,
+             COALESCE(r.route_name, '—') AS route_name,
+             COALESCE(r.total_distance, 0) AS route_distance,
+             COALESCE(i.short_name, i.name, '—') AS institution,
+             ds.shifts,
+             ds.reason,
+             ds.status,
+             ds.notes,
+             ds.created_at,
+             ds.updated_at
+      FROM daily_substitutions ds
+      JOIN buses b_orig ON b_orig.id = ds.original_bus_id
+      JOIN buses b_sub ON b_sub.id = ds.substitute_bus_id
+      LEFT JOIN routes r ON r.id = ds.route_id
+      LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b_orig.institution_id)
+      LEFT JOIN drivers dr_orig ON dr_orig.id = ds.original_driver_id
+      LEFT JOIN drivers dr_sub ON dr_sub.id = ds.substitute_driver_id
+      WHERE (ds.sub_date BETWEEN ? AND ? OR ds.status = 'active')
+        AND (? IS NULL OR r.institution_id = ? OR b_orig.institution_id = ? OR b_sub.institution_id = ?)
+        AND (? IS NULL OR b_orig.id = ? OR b_sub.id = ?)
+      ORDER BY ds.sub_date DESC, ds.id DESC
+    `, [from, to, inst, inst, inst, inst, busId, busId, busId]);
+
+    res.json({ from, to, substitutions });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not fetch substitutions report.' });
   }
 };
 
@@ -541,27 +772,74 @@ exports.maintenance = async (req, res) => {
 
 // GET /api/reports/driver-trips
 exports.driverTrips = async (req, res) => {
-  const { from, to } = range(req);
+  const { from, to, inst } = range(req);
   try {
+    await autoLogTrips();
+
     const records = await query(
-      `SELECT tl.log_date, tl.shift, tl.start_km, tl.end_km, tl.end_stop,
-              u.name AS driver_name, b.registration_number
-       FROM trip_logs tl LEFT JOIN users u ON u.id = tl.driver_id LEFT JOIN buses b ON b.id = tl.bus_id
+      `SELECT tl.log_date, tl.shift, tl.start_km, tl.end_km, tl.start_stop, tl.end_stop, tl.start_time, tl.end_time,
+              COALESCE(dr_direct.name, dr_assign.name, u.name, '—') AS driver_name,
+              b.registration_number,
+              COALESCE(i.short_name, '—') AS institution,
+              COALESCE(r.route_code, '—') AS route_code,
+              COALESCE(r.route_name, '—') AS route_name
+       FROM trip_logs tl
+       JOIN buses b ON b.id = tl.bus_id
+       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift ORDER BY (a2.driver_id IS NOT NULL) DESC, a2.id DESC LIMIT 1))
+       LEFT JOIN institutions i ON i.id = COALESCE(r.institution_id, b.institution_id)
+       LEFT JOIN users u ON u.id = tl.driver_id
+       LEFT JOIN drivers dr_direct ON dr_direct.id = tl.driver_id
+       LEFT JOIN drivers dr_assign ON dr_assign.id = COALESCE(
+         (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND a3.route_id = tl.route_id AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+         (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+         (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+         (SELECT d2.id FROM drivers d2 WHERE d2.route_id = tl.route_id ORDER BY d2.id DESC LIMIT 1)
+       )
        WHERE tl.log_date BETWEEN ? AND ?
-       ORDER BY tl.log_date DESC, u.name, tl.shift`, [from, to]);
+         AND (? IS NULL OR r.institution_id = ? OR b.institution_id = ?)
+       ORDER BY tl.log_date DESC, driver_name, tl.shift`, [from, to, inst, inst, inst]);
+
     const byDriver = await query(
-      `SELECT u.name AS driver_name,
+      `SELECT COALESCE(dr_direct.name, dr_assign.name, u.name, 'Unassigned') AS driver_name,
               COUNT(tl.id) AS trips,
               SUM(CASE WHEN tl.end_time IS NOT NULL THEN 1 ELSE 0 END) AS completed,
               SUM(CASE WHEN tl.end_km IS NOT NULL AND tl.start_km IS NOT NULL THEN tl.end_km - tl.start_km ELSE 0 END) AS km,
               COUNT(DISTINCT tl.log_date) AS days
-       FROM trip_logs tl LEFT JOIN users u ON u.id = tl.driver_id
+       FROM trip_logs tl
+       JOIN buses b ON b.id = tl.bus_id
+       LEFT JOIN routes r ON r.id = COALESCE(tl.route_id, (SELECT a2.route_id FROM assignments a2 WHERE a2.bus_id = tl.bus_id AND a2.shift = tl.shift ORDER BY (a2.driver_id IS NOT NULL) DESC, a2.id DESC LIMIT 1))
+       LEFT JOIN users u ON u.id = tl.driver_id
+       LEFT JOIN drivers dr_direct ON dr_direct.id = tl.driver_id
+       LEFT JOIN drivers dr_assign ON dr_assign.id = COALESCE(
+         (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND a3.route_id = tl.route_id AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+         (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.shift = tl.shift AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+         (SELECT a3.driver_id FROM assignments a3 WHERE a3.bus_id = tl.bus_id AND a3.driver_id IS NOT NULL ORDER BY a3.id DESC LIMIT 1),
+         (SELECT d2.id FROM drivers d2 WHERE d2.route_id = tl.route_id ORDER BY d2.id DESC LIMIT 1)
+       )
        WHERE tl.log_date BETWEEN ? AND ?
-       GROUP BY u.name ORDER BY trips DESC`, [from, to]);
-    res.json({ from, to,
-      records: records.map(r => ({ ...r, km: (r.end_km!=null && r.start_km!=null) ? (r.end_km - r.start_km) : null })),
-      byDriver: byDriver.map(d => ({ ...d, trips: Number(d.trips), completed: Number(d.completed), km: Number(d.km || 0), days: Number(d.days) })) });
-  } catch (e) { console.error(e); res.status(500).json({ error: 'Could not build the driver trips report.' }); }
+         AND (? IS NULL OR r.institution_id = ? OR b.institution_id = ?)
+       GROUP BY driver_name
+       ORDER BY (driver_name = 'Unassigned') ASC, trips DESC, km DESC`, [from, to, inst, inst, inst]);
+
+    res.json({
+      from,
+      to,
+      records: records.map(r => ({
+        ...r,
+        km: (r.end_km != null && r.start_km != null) ? (r.end_km - r.start_km) : null
+      })),
+      byDriver: byDriver.map(d => ({
+        ...d,
+        trips: Number(d.trips),
+        completed: Number(d.completed),
+        km: Number(d.km || 0),
+        days: Number(d.days)
+      }))
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not build the driver trips report.' });
+  }
 };
 
 // GET /api/reports/routes-stops

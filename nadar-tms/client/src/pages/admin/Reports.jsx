@@ -3,8 +3,31 @@ import api from '../../api/api';
 import { useToast } from '../../components/UI/Toast';
 import { fmtDate, money } from '../../components/UI/DataTable';
 
+export const fmtTime = (t) => {
+  if (!t) return '';
+  if (typeof t === 'string' && t.includes(' ')) {
+    const timePart = t.split(' ')[1];
+    const [hh, mm] = timePart.split(':');
+    if (hh !== undefined && mm !== undefined) {
+      const h = parseInt(hh, 10);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${String(h12).padStart(2, '0')}:${mm} ${ampm}`;
+    }
+  }
+  if (typeof t === 'string' && t.includes(':')) {
+    const [hh, mm] = t.split(':');
+    const h = parseInt(hh, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${String(h12).padStart(2, '0')}:${mm} ${ampm}`;
+  }
+  return String(t);
+};
+
 const REPORT_TYPES = [
   { value: 'bus_wise', label: 'Bus Wise Report' },
+  { value: 'substitutions', label: 'Breakdowns & Bus Substitutions' },
   { value: 'distance', label: 'Distance Travelled' },
   { value: 'attendance', label: 'Attendance Register' },
   { value: 'absentees', label: 'Absentees (date range)' },
@@ -41,10 +64,12 @@ export default function Reports() {
         data = await api.repDistance(st.from, st.to, st.institutionId, st.busId);
       } else if (st.type === 'bus_wise') {
         data = await api.repBusWise(st.from, st.to, st.institutionId, st.busId);
+      } else if (st.type === 'substitutions') {
+        data = await api.repSubstitutions(st.from, st.to, st.institutionId, st.busId);
       } else if (st.type === 'maintenance') {
         data = await api.repMaint(st.from, st.to, st.institutionId);
       } else if (st.type === 'drivertrips') {
-        data = await api.repDriverTrips(st.from, st.to);
+        data = await api.repDriverTrips(st.from, st.to, st.institutionId);
       } else if (st.type === 'routes_stops') {
         data = await api.repRoutesStops(st.institutionId);
       }
@@ -89,31 +114,57 @@ export default function Reports() {
         'Evening 2 KM', 'Evening 2 Trips',
         'Evening 3 KM', 'Evening 3 Trips',
         'Evening 4 KM', 'Evening 4 Trips',
-        'Routes Operated', 'Drivers'
-      ], data.buses.map((b, i) => [
+        'Routes Operated', 'Drivers',
+        'Breakdown Incidents & Handover', 'Alternate Bus Cover Duties'
+      ], data.buses.map((b, i) => {
+        const bBreakdowns = (b.breakdowns || []).map(s => `${s.sub_date}: Broken down (${s.reason || 'Issue'}). Replaced by ${s.substitute_bus_number} on ${s.route_code}`).join('; ');
+        const bCovers = (b.cover_duties || []).map(s => `${s.sub_date}: Substituted for ${s.original_bus_number} on ${s.route_code}`).join('; ');
+        return [
+          i + 1,
+          b.registration_number,
+          b.institution || '',
+          b.total_trips,
+          b.total_km,
+          b.morning1_km,
+          b.morning1_trips,
+          b.morning2_km,
+          b.morning2_trips,
+          b.morning3_km,
+          b.morning3_trips,
+          b.morning4_km,
+          b.morning4_trips,
+          b.evening1_km,
+          b.evening1_trips,
+          b.evening2_km,
+          b.evening2_trips,
+          b.evening3_km,
+          b.evening3_trips,
+          b.evening4_km,
+          b.evening4_trips,
+          b.routes || '',
+          b.drivers || '',
+          bBreakdowns || 'None',
+          bCovers || 'None'
+        ];
+      }));
+    } else if (type === 'substitutions') {
+      download(`substitutions_report_${data.from}_${data.to}.csv`, [
+        '#', 'Date', 'Status', 'Breakdown Bus', 'Reason', 'Route Code', 'Route Name', 
+        'Original Driver', 'Alternate / Substitute Bus', 'Driver Operating Alternate', 'Shifts', 'Institution', 'Notes'
+      ], (data.substitutions || []).map((s, i) => [
         i + 1,
-        b.registration_number,
-        b.institution || '',
-        b.total_trips,
-        b.total_km,
-        b.morning1_km,
-        b.morning1_trips,
-        b.morning2_km,
-        b.morning2_trips,
-        b.morning3_km,
-        b.morning3_trips,
-        b.morning4_km,
-        b.morning4_trips,
-        b.evening1_km,
-        b.evening1_trips,
-        b.evening2_km,
-        b.evening2_trips,
-        b.evening3_km,
-        b.evening3_trips,
-        b.evening4_km,
-        b.evening4_trips,
-        b.routes || '',
-        b.drivers || ''
+        s.sub_date,
+        s.status === 'active' ? 'ACTIVE INCIDENT' : 'RESOLVED / RESTORED',
+        s.original_bus_number,
+        s.reason || 'Breakdown',
+        s.route_code || '',
+        s.route_name || '',
+        s.original_driver_name || '',
+        s.substitute_bus_number || '',
+        s.substitute_driver_name || '',
+        s.shifts || 'all',
+        s.institution || '',
+        s.notes || ''
       ]));
     } else if (type === 'distance') {
       download(`distance_${data.from}_${data.to}.csv`, [
@@ -186,7 +237,7 @@ export default function Reports() {
               </select>
             </label>
 
-            {(st.type === 'bus_wise' || st.type === 'distance') && (
+            {(st.type === 'bus_wise' || st.type === 'distance' || st.type === 'substitutions') && (
               <label className="flabel">
                 <span>Bus Number</span>
                 <select className="fselect" value={st.busId} onChange={e => setSt(prev => ({ ...prev, busId: e.target.value }))}>
@@ -278,6 +329,7 @@ export default function Reports() {
         {result && (
           <div>
             {result.type === 'bus_wise' && <BusWiseReportView data={result.data} selectedBusId={st.busId} st={st} insts={insts} />}
+            {result.type === 'substitutions' && <SubstitutionsReportView data={result.data} />}
             {result.type === 'attendance' && <AttendanceReportView data={result.data} />}
             {result.type === 'absentees' && <AbsenteesReportView data={result.data} />}
             {result.type === 'fuel' && <FuelReportView data={result.data} />}
@@ -450,6 +502,7 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
 
   const buses = data?.buses || [];
   const trips = data?.trips || [];
+  const substitutions = data?.substitutions || [];
 
   // Index trips by bus ID and registration number for instant retrieval
   const tripsByBusId = {};
@@ -476,13 +529,40 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
     return [];
   };
 
+  const getBusBreakdowns = (b) => {
+    if (b.breakdowns && b.breakdowns.length > 0) return b.breakdowns;
+    const busId = b.bus_id || b.id;
+    const reg = String(b.registration_number || '').trim().toUpperCase();
+    return substitutions.filter(s => 
+      (busId && String(s.original_bus_id) === String(busId)) ||
+      (reg && String(s.original_bus_number).trim().toUpperCase() === reg)
+    );
+  };
+
+  const getBusCoverDuties = (b) => {
+    if (b.cover_duties && b.cover_duties.length > 0) return b.cover_duties;
+    const busId = b.bus_id || b.id;
+    const reg = String(b.registration_number || '').trim().toUpperCase();
+    return substitutions.filter(s => 
+      (busId && String(s.substitute_bus_id) === String(busId)) ||
+      (reg && String(s.substitute_bus_number).trim().toUpperCase() === reg)
+    );
+  };
+
   const filteredBuses = buses.filter(b => {
     if (!search.trim()) return true;
     const q = search.toLowerCase().trim();
+    const bd = getBusBreakdowns(b);
+    const cd = getBusCoverDuties(b);
+    const bdText = bd.map(s => `${s.substitute_bus_number} ${s.reason}`).join(' ').toLowerCase();
+    const cdText = cd.map(s => `${s.original_bus_number} ${s.route_code}`).join(' ').toLowerCase();
+
     return (b.registration_number && b.registration_number.toLowerCase().includes(q)) ||
            (b.institution && b.institution.toLowerCase().includes(q)) ||
            (b.routes && b.routes.toLowerCase().includes(q)) ||
-           (b.drivers && b.drivers.toLowerCase().includes(q));
+           (b.drivers && b.drivers.toLowerCase().includes(q)) ||
+           bdText.includes(q) ||
+           cdText.includes(q);
   });
 
   const totalKm = filteredBuses.reduce((sum, b) => sum + b.total_km, 0);
@@ -657,6 +737,8 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
           ) : (
             filteredBuses.map((b, i) => {
               const busTrips = getBusTrips(b);
+              const busBreakdowns = getBusBreakdowns(b);
+              const busCoverDuties = getBusCoverDuties(b);
               return (
                 <div 
                   key={b.bus_id || b.registration_number || i} 
@@ -719,6 +801,130 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                     </div>
                   </div>
 
+                  {/* Breakdown Incident Notice Banner */}
+                  {busBreakdowns.length > 0 && (
+                    <div style={{
+                      background: '#fff5f5',
+                      borderBottom: '1px solid #fecaca',
+                      padding: '8px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '5px',
+                      fontSize: '12px'
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>⚠️</span> <span>Breakdown / Alternate Bus Assigned ({busBreakdowns.length}):</span>
+                      </div>
+                      {busBreakdowns.map((s, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          flexWrap: 'wrap',
+                          background: '#ffffff',
+                          padding: '4px 10px',
+                          borderRadius: '4px',
+                          border: '1px solid #fecaca',
+                          color: '#1e293b'
+                        }}>
+                          <span className="mono" style={{ fontWeight: 600, color: '#475569' }}>
+                            {fmtDate(s.sub_date)}
+                          </span>
+                          <span style={{ color: '#94a3b8' }}>•</span>
+                          <span style={{ color: '#b91c1c', fontWeight: 600 }}>
+                            {s.reason || 'Breakdown'}
+                          </span>
+                          <span style={{ color: '#94a3b8' }}>•</span>
+                          <span>
+                            Replaced by <strong style={{ color: '#1d4ed8' }}>{s.substitute_bus_number}</strong>
+                          </span>
+                          <span style={{ color: '#94a3b8' }}>•</span>
+                          <span>
+                            Route: <strong>{s.route_code || s.route_name}</strong>
+                          </span>
+                          {s.substitute_driver_name && (
+                            <>
+                              <span style={{ color: '#94a3b8' }}>•</span>
+                              <span>Driver: <strong>{s.substitute_driver_name}</strong></span>
+                            </>
+                          )}
+                          <span style={{
+                            marginLeft: 'auto',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '3px',
+                            background: s.status === 'active' ? '#fee2e2' : '#dcfce7',
+                            color: s.status === 'active' ? '#dc2626' : '#15803d',
+                            border: `1px solid ${s.status === 'active' ? '#fca5a5' : '#86efac'}`
+                          }}>
+                            {s.status === 'active' ? 'Active' : 'Restored'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Alternate Bus Deployment Notice Banner */}
+                  {busCoverDuties.length > 0 && (
+                    <div style={{
+                      background: '#f0f7ff',
+                      borderBottom: '1px solid #bfdbfe',
+                      padding: '8px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '5px',
+                      fontSize: '12px'
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>🔄</span> <span>Cover Duty History ({busCoverDuties.length}):</span>
+                      </div>
+                      {busCoverDuties.map((s, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          flexWrap: 'wrap',
+                          background: '#ffffff',
+                          padding: '4px 10px',
+                          borderRadius: '4px',
+                          border: '1px solid #dbeafe',
+                          color: '#1e293b'
+                        }}>
+                          <span className="mono" style={{ fontWeight: 600, color: '#475569' }}>
+                            {fmtDate(s.sub_date)}
+                          </span>
+                          <span style={{ color: '#94a3b8' }}>•</span>
+                          <span>
+                            Covered for <strong style={{ color: '#b91c1c' }}>{s.original_bus_number}</strong>
+                          </span>
+                          <span style={{ color: '#94a3b8' }}>•</span>
+                          <span>
+                            Route: <strong>{s.route_code || s.route_name}</strong>
+                          </span>
+                          {s.substitute_driver_name && (
+                            <>
+                              <span style={{ color: '#94a3b8' }}>•</span>
+                              <span>Driver: <strong>{s.substitute_driver_name}</strong></span>
+                            </>
+                          )}
+                          <span style={{
+                            marginLeft: 'auto',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '3px',
+                            background: s.status === 'active' ? '#fee2e2' : '#dcfce7',
+                            color: s.status === 'active' ? '#dc2626' : '#15803d',
+                            border: `1px solid ${s.status === 'active' ? '#fca5a5' : '#86efac'}`
+                          }}>
+                            {s.status === 'active' ? 'Active' : 'Completed'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Trips Breakdown Table */}
                   {busTrips.length === 0 ? (
                     <div style={{ padding: '14px 16px', textAlign: 'center', color: '#64748b', fontSize: '12.5px', fontStyle: 'italic' }}>
@@ -735,7 +941,7 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                             <th style={{ minWidth: '100px', whiteSpace: 'nowrap' }}>Institution</th>
                             <th style={{ minWidth: '140px' }}>Route</th>
                             <th style={{ minWidth: '115px', whiteSpace: 'nowrap' }}>Driver</th>
-                            <th style={{ whiteSpace: 'nowrap' }}>Stoppages (From ➔ To)</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>Stoppages & Timing (From ➔ To)</th>
                             <th style={{ textAlign: 'right', width: '95px', whiteSpace: 'nowrap' }}>Odometer</th>
                             <th style={{ textAlign: 'right', width: '70px', whiteSpace: 'nowrap' }}>Trip KM</th>
                           </tr>
@@ -765,12 +971,33 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                               <td className="nowrap">{t.institution || b.institution || '—'}</td>
                               <td>
                                 {t.route_code !== '—' ? (
-                                  <span><strong className="mono">{t.route_code}</strong> <span style={{ color: '#64748b', fontWeight: 'normal' }}>· {t.route_name}</span></span>
+                                  <span>
+                                    <strong className="mono">{t.route_code}</strong> <span style={{ color: '#64748b', fontWeight: 'normal' }}>· {t.route_name}</span>
+                                    {t.is_substitution && (
+                                      <span style={{
+                                        fontSize: '10px',
+                                        background: '#dbeafe',
+                                        color: '#1d4ed8',
+                                        fontWeight: 800,
+                                        padding: '2px 6px',
+                                        borderRadius: '3px',
+                                        marginLeft: '6px',
+                                        display: 'inline-block'
+                                      }}>
+                                        🔄 Cover for {t.original_bus_number}
+                                      </span>
+                                    )}
+                                  </span>
                                 ) : '—'}
                               </td>
                               <td className="nowrap"><strong>{t.driver_name || '—'}</strong></td>
                               <td style={{ fontSize: '11.5px' }}>
-                                {t.start_stop || '—'} ➔ {t.end_stop || '—'}
+                                <div style={{ fontWeight: 600 }}>{t.start_stop || '—'} ➔ {t.end_stop || '—'}</div>
+                                {(t.start_time || t.end_time) && (
+                                  <div style={{ fontSize: '10.5px', color: '#0369a1', marginTop: '2px', fontWeight: 600 }}>
+                                    🕒 {fmtTime(t.start_time) || '—'} ➔ {fmtTime(t.end_time) || '—'}
+                                  </div>
+                                )}
                               </td>
                               <td className="mono nowrap" style={{ textAlign: 'right', fontSize: '11px', color: '#475569' }}>
                                 {t.start_km} ➔ {t.end_km}
@@ -840,6 +1067,8 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                 filteredBuses.map((b, i) => {
                   const isSelected = expandedBus && (expandedBus.bus_id === b.bus_id || expandedBus.registration_number === b.registration_number);
                   const busTrips = getBusTrips(b);
+                  const busBreakdowns = getBusBreakdowns(b);
+                  const busCoverDuties = getBusCoverDuties(b);
 
                   return (
                     <Fragment key={b.bus_id || b.registration_number || i}>
@@ -866,6 +1095,20 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                           }}>
                             {b.registration_number}
                           </span>
+                          {busBreakdowns.length > 0 && (
+                            <div style={{ marginTop: '3px' }}>
+                              <span style={{ fontSize: '10px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '1px 5px', borderRadius: '3px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                                ⚠️ Replaced by {busBreakdowns.map(s => s.substitute_bus_number).join(', ')}
+                              </span>
+                            </div>
+                          )}
+                          {busCoverDuties.length > 0 && (
+                            <div style={{ marginTop: '3px' }}>
+                              <span style={{ fontSize: '10px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '1px 5px', borderRadius: '3px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                                🔄 Sub for {busCoverDuties.map(s => s.original_bus_number).join(', ')}
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td>
                           <span style={{
@@ -1000,6 +1243,66 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                               </button>
                             </div>
 
+                            {/* Breakdown Incident Callout Box */}
+                            {busBreakdowns.length > 0 && (
+                              <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                                <div style={{ fontWeight: 700, color: '#991b1b', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                  <span>⚠️</span> Breakdown / Alternate Bus Assigned ({busBreakdowns.length}):
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  {busBreakdowns.map((s, idx) => (
+                                    <div key={idx} style={{ fontSize: 12, color: '#1e293b', background: '#fff', padding: '4px 10px', borderRadius: 4, border: '1px solid #fee2e2', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                      <span className="mono" style={{ fontWeight: 600, color: '#475569' }}>{fmtDate(s.sub_date)}</span>
+                                      <span style={{ color: '#94a3b8' }}>•</span>
+                                      <span style={{ color: '#b91c1c', fontWeight: 600 }}>{s.reason || 'Breakdown'}</span>
+                                      <span style={{ color: '#94a3b8' }}>•</span>
+                                      <span>Replaced by <strong style={{ color: '#1d4ed8' }}>{s.substitute_bus_number}</strong></span>
+                                      <span style={{ color: '#94a3b8' }}>•</span>
+                                      <span>Route: <strong>{s.route_code || s.route_name}</strong></span>
+                                      {s.substitute_driver_name && (
+                                        <>
+                                          <span style={{ color: '#94a3b8' }}>•</span>
+                                          <span>Driver: <strong>{s.substitute_driver_name}</strong></span>
+                                        </>
+                                      )}
+                                      <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: s.status === 'active' ? '#fee2e2' : '#dcfce7', color: s.status === 'active' ? '#dc2626' : '#15803d', border: `1px solid ${s.status === 'active' ? '#fca5a5' : '#86efac'}` }}>
+                                        {s.status === 'active' ? 'Active' : 'Restored'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Alternate Bus Deployment Callout Box */}
+                            {busCoverDuties.length > 0 && (
+                              <div style={{ background: '#f0f7ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                                <div style={{ fontWeight: 700, color: '#1e40af', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                  <span>🔄</span> Cover Duty History ({busCoverDuties.length}):
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  {busCoverDuties.map((s, idx) => (
+                                    <div key={idx} style={{ fontSize: 12, color: '#1e293b', background: '#fff', padding: '4px 10px', borderRadius: 4, border: '1px solid #dbeafe', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                      <span className="mono" style={{ fontWeight: 600, color: '#475569' }}>{fmtDate(s.sub_date)}</span>
+                                      <span style={{ color: '#94a3b8' }}>•</span>
+                                      <span>Covered for <strong style={{ color: '#b91c1c' }}>{s.original_bus_number}</strong></span>
+                                      <span style={{ color: '#94a3b8' }}>•</span>
+                                      <span>Route: <strong>{s.route_code || s.route_name}</strong></span>
+                                      {s.substitute_driver_name && (
+                                        <>
+                                          <span style={{ color: '#94a3b8' }}>•</span>
+                                          <span>Driver: <strong>{s.substitute_driver_name}</strong></span>
+                                        </>
+                                      )}
+                                      <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: s.status === 'active' ? '#fee2e2' : '#dcfce7', color: s.status === 'active' ? '#dc2626' : '#15803d', border: `1px solid ${s.status === 'active' ? '#fca5a5' : '#86efac'}` }}>
+                                        {s.status === 'active' ? 'Active' : 'Completed'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             {busTrips.length === 0 ? (
                               <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '13px', background: '#fff', borderRadius: '6px', border: '1px solid var(--paper-2)' }}>
                                 No detailed trip records logged for this bus in the selected date range.
@@ -1015,7 +1318,7 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                                       <th>Institution</th>
                                       <th>Route</th>
                                       <th>Driver</th>
-                                      <th>Stoppages (From ➔ To)</th>
+                                      <th style={{ minWidth: '160px' }}>Stoppages & Timing (From ➔ To)</th>
                                       <th style={{ textAlign: 'right' }}>Odometer</th>
                                       <th style={{ textAlign: 'right' }}>Trip KM</th>
                                     </tr>
@@ -1040,11 +1343,34 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                                         </td>
                                         <td>{t.institution || b.institution || '—'}</td>
                                         <td className="mono">
-                                          {t.route_code !== '—' ? <b>{t.route_code} <span className="muted" style={{ fontWeight: 'normal' }}>· {t.route_name}</span></b> : '—'}
+                                          {t.route_code !== '—' ? (
+                                            <span>
+                                              <b>{t.route_code} <span className="muted" style={{ fontWeight: 'normal' }}>· {t.route_name}</span></b>
+                                              {t.is_substitution && (
+                                                <span style={{
+                                                  fontSize: '10px',
+                                                  background: '#dbeafe',
+                                                  color: '#1d4ed8',
+                                                  fontWeight: 800,
+                                                  padding: '2px 6px',
+                                                  borderRadius: '3px',
+                                                  marginLeft: '6px',
+                                                  display: 'inline-block'
+                                                }}>
+                                                  🔄 Cover for {t.original_bus_number}
+                                                </span>
+                                              )}
+                                            </span>
+                                          ) : '—'}
                                         </td>
                                         <td><b>{t.driver_name || '—'}</b></td>
                                         <td style={{ fontSize: '12px' }}>
-                                          {t.start_stop || '—'} ➔ {t.end_stop || '—'}
+                                          <div style={{ fontWeight: 600 }}>{t.start_stop || '—'} ➔ {t.end_stop || '—'}</div>
+                                          {(t.start_time || t.end_time) && (
+                                            <div style={{ fontSize: '11px', color: '#0369a1', marginTop: '2px', fontWeight: 600 }}>
+                                              🕒 {fmtTime(t.start_time) || '—'} ➔ {fmtTime(t.end_time) || '—'}
+                                            </div>
+                                          )}
                                         </td>
                                         <td className="mono" style={{ textAlign: 'right', fontSize: '11.5px', color: 'var(--text-dim)' }}>
                                           {t.start_km} ➔ {t.end_km}
@@ -1177,7 +1503,49 @@ function DistanceReportView({ data }) {
 
               return (
                 <tr key={i}>
-                  <td className="mono"><b>{b.registration_number}</b></td>
+                  <td className="mono">
+                    <b>{b.registration_number}</b>
+                    {b.breakdowns && b.breakdowns.length > 0 && (
+                      <div style={{ marginTop: '3px' }}>
+                        {b.breakdowns.map((bk, idx) => (
+                          <span key={idx} style={{
+                            display: 'inline-block',
+                            background: '#fee2e2',
+                            color: '#991b1b',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            border: '1px solid #f87171',
+                            marginRight: '4px',
+                            marginBottom: '2px'
+                          }} title={`Incident (${bk.reason || 'Breakdown'}) on ${fmtDate(bk.sub_date)}: Substituted by ${bk.substitute_bus_number}`}>
+                            ⚠️ {bk.reason || 'Breakdown'}: Replaced by {bk.substitute_bus_number}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {b.cover_duties && b.cover_duties.length > 0 && (
+                      <div style={{ marginTop: '3px' }}>
+                        {b.cover_duties.map((cv, idx) => (
+                          <span key={idx} style={{
+                            display: 'inline-block',
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            border: '1px solid #93c5fd',
+                            marginRight: '4px',
+                            marginBottom: '2px'
+                          }} title={`Covering for ${cv.original_bus_number} on ${fmtDate(cv.sub_date)} (${cv.reason || 'Cover'})`}>
+                            🔄 Sub for {cv.original_bus_number}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td>{b.institution || '—'}</td>
                   <td>{b.route_code !== '—' ? <b>{b.route_code} <span className="muted">· {b.route_name}</span></b> : '—'}</td>
                   <td><b>{b.driver_name || '—'}</b></td>
@@ -1333,18 +1701,58 @@ function DriverTripsReportView({ data }) {
       <div className="section-h">Detailed Trip Records</div>
       <div className="table-wrap">
         <table className="tbl">
-          <thead><tr><th>Date</th><th>Trip</th><th>Driver</th><th>Bus</th><th>Opening km</th><th>Closing km</th><th>Distance</th><th>Reached Stop</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Trip</th>
+              <th>Driver</th>
+              <th>Bus</th>
+              <th>Institution</th>
+              <th>Route</th>
+              <th>Stoppages & Timing (From ➔ To)</th>
+              <th style={{ textAlign: 'right' }}>Odometer</th>
+              <th style={{ textAlign: 'right' }}>Distance</th>
+            </tr>
+          </thead>
           <tbody>
             {data.records.map((r, i) => (
               <tr key={i}>
                 <td className="mono">{fmtDate(r.log_date)}</td>
-                <td>{String(r.shift || '—').replace('trip', 'Trip ')}</td>
-                <td>{r.driver_name || '—'}</td>
-                <td className="mono">{r.registration_number || '—'}</td>
-                <td className="mono">{r.start_km ?? '—'}</td>
-                <td className="mono">{r.end_km ?? '—'}</td>
-                <td className="mono">{r.km != null ? r.km + ' km' : '—'}</td>
-                <td>{r.end_stop || '—'}</td>
+                <td>
+                  <span style={{
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    fontWeight: '700',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    background: r.shift?.startsWith('morning') ? '#e6f4ea' : '#fef7e0',
+                    color: r.shift?.startsWith('morning') ? '#137333' : '#b06000'
+                  }}>
+                    {r.shift}
+                  </span>
+                </td>
+                <td><b>{r.driver_name || '—'}</b></td>
+                <td className="mono"><b>{r.registration_number || '—'}</b></td>
+                <td>{r.institution || '—'}</td>
+                <td className="mono">
+                  {r.route_code && r.route_code !== '—' ? (
+                    <span><b>{r.route_code}</b> <span className="muted" style={{ fontWeight: 'normal' }}>· {r.route_name}</span></span>
+                  ) : '—'}
+                </td>
+                <td style={{ fontSize: '12px' }}>
+                  <div style={{ fontWeight: 600 }}>{r.start_stop || '—'} ➔ {r.end_stop || '—'}</div>
+                  {(r.start_time || r.end_time) && (
+                    <div style={{ fontSize: '11px', color: '#0369a1', marginTop: '2px', fontWeight: 600 }}>
+                      🕒 {fmtTime(r.start_time) || '—'} ➔ {fmtTime(r.end_time) || '—'}
+                    </div>
+                  )}
+                </td>
+                <td className="mono" style={{ textAlign: 'right', fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                  {r.start_km ?? '—'} ➔ {r.end_km ?? '—'}
+                </td>
+                <td className="mono" style={{ textAlign: 'right', fontWeight: '700', color: 'var(--navy)' }}>
+                  {r.km != null ? r.km + ' km' : '—'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -1635,6 +2043,247 @@ function RoutesStopsReportView({ data, insts = [], st = {} }) {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+function SubstitutionsReportView({ data }) {
+  const [filterText, setFilterText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const substitutions = data.substitutions || [];
+  const summary = data.summary || {
+    total: substitutions.length,
+    active: substitutions.filter(s => s.status === 'active').length,
+    resolved: substitutions.filter(s => s.status === 'resolved').length,
+    unique_buses_broken: new Set(substitutions.map(s => s.original_bus_id)).size,
+    unique_buses_substitute: new Set(substitutions.map(s => s.substitute_bus_id)).size
+  };
+
+  const filtered = substitutions.filter(s => {
+    if (statusFilter !== 'all' && s.status !== statusFilter) return false;
+    if (!filterText.trim()) return true;
+    const q = filterText.toLowerCase().trim();
+    return (
+      (s.original_bus_number && s.original_bus_number.toLowerCase().includes(q)) ||
+      (s.substitute_bus_number && s.substitute_bus_number.toLowerCase().includes(q)) ||
+      (s.substitute_driver_name && s.substitute_driver_name.toLowerCase().includes(q)) ||
+      (s.route_name && s.route_name.toLowerCase().includes(q)) ||
+      (s.route_code && s.route_code.toLowerCase().includes(q)) ||
+      (s.reason && s.reason.toLowerCase().includes(q)) ||
+      (s.notes && s.notes.toLowerCase().includes(q))
+    );
+  });
+
+  return (
+    <div>
+      <div className="cards-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card">
+          <div className="stat-card__label">Total Incidents</div>
+          <div className="stat-card__value">{summary.total}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__label">Active / Ongoing</div>
+          <div className="stat-card__value stat-card__value--red">{summary.active}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__label">Resolved</div>
+          <div className="stat-card__value stat-card__value--green">{summary.resolved}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__label">Substitutes Deployed</div>
+          <div className="stat-card__value stat-card__value--amber">{summary.unique_buses_substitute}</div>
+        </div>
+      </div>
+
+      <div style={{
+        marginBottom: '20px',
+        padding: '14px 18px',
+        borderRadius: '8px',
+        background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',
+        border: '1px solid #bfdbfe',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        fontSize: '13px',
+        color: '#1e3a8a',
+        lineHeight: 1.5
+      }}>
+        <span style={{ fontSize: '20px' }}>ℹ️</span>
+        <div>
+          <b>How Breakdown & Substitution Tracking Works:</b>
+          <div>
+            When a bus breaks down (e.g. <b>Bus 1</b>) and another bus (e.g. <b>Bus 2</b>) is assigned to take over its route, the system automatically records:
+            <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+              <li><b>Under Bus 1:</b> Incident date, breakdown cause, and that <b>Bus 2</b> took over the route.</li>
+              <li><b>Under Bus 2:</b> That <b>Bus 2</b> was assigned to cover <b>Bus 1</b> for that route and date, with all logged trips and kilometers credited to Bus 2.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+        <div className="section-h" style={{ margin: 0 }}>
+          Incidents & Bus Substitutions ({filtered.length})
+        </div>
+        <div className="hide-on-print" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <select
+            className="finput"
+            style={{ height: '36px', borderRadius: '8px', padding: '0 10px', fontSize: '13px' }}
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+          >
+            <option value="all">All Statuses</option>
+            <option value="active">Active Only</option>
+            <option value="resolved">Resolved Only</option>
+          </select>
+          <div style={{ position: 'relative', width: '260px' }}>
+            <input
+              type="text"
+              className="finput"
+              style={{ paddingLeft: '32px', height: '36px', borderRadius: '8px' }}
+              placeholder="Search bus, route, reason..."
+              value={filterText}
+              onChange={e => setFilterText(e.target.value)}
+            />
+            <span style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--text-dim)' }}>🔍</span>
+            {filterText && (
+              <button
+                type="button"
+                onClick={() => setFilterText('')}
+                style={{ position: 'absolute', right: '10px', top: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: '14px' }}>
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="table-wrap">
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Incident Bus (Broken Down)</th>
+              <th>Reason</th>
+              <th>Substitute Bus Assigned</th>
+              <th>Assigned Driver</th>
+              <th>Route Covered</th>
+              <th>Notes / Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-dim)' }}>
+                  No breakdown or substitution records found for the selected criteria.
+                </td>
+              </tr>
+            ) : (
+              filtered.map((s, idx) => {
+                const isActive = s.status === 'active';
+                return (
+                  <tr key={s.id || idx} style={{ background: isActive ? '#fef2f2' : undefined }}>
+                    <td className="mono" style={{ fontWeight: 600 }}>
+                      {fmtDate(s.sub_date)}
+                    </td>
+                    <td>
+                      {isActive ? (
+                        <span style={{
+                          background: '#fee2e2',
+                          color: '#991b1b',
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          border: '1px solid #f87171'
+                        }}>
+                          ⚠️ ACTIVE
+                        </span>
+                      ) : (
+                        <span style={{
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          border: '1px solid #86efac'
+                        }}>
+                          ✅ RESOLVED
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="mono" style={{ fontWeight: 700, color: '#991b1b', fontSize: '13px' }}>
+                        {s.original_bus_number}
+                      </div>
+                      {s.original_bus_inst && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                          {s.original_bus_inst}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <span style={{
+                        display: 'inline-block',
+                        background: '#fef3c7',
+                        color: '#92400e',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11.5px',
+                        fontWeight: 700,
+                        textTransform: 'uppercase'
+                      }}>
+                        {s.reason || 'Breakdown'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="mono" style={{ fontWeight: 700, color: '#1d4ed8', fontSize: '13px' }}>
+                        🔄 {s.substitute_bus_number}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 600 }}>
+                        (Assigned to cover {s.original_bus_number})
+                      </div>
+                      {s.substitute_bus_inst && (
+                        <div style={{ fontSize: '10.5px', color: 'var(--text-dim)' }}>
+                          {s.substitute_bus_inst}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <b>{s.substitute_driver_name || 'Original Driver'}</b>
+                    </td>
+                    <td>
+                      {s.route_name ? (
+                        <div>
+                          <b>{s.route_name}</b>
+                          {s.route_code && (
+                            <div className="mono" style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                              Code: {s.route_code}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td style={{ fontSize: '12px', maxWidth: '240px', wordBreak: 'break-word' }}>
+                      {s.notes || <span className="muted">—</span>}
+                      {s.resolved_at && (
+                        <div style={{ fontSize: '10.5px', color: '#059669', marginTop: '3px' }}>
+                          Resolved on: {fmtDate(s.resolved_at.slice(0, 10))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

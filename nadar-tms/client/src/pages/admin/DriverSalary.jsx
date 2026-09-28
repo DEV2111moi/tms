@@ -986,6 +986,23 @@ export default function DriverSalary() {
                           <span>🪪 {item.employee_code || `DRV-${item.driver_id}`}</span>
                           <span>📞 {item.driver_phone || '—'}</span>
                         </div>
+                        {item.extra_trips_count > 0 && (
+                          <div style={{ marginTop: 3 }}>
+                            <span style={{
+                              fontSize: 10,
+                              background: '#dbeafe',
+                              color: '#1d4ed8',
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3
+                            }}>
+                              ⚡ {item.extra_trips_count} Breakdown Extra Trip{item.extra_trips_count > 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td>
                         <div style={{ fontWeight: 700, color: '#0284c7' }}>

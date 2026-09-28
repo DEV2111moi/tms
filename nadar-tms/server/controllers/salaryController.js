@@ -84,7 +84,14 @@ exports.list = async (req, res) => {
           FROM assignments a
           JOIN routes r ON r.id = a.route_id
           WHERE a.driver_id = d.id
-        ) AS assigned_route_names
+        ) AS assigned_route_names,
+        (
+          SELECT COUNT(*)
+          FROM daily_substitutions ds
+          WHERE ds.substitute_driver_id = d.id
+            AND DATE_FORMAT(ds.sub_date, '%Y-%m') = s.salary_month
+            AND ds.is_extra_trip = 1
+        ) AS extra_trips_count
       FROM driver_salaries s
       JOIN drivers d ON d.id = s.driver_id
       LEFT JOIN institutions i ON i.id = COALESCE(s.institution_id, d.institution_id)

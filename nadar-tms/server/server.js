@@ -8,7 +8,7 @@ const apiRouter = require('./routes/api');
 
 const app = express();
 
-// Ensure schema enhancements (e.g. initial_point and initial_time for routes)
+// Ensure schema enhancements (e.g. initial_point and initial_time for routes, daily_substitutions)
 const { query } = require('./db/pool');
 (async () => {
   try {
@@ -17,6 +17,34 @@ const { query } = require('./db/pool');
   } catch (e) {
     try { await query(`ALTER TABLE routes ADD COLUMN initial_point VARCHAR(120) DEFAULT NULL`); } catch (e2) {}
     try { await query(`ALTER TABLE routes ADD COLUMN initial_time VARCHAR(20) DEFAULT NULL`); } catch (e3) {}
+  }
+
+  try {
+    await query(`
+      CREATE TABLE IF NOT EXISTS daily_substitutions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sub_date DATE NOT NULL,
+        original_bus_id INT NOT NULL,
+        route_id INT DEFAULT NULL,
+        original_driver_id INT DEFAULT NULL,
+        substitute_bus_id INT NOT NULL,
+        substitute_driver_id INT DEFAULT NULL,
+        shifts VARCHAR(100) DEFAULT 'all',
+        reason VARCHAR(255) DEFAULT 'Breakdown',
+        is_extra_trip TINYINT(1) DEFAULT 1,
+        status ENUM('active', 'resolved') DEFAULT 'active',
+        notes TEXT DEFAULT NULL,
+        created_by INT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_sub_date (sub_date),
+        INDEX idx_orig_bus (original_bus_id),
+        INDEX idx_sub_bus (substitute_bus_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('✅ Checked/created daily_substitutions table.');
+  } catch (e) {
+    console.error('Error ensuring daily_substitutions table:', e.message);
   }
 })();
 

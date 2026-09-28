@@ -13,6 +13,7 @@ const rep = require('../controllers/reportController');
 const notifs = require('../controllers/notificationController');
 const upload = require('../controllers/uploadController');
 const salary = require('../controllers/salaryController');
+const substitution = require('../controllers/substitutionController');
 
 // ---- Auth (public) ----
 router.post('/auth/login', auth.login);
@@ -76,6 +77,7 @@ router.get('/reports/bus-wise', authenticate, requireRole('admin', 'executive'),
 router.get('/reports/maintenance', authenticate, requireRole('admin', 'executive'), rep.maintenance);
 router.get('/reports/driver-trips', authenticate, requireRole('admin', 'executive'), rep.driverTrips);
 router.get('/reports/routes-stops', authenticate, requireRole('admin', 'executive'), rep.routesStops);
+router.get('/reports/substitutions', authenticate, requireRole('admin', 'executive', 'institution'), rep.substitutions);
 router.post('/fuel', authenticate, requireRole('admin'), driver.addFuel);
 router.post('/upload', authenticate, requireRole('admin', 'institution'), upload.upload);
 router.get('/notifications', authenticate, notifs.list);
@@ -90,5 +92,11 @@ router.put('/salaries/:id', authenticate, requireRole('admin', 'institution'), s
 router.delete('/salaries/:id', authenticate, requireRole('admin', 'institution'), salary.remove);
 router.post('/salaries/auto-generate', authenticate, requireRole('admin', 'institution'), salary.autoGenerate);
 router.post('/salaries/bulk-mark-paid', authenticate, requireRole('admin', 'institution'), salary.bulkMarkPaid);
+
+// ---- Daily Bus Substitutions & Breakdown Management ----
+router.get('/substitutions', authenticate, substitution.list);
+router.post('/substitutions', authenticate, requireRole('admin', 'institution'), substitution.create);
+router.put('/substitutions/:id/resolve', authenticate, requireRole('admin', 'institution'), substitution.resolve);
+router.delete('/substitutions/:id', authenticate, requireRole('admin', 'institution'), substitution.remove);
 
 module.exports = router;

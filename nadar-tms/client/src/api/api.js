@@ -68,8 +68,9 @@ const api = {
   repDistance: (from, to, inst, busId) => call(`/reports/distance?from=${from}&to=${to}${inst ? `&institutionId=${inst}` : ''}${busId ? `&busId=${busId}` : ''}`),
   repBusWise: (from, to, inst, busId) => call(`/reports/bus-wise?from=${from}&to=${to}${inst ? `&institutionId=${inst}` : ''}${busId ? `&busId=${busId}` : ''}`),
   repMaint: (from, to, inst) => call(`/reports/maintenance?from=${from}&to=${to}${inst ? `&institutionId=${inst}` : ''}`),
-  repDriverTrips: (from, to) => call(`/reports/driver-trips?from=${from}&to=${to}`),
+  repDriverTrips: (from, to, inst) => call(`/reports/driver-trips?from=${from}&to=${to}${inst ? `&institutionId=${inst}` : ''}`),
   repRoutesStops: (inst) => call(`/reports/routes-stops${inst ? `?institutionId=${inst}` : ''}`),
+  repSubstitutions: (from, to, inst, busId) => call(`/reports/substitutions?from=${from}&to=${to}${inst ? `&institutionId=${inst}` : ''}${busId ? `&busId=${busId}` : ''}`),
   fuelReport: () => call('/reports/fuel'),
   busFuel: (busId) => call(`/fuel/bus/${busId}`),
 
@@ -112,6 +113,17 @@ const api = {
   delSalary: (id) => call(`/salaries/${id}`, { method: 'DELETE' }),
   autoGenerateSalaries: (body) => call('/salaries/auto-generate', { method: 'POST', body: JSON.stringify(body) }),
   bulkMarkPaid: (body) => call('/salaries/bulk-mark-paid', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Daily Bus Breakdown & Substitutions
+  listSubstitutions: (params = {}) => {
+    const qs = [];
+    if (params.date) qs.push('date=' + encodeURIComponent(params.date));
+    if (params.status) qs.push('status=' + encodeURIComponent(params.status));
+    return call(`/substitutions${qs.length ? '?' + qs.join('&') : ''}`);
+  },
+  createSubstitution: (data) => call('/substitutions', { method: 'POST', body: JSON.stringify(data) }),
+  resolveSubstitution: (id) => call(`/substitutions/${id}/resolve`, { method: 'PUT' }),
+  deleteSubstitution: (id) => call(`/substitutions/${id}`, { method: 'DELETE' }),
 };
 
 export default api;
