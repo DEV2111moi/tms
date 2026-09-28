@@ -1,38 +1,73 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../../api/api';
 import { useToast } from '../../components/UI/Toast';
 import { useAuth } from '../../context/AuthContext';
 import DataTable from '../../components/UI/DataTable';
 
+function AssignIcon({ name, size = 16, color = 'currentColor', style = {} }) {
+  const icons = {
+    clipboard: <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></>,
+    bus: <><rect x="3" y="4" width="18" height="15" rx="3"/><circle cx="7.5" cy="16" r="1.5"/><circle cx="16.5" cy="16" r="1.5"/><path d="M3 10h18"/><path d="M7 4v3"/><path d="M17 4v3"/></>,
+    user: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    badge: <><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><line x1="15" y1="8" x2="17" y2="8"/><line x1="15" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="17" y2="16"/></>,
+    route: <><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/></>,
+    alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+    check: <path d="M20 6L9 17l-5-5"/>,
+    shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+    search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
+    sun: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>,
+    moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>,
+    zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
+    arrowRight: <><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></>,
+    building: <><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="22.01"/><line x1="15" y1="22" x2="15" y2="22.01"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><line x1="9" y1="18" x2="9" y2="18.01"/><line x1="15" y1="18" x2="15" y2="18.01"/></>,
+  };
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ verticalAlign: 'middle', flexShrink: 0, ...style }}
+    >
+      {icons[name] || icons.clipboard}
+    </svg>
+  );
+}
+
 const SHIFT_MAP = {
-  morning: '☀️ Morning',
-  evening: '🌙 Evening',
-  morning1: '☀️ Morning 1',
-  morning2: '☀️ Morning 2',
-  morning3: '☀️ Morning 3',
-  morning4: '☀️ Morning 4',
-  evening1: '🌙 Evening 1',
-  evening2: '🌙 Evening 2',
-  evening3: '🌙 Evening 3',
-  evening4: '🌙 Evening 4'
+  morning: 'Morning',
+  evening: 'Evening',
+  morning1: 'Morning 1',
+  morning2: 'Morning 2',
+  morning3: 'Morning 3',
+  morning4: 'Morning 4',
+  evening1: 'Evening 1',
+  evening2: 'Evening 2',
+  evening3: 'Evening 3',
+  evening4: 'Evening 4'
 };
 
 const PRESET_COMBINATIONS = [
-  { value: 'm1_e1', label: '☀️🌙 Both sessions (Morning 1 + Evening 1)', shifts: ['morning1', 'evening1'] },
-  { value: 'm1_e2', label: '☀️🌙 Morning 1 + Evening 2', shifts: ['morning1', 'evening2'] },
-  { value: 'm2_e1', label: '☀️🌙 Morning 2 + Evening 1', shifts: ['morning2', 'evening1'] },
-  { value: 'm2_e2', label: '☀️🌙 Morning 2 + Evening 2', shifts: ['morning2', 'evening2'] },
-  { value: 'all_m', label: '☀️ All 4 Morning (M1-M4)', shifts: ['morning1', 'morning2', 'morning3', 'morning4'] },
-  { value: 'all_e', label: '🌙 All 4 Evening (E1-E4)', shifts: ['evening1', 'evening2', 'evening3', 'evening4'] },
-  { value: 'all', label: '🔄 All 8 sessions (M1-M4, E1-E4)', shifts: ['morning1', 'morning2', 'morning3', 'morning4', 'evening1', 'evening2', 'evening3', 'evening4'] },
-  { value: 'morning1', label: '☀️ Morning 1 only', shifts: ['morning1'] },
-  { value: 'morning2', label: '☀️ Morning 2 only', shifts: ['morning2'] },
-  { value: 'morning3', label: '☀️ Morning 3 only', shifts: ['morning3'] },
-  { value: 'morning4', label: '☀️ Morning 4 only', shifts: ['morning4'] },
-  { value: 'evening1', label: '🌙 Evening 1 only', shifts: ['evening1'] },
-  { value: 'evening2', label: '🌙 Evening 2 only', shifts: ['evening2'] },
-  { value: 'evening3', label: '🌙 Evening 3 only', shifts: ['evening3'] },
-  { value: 'evening4', label: '🌙 Evening 4 only', shifts: ['evening4'] },
+  { value: 'm1_e1', label: 'Both sessions (Morning 1 + Evening 1)', shifts: ['morning1', 'evening1'] },
+  { value: 'm1_e2', label: 'Morning 1 + Evening 2', shifts: ['morning1', 'evening2'] },
+  { value: 'm2_e1', label: 'Morning 2 + Evening 1', shifts: ['morning2', 'evening1'] },
+  { value: 'm2_e2', label: 'Morning 2 + Evening 2', shifts: ['morning2', 'evening2'] },
+  { value: 'all_m', label: 'All 4 Morning (M1-M4)', shifts: ['morning1', 'morning2', 'morning3', 'morning4'] },
+  { value: 'all_e', label: 'All 4 Evening (E1-E4)', shifts: ['evening1', 'evening2', 'evening3', 'evening4'] },
+  { value: 'all', label: 'All 8 sessions (M1-M4, E1-E4)', shifts: ['morning1', 'morning2', 'morning3', 'morning4', 'evening1', 'evening2', 'evening3', 'evening4'] },
+  { value: 'morning1', label: 'Morning 1 only', shifts: ['morning1'] },
+  { value: 'morning2', label: 'Morning 2 only', shifts: ['morning2'] },
+  { value: 'morning3', label: 'Morning 3 only', shifts: ['morning3'] },
+  { value: 'morning4', label: 'Morning 4 only', shifts: ['morning4'] },
+  { value: 'evening1', label: 'Evening 1 only', shifts: ['evening1'] },
+  { value: 'evening2', label: 'Evening 2 only', shifts: ['evening2'] },
+  { value: 'evening3', label: 'Evening 3 only', shifts: ['evening3'] },
+  { value: 'evening4', label: 'Evening 4 only', shifts: ['evening4'] },
 ];
 
 const getSelectValue = (shifts) => {
@@ -134,8 +169,8 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
           {selectedOption ? (
             selectedOption.driver_name !== undefined ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: 'var(--navy)' }}>
-                  🚌 {selectedOption.registration_number || selectedOption.label.split(' · ')[0]}
+                <span style={{ fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: 'var(--navy)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <AssignIcon name="bus" size={13} color="var(--navy)" /> {selectedOption.registration_number || selectedOption.label.split(' · ')[0]}
                 </span>
                 {activeDriverName ? (
                   <span
@@ -152,7 +187,7 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                       gap: 4
                     }}
                   >
-                    <span>👤</span> {activeDriverName}
+                    <AssignIcon name="user" size={11} color="#1d4ed8" /> {activeDriverName}
                   </span>
                 ) : (
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>
@@ -517,8 +552,6 @@ export default function Assignments() {
     }
   };
 
-  if (loading) return <div className="loading-center"><div className="spinner" /> Loading...</div>;
-
   const routes = refs.routes || [];
   const buses = refs.buses || [];
   const drivers = refs.drivers || [];
@@ -533,7 +566,7 @@ export default function Assignments() {
     const assigned = items.filter(a => a.route_id === r.id);
     const driverNames = [...new Set(assigned.map(a => a.driver_name).filter(Boolean))].join(', ');
     const hasBus = assigned.some(a => a.bus_id != null);
-    const statusBadge = hasBus ? (driverNames ? ` · 👤 ${driverNames}` : '') : ' · ⚠️ Unassigned';
+    const statusBadge = hasBus ? (driverNames ? ` · ${driverNames}` : '') : ' · Unassigned';
     return {
       value: r.id,
       label: `${r.route_code} — ${r.route_name}${statusBadge}`,
@@ -558,7 +591,7 @@ export default function Assignments() {
       registration_number: b.registration_number,
       driver_name: driverName || '',
       driver_id: driverId || null,
-      label: driverName ? `${b.registration_number} · 👤 ${driverName}` : `${b.registration_number} · Standby`,
+      label: driverName ? `${b.registration_number} · ${driverName}` : `${b.registration_number} · Standby`,
       searchText: `${b.registration_number} ${driverName || ''}`
     };
   });
@@ -778,12 +811,13 @@ export default function Assignments() {
             textTransform: 'none',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4
+            gap: 5,
+            fontWeight: 700
           }}
           onClick={() => handleAssignRoute(item)}
           title={`Assign bus and driver to ${item.route_code}`}
         >
-          ⚡ Assign
+          <AssignIcon name="zap" size={13} color="#fff" /> Assign
         </button>
       )
     }
@@ -830,12 +864,24 @@ export default function Assignments() {
   const hasMultipleSessions = selectedShifts.length > 1;
   const isSplitSessions = hasMultipleSessions && !sameForBoth && morningShifts.length > 0 && eveningShifts.length > 0;
 
+  // KPI Calculations
+  const stats = useMemo(() => {
+    const total = items.length;
+    const uniqueBuses = new Set(items.map(a => a.bus_id).filter(Boolean)).size;
+    const uniqueDrivers = new Set(items.map(a => a.driver_id).filter(Boolean)).size;
+    const uniqueIncharges = new Set(items.map(a => a.incharge_id).filter(Boolean)).size;
+    const unassigned = allUnassignedRoutes.length;
+    return { total, uniqueBuses, uniqueDrivers, uniqueIncharges, unassigned };
+  }, [items, allUnassignedRoutes]);
+
+  if (loading) return <div className="loading-center"><div className="spinner" /> Loading...</div>;
+
   return (
     <>
       <div className="page-head">
         <div>
-          <div className="page-title">Assign Route</div>
-          <div className="page-sub">Standing assignment — applies daily until updated</div>
+          <div className="page-title">Route Assignments</div>
+          <div className="page-sub">Standing mapping of buses, drivers, and faculty incharges to daily routes</div>
         </div>
         {allUnassignedRoutes.length > 0 && (
           <button
@@ -861,14 +907,76 @@ export default function Assignments() {
               boxShadow: '0 2px 6px rgba(245, 158, 11, 0.12)'
             }}
           >
-            <span>⚠️ {allUnassignedRoutes.length} Routes Not Assigned</span>
+            <AssignIcon name="alert" size={15} color="#b45309" />
+            <span>{allUnassignedRoutes.length} Routes Need Assignment</span>
             <span style={{ fontSize: '11px', background: '#f59e0b', color: '#fff', padding: '2px 7px', borderRadius: '10px' }}>
               View List ➔
             </span>
           </button>
         )}
       </div>
+
       <div className="page-body">
+        {/* KPI Summary Ribbon */}
+        <div className="att-kpi-ribbon">
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--purple">
+              <AssignIcon name="clipboard" size={22} color="#7c6cfc" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val">{stats.total}</div>
+              <div className="att-kpi-label">Active Assignments</div>
+              <div className="att-kpi-sub">Total shift mappings</div>
+            </div>
+          </div>
+
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--blue">
+              <AssignIcon name="bus" size={22} color="#3b82f6" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#3b82f6' }}>{stats.uniqueBuses}</div>
+              <div className="att-kpi-label">Buses Deployed</div>
+              <div className="att-kpi-sub">Active fleet in service</div>
+            </div>
+          </div>
+
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--green">
+              <AssignIcon name="user" size={22} color="#10b981" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#10b981' }}>{stats.uniqueDrivers}</div>
+              <div className="att-kpi-label">Drivers on Duty</div>
+              <div className="att-kpi-sub">Pilots rostered</div>
+            </div>
+          </div>
+
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--purple">
+              <AssignIcon name="badge" size={22} color="#7c6cfc" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#7c6cfc' }}>{stats.uniqueIncharges}</div>
+              <div className="att-kpi-label">Bus Incharges</div>
+              <div className="att-kpi-sub">Faculty / staff escorts</div>
+            </div>
+          </div>
+
+          <div className={`att-kpi-card ${stats.unassigned > 0 ? 'att-kpi-card--warn' : ''}`}>
+            <div className="att-kpi-icon att-kpi-icon--amber">
+              <AssignIcon name="alert" size={22} color="#f59e0b" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: stats.unassigned > 0 ? '#d97706' : '#10b981' }}>
+                {stats.unassigned}
+              </div>
+              <div className="att-kpi-label">Unassigned Slots</div>
+              <div className="att-kpi-sub">{stats.unassigned > 0 ? 'Routes without bus/driver' : '100% routes covered'}</div>
+            </div>
+          </div>
+        </div>
+
         <form className="card" onSubmit={handleSave} style={{ marginBottom: 24 }}>
           <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 14 }}>
             {form.route_id ? 'Edit Assignment' : 'New / Update Assignment'}
@@ -889,7 +997,7 @@ export default function Assignments() {
               value={form.route_id}
               options={routeOptions}
               onChange={handleRouteChange}
-              placeholder="🔍 Search route code, name, or driver..."
+              placeholder="Search route code, name, or driver..."
               emptyText="Choose route"
             />
 
@@ -911,18 +1019,18 @@ export default function Assignments() {
                   <option key={p.value} value={p.value}>{p.label}</option>
                 ))}
                 <option value="custom" disabled={getSelectValue(selectedShifts) !== 'custom'}>
-                  ⚡ Custom Selection ({selectedShifts.map(s => SHIFT_MAP[s] || s).join(', ')})
+                  Custom Selection ({selectedShifts.map(s => SHIFT_MAP[s] || s).join(', ')})
                 </option>
               </select>
 
               {/* Selectable toggle chips for sessions */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                 {[
-                  { key: 'morning1', label: 'Morning 1', icon: '☀️' },
-                  { key: 'morning2', label: 'Morning 2', icon: '☀️' },
-                  { key: 'evening1', label: 'Evening 1', icon: '🌙' },
-                  { key: 'evening2', label: 'Evening 2', icon: '🌙' }
-                ].map(({ key, label, icon }) => {
+                  { key: 'morning1', label: 'Morning 1', isMorning: true },
+                  { key: 'morning2', label: 'Morning 2', isMorning: true },
+                  { key: 'evening1', label: 'Evening 1', isMorning: false },
+                  { key: 'evening2', label: 'Evening 2', isMorning: false }
+                ].map(({ key, label, isMorning }) => {
                   const isSelected = selectedShifts.includes(key);
                   return (
                     <button
@@ -946,7 +1054,7 @@ export default function Assignments() {
                       }}
                       title={`Toggle ${label}`}
                     >
-                      <span>{icon}</span>
+                      <AssignIcon name={isMorning ? 'sun' : 'moon'} size={12} color={isSelected ? '#1d4ed8' : '#94a3b8'} />
                       <span>{label}</span>
                       <span style={{ 
                         fontSize: 11, 
@@ -993,7 +1101,7 @@ export default function Assignments() {
                           driver_id: autoDriver || (val ? prev.driver_id : '')
                         }));
                       }}
-                      placeholder={`🔍 Search ${morningLabel.toLowerCase()} bus number or driver...`}
+                      placeholder={`Search ${morningLabel.toLowerCase()} bus number or driver...`}
                     />
 
                     <SearchableSelect
@@ -1001,7 +1109,7 @@ export default function Assignments() {
                       value={form.driver_id}
                       options={driverOptions}
                       onChange={val => setForm(prev => ({ ...prev, driver_id: val }))}
-                      placeholder={`🔍 Search ${morningLabel.toLowerCase()} driver name...`}
+                      placeholder={`Search ${morningLabel.toLowerCase()} driver name...`}
                     />
 
                     <SearchableSelect
@@ -1018,7 +1126,7 @@ export default function Assignments() {
                           evening_driver_id: autoDriver || (val ? prev.evening_driver_id : '')
                         }));
                       }}
-                      placeholder={`🔍 Search ${eveningLabel.toLowerCase()} bus number or driver...`}
+                      placeholder={`Search ${eveningLabel.toLowerCase()} bus number or driver...`}
                     />
 
                     <SearchableSelect
@@ -1026,7 +1134,7 @@ export default function Assignments() {
                       value={form.evening_driver_id}
                       options={driverOptions}
                       onChange={val => setForm(prev => ({ ...prev, evening_driver_id: val }))}
-                      placeholder={`🔍 Search ${eveningLabel.toLowerCase()} driver name...`}
+                      placeholder={`Search ${eveningLabel.toLowerCase()} driver name...`}
                     />
                   </>
                 ) : (
@@ -1045,7 +1153,7 @@ export default function Assignments() {
                           driver_id: autoDriver || (val ? prev.driver_id : '')
                         }));
                       }}
-                      placeholder="🔍 Search bus number or driver..."
+                      placeholder="Search bus number or driver..."
                     />
 
                     <SearchableSelect
@@ -1053,7 +1161,7 @@ export default function Assignments() {
                       value={form.driver_id}
                       options={driverOptions}
                       onChange={val => setForm(prev => ({ ...prev, driver_id: val }))}
-                      placeholder="🔍 Search driver name..."
+                      placeholder="Search driver name..."
                     />
                   </>
                 )}
@@ -1066,7 +1174,7 @@ export default function Assignments() {
                 value={form.incharge_id}
                 options={inchargeOptions}
                 onChange={val => setForm(prev => ({ ...prev, incharge_id: val }))}
-                placeholder="🔍 Search incharge name..."
+                placeholder="Search incharge name..."
               />
             </div>
           </div>
@@ -1094,7 +1202,7 @@ export default function Assignments() {
                   }}
                   title="Delete this assignment and make route unassigned"
                 >
-                  <span>🗑️</span> Delete assignment
+                  <AssignIcon name="trash" size={14} color="#dc2626" /> Delete assignment
                 </button>
               </>
             )}
@@ -1127,7 +1235,8 @@ export default function Assignments() {
                 padding: '8px 16px'
               }}
             >
-              <span>📋 Current Assignments</span>
+              <AssignIcon name="clipboard" size={14} color="currentColor" />
+              <span>Current Assignments</span>
               <span style={{
                 background: viewMode === 'assigned' ? 'rgba(0,0,0,0.15)' : 'var(--paper-2)',
                 color: viewMode === 'assigned' ? 'var(--navy)' : 'inherit',
@@ -1157,7 +1266,8 @@ export default function Assignments() {
                   : { borderColor: '#f59e0b', color: '#b45309', background: 'rgba(245, 158, 11, 0.08)' })
               }}
             >
-              <span>⚠️ Unassigned Routes</span>
+              <AssignIcon name="alert" size={14} color="currentColor" />
+              <span>Unassigned Routes</span>
               <span style={{
                 background: viewMode === 'unassigned' ? 'rgba(0,0,0,0.25)' : '#f59e0b',
                 color: '#fff',
@@ -1172,13 +1282,16 @@ export default function Assignments() {
           </div>
 
           <div style={{ position: 'relative', width: '100%', maxWidth: 360 }}>
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+              <AssignIcon name="search" size={15} color="#94a3b8" />
+            </span>
             <input
               type="text"
               className="fselect"
-              placeholder={viewMode === 'unassigned' ? "🔍 Search unassigned route, institution..." : "🔍 Search route, driver, bus..."}
+              placeholder={viewMode === 'unassigned' ? "Search unassigned route, institution..." : "Search route, driver, bus..."}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              style={{ width: '100%', paddingRight: searchQuery ? 30 : 12, borderRadius: 6, background: '#fff' }}
+              style={{ width: '100%', paddingLeft: 34, paddingRight: searchQuery ? 30 : 12, borderRadius: 6, background: '#fff', height: 38 }}
             />
             {searchQuery && (
               <button
@@ -1280,7 +1393,7 @@ export default function Assignments() {
           </div>
         )}
 
-        {/* Filter chips when on Unassigned Routes: Shift filter for Institution, Institution filter for Admin */}
+        {/* Filter chips when on Unassigned Routes */}
         {viewMode === 'unassigned' && (
           isInst ? (
             <div style={{
@@ -1444,14 +1557,14 @@ export default function Assignments() {
             data={filteredItems}
             onEdit={handleEdit}
             onDelete={handleDelete}
-            emptyIcon="🔗"
+            emptyIcon="📋"
             emptyText={searchQuery ? 'No matching assignments found.' : 'No assignments set up.'}
           />
         ) : (
           <DataTable
             columns={UNASSIGNED_COLUMNS}
             data={filteredUnassigned}
-            emptyIcon="🎉"
+            emptyIcon="✓"
             emptyText={searchQuery ? 'No matching unassigned routes found.' : 'All routes have buses assigned! Great job!'}
           />
         )}

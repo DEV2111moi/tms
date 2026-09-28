@@ -1,7 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/api';
+
+function AttIcon({ name, size = 16, color = 'currentColor', style = {} }) {
+  const icons = {
+    check: <path d="M20 6L9 17l-5-5" />,
+    alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+    clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+    bus: <><rect x="3" y="4" width="18" height="15" rx="3"/><circle cx="7.5" cy="16" r="1.5"/><circle cx="16.5" cy="16" r="1.5"/><path d="M3 10h18"/><path d="M7 4v3"/><path d="M17 4v3"/></>,
+    route: <><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/></>,
+    users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+    userX: <><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></>,
+    chart: <><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
+    download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+    print: <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
+    fileText: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>,
+    phone: <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></>,
+    edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
+    plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    x: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    circleSlash: <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></>
+  };
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ verticalAlign: 'middle', flexShrink: 0, ...style }}
+    >
+      {icons[name] || icons.check}
+    </svg>
+  );
+}
 
 export default function AttendanceReport() {
   const { user } = useAuth();
@@ -13,6 +49,7 @@ export default function AttendanceReport() {
   const [loading, setLoading] = useState(true);
 
   // Filters
+  const [selectedCampusFilter, setSelectedCampusFilter] = useState('ALL');
   const [rosterShiftFilter, setRosterShiftFilter] = useState('ALL');
   const [submissionFilter, setSubmissionFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -117,27 +154,27 @@ export default function AttendanceReport() {
     if (st === 'submitted') {
       return (
         <span className="tag tag--ok" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', fontWeight: 600 }}>
-          <span>✓</span> Submitted
+          <AttIcon name="check" size={13} color="#16a34a" /> Submitted
         </span>
       );
     }
     if (st === 'in_transit') {
       return (
         <span className="tag" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', fontWeight: 600 }}>
-          <span>🚌</span> In Transit
+          <AttIcon name="bus" size={13} color="#0369a1" /> In Transit
         </span>
       );
     }
     if (st === 'pending') {
       return (
         <span className="tag tag--warn" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px' }}>
-          <span>⚠️</span> Not Submitted
+          <AttIcon name="alert" size={13} color="#92400e" /> Not Submitted
         </span>
       );
     }
     return (
       <span className="tag" style={{ background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px' }}>
-        <span>⭕</span> No Incharge
+        <AttIcon name="circleSlash" size={13} color="#64748b" /> No Incharge
       </span>
     );
   };
@@ -351,40 +388,39 @@ export default function AttendanceReport() {
   // Print All Routes Consolidated Report
   const handlePrintAllRoutesReport = () => {
     const formattedDate = new Date(selectedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    const kpis = data?.kpis || {};
-    const campusRoster = data?.campusRoster || [];
-    const inst = data?.institution;
+    const inst = selectedInstObj || data?.institution || { name: 'THENI MELAPETTAI HINDU NADARGAL URAVINMURAI', short_name: 'TMHNU Fleet', code: 'TMHNU' };
+    const rosterToPrint = campusScopedRoster;
 
     const html = `
       <div class="print-header">
         <div class="inst-name">${inst?.name || 'THENI MELAPETTAI HINDU NADARGAL URAVINMURAI'}</div>
         <div class="inst-sub">Autonomous Institution · Transport Operations Department · Theni</div>
-        <div class="report-title">Campus Consolidated Route Attendance & Incharge Audit Report</div>
+        <div class="report-title">${selectedCampusFilter === 'ALL' ? 'Central Fleet Consolidated Attendance Report' : `${inst.short_name || inst.name} · Route Attendance & Incharge Audit Report`}</div>
       </div>
 
       <div class="meta-grid">
-        <div class="meta-item"><b>Campus</b>${inst?.short_name || 'Campus'} (${inst?.code || 'CAMPUS'})</div>
+        <div class="meta-item"><b>Campus / Institution</b>${selectedCampusFilter === 'ALL' ? 'All Campuses (Combined)' : (inst?.short_name || inst?.name)}</div>
         <div class="meta-item"><b>Report Date</b>${formattedDate}</div>
-        <div class="meta-item"><b>Total Campus Routes</b>${kpis.routesCount || campusRoster.length}</div>
-        <div class="meta-item"><b>Fleet Buses Running</b>${kpis.busesRunning || '—'}</div>
-        <div class="meta-item"><b>Submitted Today</b>${kpis.submittedCount || 0} Routes</div>
-        <div class="meta-item"><b>Pending Submission</b>${kpis.pendingSubmissionCount || 0} Routes</div>
-        <div class="meta-item"><b>In Transit</b>${kpis.inTransitCount || 0} Routes</div>
-        <div class="meta-item"><b>No Incharge</b>${kpis.noInchargeCount || 0} Routes</div>
+        <div class="meta-item"><b>Total Campus Routes</b>${dynamicKPIs.routesCount || rosterToPrint.length}</div>
+        <div class="meta-item"><b>Assigned Routes</b>${dynamicKPIs.assignedRoutesCount || '—'}</div>
+        <div class="meta-item"><b>Submitted Today</b>${dynamicKPIs.submittedCount || 0} Routes</div>
+        <div class="meta-item"><b>Pending Submission</b>${dynamicKPIs.pendingSubmissionCount || 0} Routes</div>
+        <div class="meta-item"><b>In Transit</b>${dynamicKPIs.inTransitCount || 0} Routes</div>
+        <div class="meta-item"><b>No Incharge</b>${dynamicKPIs.noInchargeCount || 0} Routes</div>
       </div>
 
       <div class="kpi-row">
-        <div class="kpi-box"><div class="kpi-val">${kpis.totalStudents || 0}</div><div class="kpi-lbl">Registered Students</div></div>
-        <div class="kpi-box"><div class="kpi-val" style="color: #15803d">${kpis.boardedToday || 0}</div><div class="kpi-lbl">Boarded Today</div></div>
-        <div class="kpi-box"><div class="kpi-val" style="color: #b91c1c">${kpis.absentToday || 0}</div><div class="kpi-lbl">Total Absent</div></div>
-        <div class="kpi-box"><div class="kpi-val" style="color: #0284c7">${kpis.attendanceRate || 0}%</div><div class="kpi-lbl">Campus Attendance Rate</div></div>
-        <div class="kpi-box"><div class="kpi-val" style="color: #d97706">${kpis.totalDailyKm || 0} km</div><div class="kpi-lbl">Daily Fleet Distance</div></div>
+        <div class="kpi-box"><div class="kpi-val">${dynamicKPIs.totalStudents || 0}</div><div class="kpi-lbl">Registered Students</div></div>
+        <div class="kpi-box"><div class="kpi-val" style="color: #15803d">${dynamicKPIs.boardedToday || 0}</div><div class="kpi-lbl">Boarded Today</div></div>
+        <div class="kpi-box"><div class="kpi-val" style="color: #b91c1c">${dynamicKPIs.absentToday || 0}</div><div class="kpi-lbl">Total Absent</div></div>
+        <div class="kpi-box"><div class="kpi-val" style="color: #0284c7">${dynamicKPIs.attendanceRate || 0}%</div><div class="kpi-lbl">Attendance Rate</div></div>
       </div>
 
       <table>
         <thead>
           <tr>
             <th style="width: 35px">S.No</th>
+            ${selectedCampusFilter === 'ALL' ? '<th>Campus</th>' : ''}
             <th>Route</th>
             <th>Shift</th>
             <th>Bus Number</th>
@@ -398,9 +434,10 @@ export default function AttendanceReport() {
           </tr>
         </thead>
         <tbody>
-          ${campusRoster.map((item, idx) => `
+          ${rosterToPrint.map((item, idx) => `
             <tr>
               <td>${idx + 1}</td>
+              ${selectedCampusFilter === 'ALL' ? `<td><b>${item.institution_name || 'Central'}</b></td>` : ''}
               <td><b>${item.route_code}</b> · ${item.route_name}</td>
               <td>${item.shift}</td>
               <td><b>${item.registration_number}</b></td>
@@ -411,9 +448,9 @@ export default function AttendanceReport() {
               <td style="color: #b91c1c; font-weight: 700">${item.absentCount}</td>
               <td><b>${item.attendanceRate}%</b></td>
               <td>
-                ${item.submissionStatus === 'submitted' ? '<span style="color: #15803d; font-weight: 700">✓ Submitted</span>' :
-                  item.submissionStatus === 'in_transit' ? '<span style="color: #0369a1; font-weight: 700">🚌 In Transit</span>' :
-                  item.submissionStatus === 'pending' ? '<span style="color: #b45309; font-weight: 700">⚠️ Not Submitted</span>' :
+                ${item.submissionStatus === 'submitted' ? '<span style="color: #15803d; font-weight: 700">Submitted</span>' :
+                  item.submissionStatus === 'in_transit' ? '<span style="color: #0369a1; font-weight: 700">In Transit</span>' :
+                  item.submissionStatus === 'pending' ? '<span style="color: #b45309; font-weight: 700">Not Submitted</span>' :
                   '<span style="color: #64748b">No Incharge</span>'}
               </td>
             </tr>
@@ -428,15 +465,16 @@ export default function AttendanceReport() {
       </div>
     `;
 
-    printReportWindow(`Campus_All_Routes_Attendance_${selectedDate}`, html);
+    printReportWindow(`Campus_${selectedCampusFilter}_Attendance_${selectedDate}`, html);
   };
 
   // Export Consolidated CSV
   const handleExportAllRoutesCSV = () => {
-    const campusRoster = data?.campusRoster || [];
-    const headers = ['S.No', 'Route Code', 'Route Name', 'Shift', 'Bus Number', 'Driver Name', 'Driver Phone', 'Bus Incharge', 'Incharge Phone', 'Enrolled Students', 'Students Boarded', 'Absent Students', 'Attendance Rate %', 'Submission Status'];
-    const rows = campusRoster.map((item, idx) => [
+    const rosterToExport = campusScopedRoster;
+    const headers = ['S.No', ...(selectedCampusFilter === 'ALL' ? ['Campus'] : []), 'Route Code', 'Route Name', 'Shift', 'Bus Number', 'Driver Name', 'Driver Phone', 'Bus Incharge', 'Incharge Phone', 'Enrolled Students', 'Students Boarded', 'Absent Students', 'Attendance Rate %', 'Submission Status'];
+    const rows = rosterToExport.map((item, idx) => [
       idx + 1,
+      ...(selectedCampusFilter === 'ALL' ? [item.institution_name || 'Central'] : []),
       item.route_code,
       item.route_name,
       item.shift,
@@ -451,8 +489,85 @@ export default function AttendanceReport() {
       `${item.attendanceRate}%`,
       item.attendanceStatus,
     ]);
-    downloadCSV(`${data?.institution?.code || 'Campus'}_All_Routes_Attendance_${selectedDate}.csv`, headers, rows);
+    const filePrefix = selectedInstObj ? selectedInstObj.code : 'Fleet';
+    downloadCSV(`${filePrefix}_Routes_Attendance_${selectedDate}.csv`, headers, rows);
   };
+
+  // 1. Campus Scoped Roster
+  const campusRoster = data?.campusRoster || [];
+  const absentStudentsList = data?.absentStudentsList || [];
+  const institutions = data?.institutions || data?.institutionSummary || [];
+  const kpis = data?.kpis || {};
+  const institution = data?.institution;
+  const isInstitution = data?.isInstitution || user?.role === 'institution';
+  const selectedInstObj = institutions.find(i => String(i.id) === String(selectedCampusFilter));
+
+  const campusScopedRoster = useMemo(() => {
+    if (!campusRoster || campusRoster.length === 0) return [];
+    if (selectedCampusFilter === 'ALL') return campusRoster;
+    return campusRoster.filter(r => String(r.institution_id) === String(selectedCampusFilter));
+  }, [campusRoster, selectedCampusFilter]);
+
+  // 2. Campus Scoped Absent Students List
+  const campusScopedAbsentList = useMemo(() => {
+    if (!absentStudentsList || absentStudentsList.length === 0) return [];
+    if (selectedCampusFilter === 'ALL') return absentStudentsList;
+    return absentStudentsList.filter(st => String(st.institution_id) === String(selectedCampusFilter));
+  }, [absentStudentsList, selectedCampusFilter]);
+
+  // 3. Dynamic KPIs Recalculated for the Selected Campus Filter
+  const dynamicKPIs = useMemo(() => {
+    if (selectedCampusFilter === 'ALL') {
+      return kpis;
+    }
+    const routesCount = campusScopedRoster.length;
+    const assignedRoutesCount = campusScopedRoster.filter(r => r.bus_id && r.driver_id).length;
+    const totalStudents = campusScopedRoster.reduce((sum, r) => sum + (r.enrolledStudents || 0), 0);
+    const boardedToday = campusScopedRoster.reduce((sum, r) => sum + (r.boardedCount || 0), 0);
+    const absentToday = campusScopedRoster.reduce((sum, r) => sum + (r.absentCount || 0), 0);
+    const totalMarked = boardedToday + absentToday;
+    const attendanceRate = totalMarked > 0 ? Math.round((boardedToday / totalMarked) * 100) : (totalStudents > 0 ? Math.round((boardedToday / totalStudents) * 100) : 0);
+    const pendingSubmissionCount = campusScopedRoster.filter(r => r.submissionStatus === 'pending').length;
+    const submittedCount = campusScopedRoster.filter(r => r.submissionStatus === 'submitted').length;
+    const inTransitCount = campusScopedRoster.filter(r => r.submissionStatus === 'in_transit').length;
+    const noInchargeCount = campusScopedRoster.filter(r => r.submissionStatus === 'no_incharge').length;
+
+    return {
+      routesCount,
+      assignedRoutesCount,
+      totalStudents,
+      boardedToday,
+      absentToday,
+      attendanceRate,
+      pendingSubmissionCount,
+      submittedCount,
+      inTransitCount,
+      noInchargeCount,
+    };
+  }, [campusScopedRoster, selectedCampusFilter, kpis]);
+
+  // 4. Filtered Roster by Shift, Submission Status, and Search Query
+  const filteredRoster = useMemo(() => {
+    return campusScopedRoster.filter(item => {
+      const matchesShift = rosterShiftFilter === 'ALL' || item.shift === rosterShiftFilter;
+      const matchesSubmission = submissionFilter === 'ALL' ||
+        (submissionFilter === 'pending' && item.submissionStatus === 'pending') ||
+        (submissionFilter === 'submitted' && item.submissionStatus === 'submitted') ||
+        (submissionFilter === 'in_transit' && item.submissionStatus === 'in_transit') ||
+        (submissionFilter === 'no_incharge' && item.submissionStatus === 'no_incharge');
+
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch = !q ||
+        String(item.route_code || '').toLowerCase().includes(q) ||
+        String(item.route_name || '').toLowerCase().includes(q) ||
+        String(item.registration_number || '').toLowerCase().includes(q) ||
+        String(item.driver_name || '').toLowerCase().includes(q) ||
+        String(item.incharge_name || '').toLowerCase().includes(q) ||
+        String(item.institution_name || '').toLowerCase().includes(q);
+
+      return matchesShift && matchesSubmission && matchesSearch;
+    });
+  }, [campusScopedRoster, rosterShiftFilter, submissionFilter, searchQuery]);
 
   if (loading && !data) {
     return (
@@ -462,41 +577,37 @@ export default function AttendanceReport() {
     );
   }
 
-  const { institution, kpis = {}, campusRoster = [], inchargesList = [], absentStudentsList = [] } = data || {};
-
-  // Filtered Roster
-  const filteredRoster = campusRoster.filter(item => {
-    const matchesShift = rosterShiftFilter === 'ALL' || item.shift === rosterShiftFilter;
-    const matchesSubmission = submissionFilter === 'ALL' ||
-      (submissionFilter === 'pending' && item.submissionStatus === 'pending') ||
-      (submissionFilter === 'submitted' && item.submissionStatus === 'submitted') ||
-      (submissionFilter === 'in_transit' && item.submissionStatus === 'in_transit') ||
-      (submissionFilter === 'no_incharge' && item.submissionStatus === 'no_incharge');
-
-    const q = searchQuery.trim().toLowerCase();
-    const matchesSearch = !q ||
-      String(item.route_code || '').toLowerCase().includes(q) ||
-      String(item.route_name || '').toLowerCase().includes(q) ||
-      String(item.registration_number || '').toLowerCase().includes(q) ||
-      String(item.driver_name || '').toLowerCase().includes(q) ||
-      String(item.incharge_name || '').toLowerCase().includes(q);
-
-    return matchesShift && matchesSubmission && matchesSearch;
-  });
-
   return (
     <>
       {/* Page Header */}
       <div className="page-head">
         <div>
           <div className="page-title">
-            {institution?.name || 'Campus'} · Attendance Reports
+            {selectedInstObj ? selectedInstObj.name : (institution?.name || (isInstitution ? 'Campus' : 'All Campuses'))} · Attendance Reports
           </div>
           <div className="page-sub">
-            Route-wise student manifest, bus incharge submission tracking, and consolidated reports · {institution?.code || 'CAMPUS'}
+            Route-wise student manifest, bus incharge submission tracking, and consolidated reports · {selectedInstObj ? selectedInstObj.code : (isInstitution ? institution?.code : 'TMHNU CENTRAL FLEET')}
           </div>
         </div>
         <div className="dashboard-head-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {/* Campus Selector Dropdown (for Central Admin) */}
+          {!isInstitution && institutions.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#ffffff', padding: '3px 8px', borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Campus:</span>
+              <select
+                className="fselect"
+                value={selectedCampusFilter}
+                onChange={e => setSelectedCampusFilter(e.target.value)}
+                style={{ padding: '4px 8px', height: 30, fontSize: 12.5, fontWeight: 700, color: '#1e293b', border: 'none', background: 'transparent', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="ALL">All Campuses ({campusRoster.length} routes)</option>
+                {institutions.map(inst => (
+                  <option key={inst.id} value={inst.id}>{inst.short_name || inst.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Date Picker */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>Date:</span>
@@ -514,13 +625,7 @@ export default function AttendanceReport() {
             onClick={() => setAllRoutesReportModal(true)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px' }}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
+            <AttIcon name="chart" size={15} color="#fff" />
             <span>Consolidated Report</span>
           </button>
 
@@ -530,76 +635,83 @@ export default function AttendanceReport() {
             title="Refresh attendance records"
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M23 4v6h-6" />
-              <path d="M1 20v-6h6" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
+            <AttIcon name="clock" size={14} color="currentColor" />
             <span>Refresh</span>
           </button>
         </div>
       </div>
 
       <div className="page-body">
-        {/* KPI Summary Ribbon */}
-        <div className="cards-grid--5" style={{ marginBottom: 18 }}>
-          <div className="stat-card">
-            <div className="stat-card__label">Campus Routes</div>
-            <div className="stat-card__value">{kpis.routesCount || 0}</div>
-            <div className="stat-card__meta">
-              <span>{kpis.assignedRoutesCount || 0} active assignments</span>
+        {/* KPI Summary Ribbon — 5 compact cards in a clean row */}
+        <div className="att-kpi-ribbon">
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--purple">
+              <AttIcon name="route" size={20} color="#7c6cfc" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val">{dynamicKPIs.routesCount || 0}</div>
+              <div className="att-kpi-label">Campus Routes</div>
+              <div className="att-kpi-sub">{dynamicKPIs.assignedRoutesCount || 0} active assignments</div>
             </div>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-card__label">Registered Riders</div>
-            <div className="stat-card__value stat-card__value--green">{kpis.totalStudents || 0}</div>
-            <div className="stat-card__meta">
-              <span>Enrolled campus students</span>
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--blue">
+              <AttIcon name="users" size={20} color="#3b82f6" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#3b82f6' }}>{dynamicKPIs.totalStudents || 0}</div>
+              <div className="att-kpi-label">Registered Riders</div>
+              <div className="att-kpi-sub">Enrolled campus students</div>
             </div>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-card__label">Boarded Today</div>
-            <div className="stat-card__value stat-card__value--green">{kpis.boardedToday || 0}</div>
-            <div className="stat-card__meta">
-              <span style={{ color: '#16a34a', fontWeight: 600 }}>{kpis.attendanceRate || 0}% Attendance Rate</span>
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--green">
+              <AttIcon name="check" size={20} color="#10b981" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#10b981' }}>{dynamicKPIs.boardedToday || 0}</div>
+              <div className="att-kpi-label">Boarded Today</div>
+              <div className="att-kpi-sub" style={{ color: '#10b981', fontWeight: 600 }}>{dynamicKPIs.attendanceRate || 0}% Attendance Rate</div>
             </div>
           </div>
 
-          <div className="stat-card" style={{ borderLeft: kpis.absentToday > 0 ? '3.5px solid #ef4444' : '3.5px solid #22c55e' }}>
-            <div className="stat-card__label">Absent Today</div>
-            <div className={`stat-card__value ${kpis.absentToday > 0 ? 'stat-card__value--red' : 'stat-card__value--green'}`}>
-              {kpis.absentToday || 0}
+          <div className={`att-kpi-card ${dynamicKPIs.absentToday > 0 ? 'att-kpi-card--alert' : ''}`}>
+            <div className={`att-kpi-icon ${dynamicKPIs.absentToday > 0 ? 'att-kpi-icon--red' : 'att-kpi-icon--green'}`}>
+              <AttIcon name="userX" size={20} color={dynamicKPIs.absentToday > 0 ? '#ef4444' : '#10b981'} />
             </div>
-            <div className="stat-card__meta">
-              <span>{kpis.absentToday > 0 ? 'Students marked absent' : 'No absentees reported'}</span>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: dynamicKPIs.absentToday > 0 ? '#ef4444' : '#10b981' }}>{dynamicKPIs.absentToday || 0}</div>
+              <div className="att-kpi-label">Absent Today</div>
+              <div className="att-kpi-sub">{dynamicKPIs.absentToday > 0 ? `${dynamicKPIs.absentToday} marked absent` : 'No absentees reported'}</div>
             </div>
           </div>
 
-          <div className="stat-card" style={{ borderLeft: kpis.pendingSubmissionCount > 0 ? '3.5px solid #f59e0b' : '3.5px solid #22c55e' }}>
-            <div className="stat-card__label">Pending Submissions</div>
-            <div className={`stat-card__value ${kpis.pendingSubmissionCount > 0 ? 'stat-card__value--amber' : 'stat-card__value--green'}`}>
-              {kpis.pendingSubmissionCount || 0}
+          <div className={`att-kpi-card ${dynamicKPIs.pendingSubmissionCount > 0 ? 'att-kpi-card--warn' : ''}`}>
+            <div className={`att-kpi-icon ${dynamicKPIs.pendingSubmissionCount > 0 ? 'att-kpi-icon--amber' : 'att-kpi-icon--green'}`}>
+              <AttIcon name="clock" size={20} color={dynamicKPIs.pendingSubmissionCount > 0 ? '#f59e0b' : '#10b981'} />
             </div>
-            <div className="stat-card__meta">
-              <span>{kpis.submittedCount || 0} submitted · {kpis.inTransitCount || 0} running</span>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: dynamicKPIs.pendingSubmissionCount > 0 ? '#f59e0b' : '#10b981' }}>{dynamicKPIs.pendingSubmissionCount || 0}</div>
+              <div className="att-kpi-label">Pending Submissions</div>
+              <div className="att-kpi-sub">{dynamicKPIs.submittedCount || 0} submitted · {dynamicKPIs.inTransitCount || 0} in transit</div>
             </div>
           </div>
         </div>
 
         {/* Pending Incharges Alert Banner */}
-        {kpis.pendingSubmissionCount > 0 && (
+        {dynamicKPIs.pendingSubmissionCount > 0 && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
             padding: '12px 18px', borderRadius: 10, background: '#fffbeb', border: '1px solid #fcd34d',
             marginBottom: 16
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 24 }}>⚠️</span>
+              <AttIcon name="alert" size={22} color="#b45309" />
               <div>
                 <div style={{ fontWeight: 700, color: '#92400e', fontSize: 14 }}>
-                  {kpis.pendingSubmissionCount} Route Incharges Have Not Yet Submitted Attendance
+                  {dynamicKPIs.pendingSubmissionCount} Route Incharges Have Not Yet Submitted Attendance
                 </div>
                 <div style={{ fontSize: 12.5, color: '#b45309', marginTop: 2 }}>
                   Teachers have been allocated to these routes but attendance submission for {selectedDate} is still pending.
@@ -611,23 +723,33 @@ export default function AttendanceReport() {
               style={{
                 background: submissionFilter === 'pending' ? '#92400e' : '#d97706',
                 color: '#fff', fontSize: 12, padding: '6px 14px', fontWeight: 600, borderRadius: 6, border: 'none',
-                cursor: 'pointer'
+                cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6
               }}
               onClick={() => setSubmissionFilter(submissionFilter === 'pending' ? 'ALL' : 'pending')}
             >
-              {submissionFilter === 'pending' ? '✕ Clear Filter' : `View ${kpis.pendingSubmissionCount} Pending Routes`}
+              {submissionFilter === 'pending' ? (
+                <>
+                  <AttIcon name="x" size={13} color="#fff" />
+                  <span>Clear Filter</span>
+                </>
+              ) : (
+                <>
+                  <AttIcon name="alert" size={13} color="#fff" />
+                  <span>View {dynamicKPIs.pendingSubmissionCount} Pending Routes</span>
+                </>
+              )}
             </button>
           </div>
         )}
 
         {/* Absent Students Alert Banner (if any) */}
-        {absentStudentsList && absentStudentsList.length > 0 && (
+        {campusScopedAbsentList && campusScopedAbsentList.length > 0 && (
           <div className="unassigned-panel" style={{ border: '1px solid #fca5a5', background: '#fffafa', marginBottom: 16 }}>
             <div className="unassigned-panel-head">
               <div className="unassigned-panel-title">
-                <span style={{ fontSize: 22 }}>⚠️</span>
+                <AttIcon name="alert" size={22} color="#b91c1c" />
                 <div>
-                  <h3 style={{ margin: 0, color: '#b91c1c' }}>Absent Students ({absentStudentsList.length})</h3>
+                  <h3 style={{ margin: 0, color: '#b91c1c' }}>Absent Students ({campusScopedAbsentList.length})</h3>
                   <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
                     The following students were marked absent on bus trips for {selectedDate}.
                   </p>
@@ -641,22 +763,31 @@ export default function AttendanceReport() {
                   <tr>
                     <th>Student Name</th>
                     <th>Class / Grade</th>
+                    {selectedCampusFilter === 'ALL' && <th>Campus</th>}
                     <th>Route Code</th>
                     <th>Bus Stop</th>
                     <th>Parent Phone</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {absentStudentsList.map((st, idx) => (
+                  {campusScopedAbsentList.map((st, idx) => (
                     <tr key={idx}>
                       <td><b>{st.name}</b></td>
                       <td>{st.classGrade}</td>
+                      {selectedCampusFilter === 'ALL' && (
+                        <td>
+                          <span className="tag" style={{ background: '#f1f5f9', color: '#475569', fontSize: 11, fontWeight: 700 }}>
+                            {st.institution_name || 'Central'}
+                          </span>
+                        </td>
+                      )}
                       <td><span className="mono" style={{ fontWeight: 600 }}>{st.routeCode}</span></td>
                       <td>{st.stopName}</td>
                       <td className="mono">
                         {st.parentPhone !== '—' ? (
-                          <a href={`tel:${st.parentPhone}`} style={{ color: '#0284c7', textDecoration: 'none' }}>
-                            📞 {st.parentPhone}
+                          <a href={`tel:${st.parentPhone}`} style={{ color: '#0284c7', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <AttIcon name="phone" size={12} color="#0284c7" />
+                            <span>{st.parentPhone}</span>
                           </a>
                         ) : '—'}
                       </td>
@@ -689,16 +820,18 @@ export default function AttendanceReport() {
               <button
                 className="btn btn-secondary"
                 onClick={() => setAllRoutesReportModal(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '7px 14px', fontWeight: 700, letterSpacing: '0.3px', textTransform: 'uppercase' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '7px 14px', fontWeight: 700, letterSpacing: '0.3px', textTransform: 'uppercase' }}
               >
-                📊 Consolidated Report
+                <AttIcon name="chart" size={14} color="currentColor" />
+                <span>Consolidated Report</span>
               </button>
               <button
                 className="btn btn-secondary"
                 onClick={handleExportAllRoutesCSV}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '7px 12px' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '7px 12px' }}
               >
-                📥 Export CSV
+                <AttIcon name="download" size={14} color="currentColor" />
+                <span>Export CSV</span>
               </button>
               <input
                 type="text"
@@ -711,43 +844,31 @@ export default function AttendanceReport() {
             </div>
           </div>
 
-          {/* Submission Status Filter Chips */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-            <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>SUBMISSION STATUS:</span>
-            <button
-              className={`filter-chip ${submissionFilter === 'ALL' ? 'active' : ''}`}
-              onClick={() => setSubmissionFilter('ALL')}
-            >
-              All Routes ({campusRoster.length})
-            </button>
-            <button
-              className={`filter-chip ${submissionFilter === 'pending' ? 'active' : ''}`}
-              onClick={() => setSubmissionFilter('pending')}
-              style={submissionFilter === 'pending' ? { background: '#d97706', borderColor: '#d97706' } : {}}
-            >
-              ⚠️ Pending Submission ({kpis.pendingSubmissionCount || 0})
-            </button>
-            <button
-              className={`filter-chip ${submissionFilter === 'submitted' ? 'active' : ''}`}
-              onClick={() => setSubmissionFilter('submitted')}
-              style={submissionFilter === 'submitted' ? { background: '#16a34a', borderColor: '#16a34a' } : {}}
-            >
-              ✓ Submitted ({kpis.submittedCount || 0})
-            </button>
-            <button
-              className={`filter-chip ${submissionFilter === 'in_transit' ? 'active' : ''}`}
-              onClick={() => setSubmissionFilter('in_transit')}
-              style={submissionFilter === 'in_transit' ? { background: '#0284c7', borderColor: '#0284c7' } : {}}
-            >
-              🚌 In Transit ({kpis.inTransitCount || 0})
-            </button>
-            <button
-              className={`filter-chip ${submissionFilter === 'no_incharge' ? 'active' : ''}`}
-              onClick={() => setSubmissionFilter('no_incharge')}
-            >
-              No Incharge ({kpis.noInchargeCount || 0})
-            </button>
-          </div>
+          {/* Campus Filter Chips (Central Admin) */}
+          {!isInstitution && institutions.length > 0 && (
+            <div className="filter-chips" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span className="muted" style={{ fontSize: 12, fontWeight: 700, marginRight: 4 }}>CAMPUS:</span>
+              <button
+                className={`filter-chip ${selectedCampusFilter === 'ALL' ? 'active' : ''}`}
+                onClick={() => setSelectedCampusFilter('ALL')}
+              >
+                All Campuses ({campusRoster.length})
+              </button>
+              {institutions.map(inst => {
+                const count = campusRoster.filter(r => String(r.institution_id) === String(inst.id)).length;
+                return (
+                  <button
+                    key={inst.id}
+                    className={`filter-chip ${String(selectedCampusFilter) === String(inst.id) ? 'active' : ''}`}
+                    onClick={() => setSelectedCampusFilter(inst.id)}
+                  >
+                    {inst.short_name || inst.name} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
 
           {/* Shift Filter Chips */}
           <div className="filter-chips" style={{ marginBottom: 14 }}>
@@ -781,6 +902,7 @@ export default function AttendanceReport() {
               <thead>
                 <tr>
                   <th style={{ width: 45 }}>S.NO</th>
+                  {selectedCampusFilter === 'ALL' && <th>Campus</th>}
                   <th>Route</th>
                   <th>Shift</th>
                   <th>Bus Number</th>
@@ -796,6 +918,13 @@ export default function AttendanceReport() {
                   filteredRoster.map((item, idx) => (
                     <tr key={item.id}>
                       <td style={{ color: '#64748b', fontWeight: 600 }}>{idx + 1}</td>
+                      {selectedCampusFilter === 'ALL' && (
+                        <td>
+                          <span className="tag" style={{ background: '#f1f5f9', color: '#475569', fontSize: 11, fontWeight: 700 }}>
+                            {item.institution_short_name || item.institution_name || 'Central'}
+                          </span>
+                        </td>
+                      )}
                       <td>
                         <b>{item.route_code}</b> · {item.route_name}
                       </td>
@@ -810,7 +939,10 @@ export default function AttendanceReport() {
                       <td>
                         <div><b>{item.driver_name}</b></div>
                         {item.driver_phone !== '—' && (
-                          <div className="muted" style={{ fontSize: 11 }}>📞 {item.driver_phone}</div>
+                          <div className="muted" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <AttIcon name="phone" size={11} color="#8c98a4" />
+                            <span>{item.driver_phone}</span>
+                          </div>
                         )}
                       </td>
                       <td>
@@ -819,26 +951,31 @@ export default function AttendanceReport() {
                             <div>
                               <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{item.incharge_name}</div>
                               {item.incharge_phone !== '—' && (
-                                <div className="muted" style={{ fontSize: 11 }}>📞 {item.incharge_phone}</div>
+                                <div className="muted" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                  <AttIcon name="phone" size={11} color="#8c98a4" />
+                                  <span>{item.incharge_phone}</span>
+                                </div>
                               )}
                             </div>
                             <button
                               className="btn btn-secondary"
-                              style={{ padding: '2px 7px', fontSize: 11, whiteSpace: 'nowrap' }}
+                              style={{ padding: '2px 7px', fontSize: 11, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3 }}
                               onClick={() => openAssignModal(item)}
                               title="Reassign another incharge"
                             >
-                              ✎ Reassign
+                              <AttIcon name="edit" size={11} color="currentColor" />
+                              <span>Reassign</span>
                             </button>
                           </div>
                         ) : (
                           <button
                             className="btn btn-secondary"
-                            style={{ padding: '4px 10px', fontSize: 11, color: '#b91c1c', background: '#fee2e2', border: '1px solid #fca5a5', fontWeight: 700 }}
+                            style={{ padding: '4px 10px', fontSize: 11, color: '#b91c1c', background: '#fee2e2', border: '1px solid #fca5a5', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}
                             onClick={() => openAssignModal(item)}
                             title="Assign bus incharge to this route"
                           >
-                            + Assign Incharge
+                            <AttIcon name="plus" size={12} color="#b91c1c" />
+                            <span>Assign Incharge</span>
                           </button>
                         )}
                       </td>
@@ -875,7 +1012,8 @@ export default function AttendanceReport() {
                           onClick={() => openRouteReport(item)}
                           title="View student manifest & print route report"
                         >
-                          <span>📄</span> Route Report
+                          <AttIcon name="fileText" size={13} color="currentColor" />
+                          <span>Route Report</span>
                         </button>
                       </td>
                     </tr>
@@ -979,10 +1117,10 @@ export default function AttendanceReport() {
                   <option value="">-- No Incharge (Leave Unassigned) --</option>
                   {inchargesList.map(inc => (
                     <option key={inc.id} value={inc.id}>
-                      {inc.name} {inc.phone ? `(📞 ${inc.phone})` : ''}
+                      {inc.name} {inc.phone ? `(${inc.phone})` : ''}
                     </option>
                   ))}
-                  <option value="NEW">➕ Add New Incharge Account...</option>
+                  <option value="NEW">+ Add New Incharge Account...</option>
                 </select>
               </div>
 
@@ -1070,19 +1208,21 @@ export default function AttendanceReport() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
                   className="btn btn-secondary"
-                  style={{ padding: '5px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}
+                  style={{ padding: '5px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   onClick={handleExportRouteCSV}
                   disabled={!routeReportModal.data}
                 >
-                  📥 Download CSV
+                  <AttIcon name="download" size={13} color="currentColor" />
+                  <span>Download CSV</span>
                 </button>
                 <button
                   className="btn btn-primary"
-                  style={{ padding: '5px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}
+                  style={{ padding: '5px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   onClick={handlePrintRouteReport}
                   disabled={!routeReportModal.data}
                 >
-                  🖨️ Print Report
+                  <AttIcon name="print" size={13} color="#fff" />
+                  <span>Print Report</span>
                 </button>
                 <button
                   className="btn btn-secondary"
@@ -1120,14 +1260,20 @@ export default function AttendanceReport() {
                       <div className="muted" style={{ fontSize: 10.5, textTransform: 'uppercase', fontWeight: 600 }}>Driver</div>
                       <div style={{ fontWeight: 600 }}>{routeReportModal.route.driver_name}</div>
                       {routeReportModal.route.driver_phone !== '—' && (
-                        <div className="muted" style={{ fontSize: 11 }}>📞 {routeReportModal.route.driver_phone}</div>
+                        <div className="muted" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <AttIcon name="phone" size={11} color="#8c98a4" />
+                          <span>{routeReportModal.route.driver_phone}</span>
+                        </div>
                       )}
                     </div>
                     <div>
                       <div className="muted" style={{ fontSize: 10.5, textTransform: 'uppercase', fontWeight: 600 }}>Bus Incharge</div>
                       <div style={{ fontWeight: 600 }}>{routeReportModal.route.incharge_name}</div>
                       {routeReportModal.route.incharge_phone !== '—' && (
-                        <div className="muted" style={{ fontSize: 11 }}>📞 {routeReportModal.route.incharge_phone}</div>
+                        <div className="muted" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <AttIcon name="phone" size={11} color="#8c98a4" />
+                          <span>{routeReportModal.route.incharge_phone}</span>
+                        </div>
                       )}
                     </div>
                     <div>
@@ -1185,17 +1331,24 @@ export default function AttendanceReport() {
                               </td>
                               <td>
                                 {st.status === 'present' ? (
-                                  <span className="tag tag--ok" style={{ padding: '2px 7px', fontSize: 11 }}>✓ Present</span>
+                                  <span className="tag tag--ok" style={{ padding: '2px 7px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                    <AttIcon name="check" size={11} color="#16a34a" />
+                                    <span>Present</span>
+                                  </span>
                                 ) : st.status === 'absent' ? (
-                                  <span className="tag tag--warn" style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '2px 7px', fontSize: 11 }}>✕ Absent</span>
+                                  <span className="tag tag--warn" style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '2px 7px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                    <AttIcon name="userX" size={11} color="#b91c1c" />
+                                    <span>Absent</span>
+                                  </span>
                                 ) : (
                                   <span className="tag" style={{ background: '#f1f5f9', color: '#64748b', padding: '2px 7px', fontSize: 11 }}>Pending</span>
                                 )}
                               </td>
                               <td className="mono">
                                 {st.parent_phone !== '—' ? (
-                                  <a href={`tel:${st.parent_phone}`} style={{ color: '#0284c7', textDecoration: 'none' }}>
-                                    📞 {st.parent_phone}
+                                  <a href={`tel:${st.parent_phone}`} style={{ color: '#0284c7', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                    <AttIcon name="phone" size={11} color="#0284c7" />
+                                    <span>{st.parent_phone}</span>
                                   </a>
                                 ) : '—'}
                               </td>
@@ -1242,23 +1395,25 @@ export default function AttendanceReport() {
                   Campus Consolidated Route Attendance Report
                 </h3>
                 <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                  {institution?.name || 'Campus'} · {new Date(selectedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  {data?.institution?.name || 'Campus'} · {new Date(selectedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
                   className="btn btn-secondary"
-                  style={{ padding: '5px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}
+                  style={{ padding: '5px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   onClick={handleExportAllRoutesCSV}
                 >
-                  📥 Download Campus CSV
+                  <AttIcon name="download" size={13} color="currentColor" />
+                  <span>Download Campus CSV</span>
                 </button>
                 <button
                   className="btn btn-primary"
-                  style={{ padding: '5px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}
+                  style={{ padding: '5px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   onClick={handlePrintAllRoutesReport}
                 >
-                  🖨️ Print Consolidated Report
+                  <AttIcon name="print" size={13} color="#fff" />
+                  <span>Print Consolidated Report</span>
                 </button>
                 <button
                   className="btn btn-secondary"
@@ -1274,27 +1429,27 @@ export default function AttendanceReport() {
               {/* Campus KPI Summary */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
                 <div style={{ padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{kpis.routesCount || 0}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{dynamicKPIs.routesCount || 0}</div>
                   <div className="muted" style={{ fontSize: 11, fontWeight: 600 }}>Total Routes</div>
                 </div>
                 <div style={{ padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{kpis.totalStudents || 0}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{dynamicKPIs.totalStudents || 0}</div>
                   <div className="muted" style={{ fontSize: 11, fontWeight: 600 }}>Registered Students</div>
                 </div>
                 <div style={{ padding: '10px 12px', border: '1px solid #bbf7d0', borderRadius: 8, textAlign: 'center', background: '#f0fdf4' }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#15803d' }}>{kpis.boardedToday || 0}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#15803d' }}>{dynamicKPIs.boardedToday || 0}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#166534' }}>Boarded (Present)</div>
                 </div>
                 <div style={{ padding: '10px 12px', border: '1px solid #fecaca', borderRadius: 8, textAlign: 'center', background: '#fef2f2' }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#b91c1c' }}>{kpis.absentToday || 0}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#b91c1c' }}>{dynamicKPIs.absentToday || 0}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#991b1b' }}>Total Absent</div>
                 </div>
                 <div style={{ padding: '10px 12px', border: '1px solid #bae6fd', borderRadius: 8, textAlign: 'center', background: '#f0f9ff' }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0284c7' }}>{kpis.attendanceRate || 0}%</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0284c7' }}>{dynamicKPIs.attendanceRate || 0}%</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#0369a1' }}>Attendance Rate</div>
                 </div>
                 <div style={{ padding: '10px 12px', border: '1px solid #fde68a', borderRadius: 8, textAlign: 'center', background: '#fffbeb' }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#92400e' }}>{kpis.pendingSubmissionCount || 0}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#92400e' }}>{dynamicKPIs.pendingSubmissionCount || 0}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e' }}>Pending Submissions</div>
                 </div>
               </div>
@@ -1305,6 +1460,7 @@ export default function AttendanceReport() {
                   <thead>
                     <tr>
                       <th style={{ width: 40 }}>S.No</th>
+                      {selectedCampusFilter === 'ALL' && <th>Campus</th>}
                       <th>Route Code & Name</th>
                       <th>Shift</th>
                       <th>Bus</th>
@@ -1318,10 +1474,17 @@ export default function AttendanceReport() {
                     </tr>
                   </thead>
                   <tbody>
-                    {campusRoster.length > 0 ? (
-                      campusRoster.map((item, idx) => (
+                    {campusScopedRoster.length > 0 ? (
+                      campusScopedRoster.map((item, idx) => (
                         <tr key={item.id}>
                           <td style={{ color: '#64748b' }}>{idx + 1}</td>
+                          {selectedCampusFilter === 'ALL' && (
+                            <td>
+                              <span className="tag" style={{ background: '#f1f5f9', color: '#475569', fontSize: 11, fontWeight: 700 }}>
+                                {item.institution_short_name || item.institution_name || 'Central'}
+                              </span>
+                            </td>
+                          )}
                           <td>
                             <b>{item.route_code}</b> · {item.route_name}
                           </td>
@@ -1333,11 +1496,21 @@ export default function AttendanceReport() {
                           <td className="mono" style={{ fontWeight: 600 }}>{item.registration_number}</td>
                           <td>
                             <div>{item.driver_name}</div>
-                            {item.driver_phone !== '—' && <div className="muted" style={{ fontSize: 11 }}>📞 {item.driver_phone}</div>}
+                            {item.driver_phone !== '—' && (
+                              <div className="muted" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                <AttIcon name="phone" size={11} color="#8c98a4" />
+                                <span>{item.driver_phone}</span>
+                              </div>
+                            )}
                           </td>
                           <td>
                             <div>{item.incharge_name}</div>
-                            {item.incharge_phone !== '—' && <div className="muted" style={{ fontSize: 11 }}>📞 {item.incharge_phone}</div>}
+                            {item.incharge_phone !== '—' && (
+                              <div className="muted" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                <AttIcon name="phone" size={11} color="#8c98a4" />
+                                <span>{item.incharge_phone}</span>
+                              </div>
+                            )}
                           </td>
                           <td><b>{item.enrolledStudents}</b></td>
                           <td style={{ color: '#15803d', fontWeight: 700 }}>{item.boardedCount}</td>
@@ -1352,7 +1525,7 @@ export default function AttendanceReport() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={11} className="muted" style={{ textAlign: 'center', padding: '20px 0' }}>
+                        <td colSpan={selectedCampusFilter === 'ALL' ? 12 : 11} className="muted" style={{ textAlign: 'center', padding: '20px 0' }}>
                           No routes registered in campus roster.
                         </td>
                       </tr>
