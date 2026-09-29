@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../../api/api';
 import DataTable from '../../components/UI/DataTable';
@@ -20,6 +20,8 @@ function DrvIcon({ name, size = 16, color = 'currentColor', style = {} }) {
     plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
     search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
     badge: <><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><line x1="15" y1="8" x2="17" y2="8"/><line x1="15" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="17" y2="16"/></>,
+    phone: <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></>,
+    id: <><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></>,
   };
   return (
     <svg
@@ -38,80 +40,45 @@ function DrvIcon({ name, size = 16, color = 'currentColor', style = {} }) {
   );
 }
 
-const COLUMNS = [
-  {
-    key: 'sno',
-    label: 'S.NO',
-    width: 55
-  },
-  {
-    key: 'name',
-    label: 'Name',
-    render: (val) => (
-      <span style={{ fontWeight: 700, color: 'var(--ink, #0f172a)' }}>{val}</span>
-    )
-  },
-  {
-    key: 'assigned_bus_numbers',
-    label: 'Bus No',
-    render: (val) => {
-      if (!val) return <span style={{ color: 'var(--text-dim, #94a3b8)', fontStyle: 'italic' }}>—</span>;
-      const buses = val.split(', ').map(b => b.trim()).filter(Boolean);
-      return (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-          {buses.map(b => (
-            <span
-              key={b}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                background: '#eff6ff',
-                color: '#1d4ed8',
-                border: '1px solid #bfdbfe',
-                padding: '2px 7px',
-                borderRadius: 5,
-                fontSize: 12,
-                fontWeight: 700,
-                fontFamily: 'JetBrains Mono, monospace'
-              }}
-            >
-              <DrvIcon name="bus" size={12} color="#1d4ed8" /> {b}
-            </span>
-          ))}
-        </div>
-      );
-    }
-  },
-  { key: 'assigned_route_code', label: 'Assigned Route', mono: true },
-  { key: 'license_number', label: 'Licence', mono: true },
-  { key: 'phone', label: 'Mobile', mono: true },
-  { key: 'license_expiry', label: 'Licence Expiry', date: true },
-  { key: 'status', label: 'Status', tag: true },
-];
-
 const FIELDS = [
   { key: 'name', label: 'Driver Name', required: true },
-  { key: 'license_number', label: 'Licence Number', required: true },
-  { key: 'license_expiry', label: 'Licence Expiry', type: 'date' },
-  { key: 'phone', label: 'Mobile' },
-  { key: 'route_id', label: 'Route', type: 'route' },
-  { key: 'institution_id', label: 'Institution', type: 'instref' },
-  { key: 'user_id', label: 'Linked Login', type: 'userref', role: 'driver' },
-  { key: 'status', label: 'Status', type: 'select', options: ['active', 'inactive'] },
-  { key: 'employee_code', label: 'Employee Code' },
+  { key: 'employee_code', label: 'Employee Code / ID' },
   { key: 'father_name', label: "Father's Name" },
   { key: 'date_of_birth', label: 'Date of Birth', type: 'date' },
   { key: 'gender', label: 'Gender', type: 'select', options: ['male', 'female', 'other'] },
   { key: 'blood_group', label: 'Blood Group' },
+  { key: 'aadhaar_no', label: 'Aadhaar Card No.' },
+  { key: 'phone', label: 'Primary Mobile Number', required: true },
   { key: 'alternate_mobile', label: 'Alternate Mobile' },
-  { key: 'email', label: 'Email' },
-  { key: 'current_address', label: 'Current Address', type: 'textarea', full: true },
-  { key: 'aadhaar_no', label: 'Aadhaar No.' },
-  { key: 'joining_date', label: 'Joining Date', type: 'date' },
-  { key: 'experience_years', label: 'Experience (years)', type: 'number' },
-  { key: 'emergency_contact_name', label: 'Emergency Contact' },
-  { key: 'emergency_contact_no', label: 'Emergency Phone' },
+  { key: 'email', label: 'Email Address' },
+  { key: 'current_address', label: 'Current Residential Address', type: 'textarea', full: true },
+  { key: 'permanent_address', label: 'Permanent Address', type: 'textarea', full: true },
+  { key: 'native_place', label: 'Native Place / Town' },
+  { key: 'district', label: 'District (e.g. Theni)' },
+  { key: 'state', label: 'State (e.g. Tamilnadu)' },
+  { key: 'pincode', label: 'Pincode' },
+  { key: 'status', label: 'Operational Status', type: 'select', options: ['active', 'inactive'] },
+  { key: 'institution_id', label: 'Institution / Campus', type: 'instref' },
+  { key: 'route_id', label: 'Assigned Route', type: 'route' },
+  { key: 'user_id', label: 'Linked Login Account', type: 'userref', role: 'driver' },
+  { key: 'designation', label: 'Designation (e.g. DRIVER)' },
+  { key: 'employment_type', label: 'Employment Type', type: 'select', options: ['REGULAR', 'CONTRACT', 'TEMPORARY'] },
+  { key: 'joining_date', label: 'Date of Joining', type: 'date' },
+  { key: 'experience_years', label: 'Total Experience (years)', type: 'number' },
+  { key: 'previous_employer', label: 'Previous Employer' },
+  { key: 'epf_applicable', label: 'EPF Applicable', type: 'bool' },
+  { key: 'epf_uan_no', label: 'EPF UAN Number' },
+  { key: 'esi_applicable', label: 'ESI Applicable', type: 'bool' },
+  { key: 'esi_no', label: 'ESI Number' },
+  { key: 'license_number', label: 'Licence Number', required: true },
+  { key: 'license_type', label: 'Licence Type (e.g. HMV, Transport)' },
+  { key: 'license_issue_date', label: 'Licence Issue Date', type: 'date' },
+  { key: 'license_expiry', label: 'Licence Expiry Date', type: 'date' },
+  { key: 'badge_no', label: 'Badge Number' },
+  { key: 'badge_expiry_date', label: 'Badge Expiry Date', type: 'date' },
+  { key: 'emergency_contact_name', label: 'Emergency Contact Person' },
+  { key: 'emergency_contact_phone', label: 'Emergency Contact Phone' },
+  { key: 'emergency_contact_relation', label: 'Relationship to Contact' },
 ];
 
 function fmtDate(d) {
@@ -161,6 +128,396 @@ export default function Drivers() {
   const { user } = useAuth();
   const canEdit = user?.role === 'admin';
 
+  const [expandedId, setExpandedId] = useState(null);
+
+  const columns = useMemo(() => [
+    {
+      key: 'sno',
+      label: 'S.NO',
+      width: 50
+    },
+    {
+      key: 'name',
+      label: 'Driver & Identity',
+      render: (val, item) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 800, color: '#0f172a', fontSize: 13 }}>{val}</span>
+            {item.employee_code && (
+              <span
+                style={{
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  background: '#f5f3ff',
+                  color: '#7c6cfc',
+                  border: '1px solid #ddd6fe',
+                  padding: '1px 6px',
+                  borderRadius: 4
+                }}
+              >
+                #{item.employee_code}
+              </span>
+            )}
+            {item.blood_group && (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  background: '#fee2e2',
+                  color: '#b91c1c',
+                  border: '1px solid #fca5a5',
+                  padding: '1px 5px',
+                  borderRadius: 3
+                }}
+              >
+                🩸 {item.blood_group}
+              </span>
+            )}
+          </div>
+          {item.father_name && (
+            <span style={{ fontSize: 11, color: '#64748b' }}>
+              S/o {item.father_name}
+            </span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'phone',
+      label: 'Contact & Aadhaar',
+      render: (val, item) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span className="mono" style={{ fontWeight: 700, color: '#1e293b', fontSize: 12 }}>
+            📞 {val || '—'}
+          </span>
+          {item.aadhaar_no && (
+            <span className="mono" style={{ fontSize: 10.5, color: '#64748b' }} title="Aadhaar Card Number">
+              🪪 {item.aadhaar_no}
+            </span>
+          )}
+          {item.alternate_mobile && (
+            <span className="mono" style={{ fontSize: 10, color: '#94a3b8' }}>
+              Alt: {item.alternate_mobile}
+            </span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'assigned_bus_numbers',
+      label: 'Bus & Route',
+      render: (val, item) => {
+        const buses = val ? val.split(', ').map(b => b.trim()).filter(Boolean) : [];
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {buses.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                {buses.map(b => (
+                  <span
+                    key={b}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe',
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      fontFamily: 'JetBrains Mono, monospace'
+                    }}
+                  >
+                    🚌 {b}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 11 }}>— Standby</span>
+            )}
+            {item.assigned_route_code && (
+              <span className="mono" style={{ fontSize: 11, color: '#475569', fontWeight: 600 }}>
+                🛣️ {item.assigned_route_code}
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      key: 'license_number',
+      label: 'Licence & Badge',
+      render: (val, item) => {
+        const lic = getLicenseStatus(item.license_expiry);
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span className="mono" style={{ fontWeight: 700, fontSize: 11.5, color: '#0f172a' }}>
+              {val || '—'}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+              <span className="mono" style={{ fontSize: 11, color: '#64748b' }}>
+                {fmtDate(item.license_expiry)}
+              </span>
+              <span
+                style={{
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  padding: '1px 5px',
+                  borderRadius: 3,
+                  background: lic.bg,
+                  color: lic.color,
+                  border: `1px solid ${lic.border}`
+                }}
+              >
+                {lic.label}
+              </span>
+            </div>
+            {item.badge_no && (
+              <span className="mono" style={{ fontSize: 10, color: '#64748b' }}>
+                Badge: #{item.badge_no}
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      key: 'experience_years',
+      label: 'Service & Exp',
+      render: (val, item) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 12 }}>
+            {val ? `${val} Yrs Exp` : '—'}
+          </span>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                background: '#f1f5f9',
+                color: '#475569',
+                padding: '1px 5px',
+                borderRadius: 3
+              }}
+            >
+              {item.employment_type || 'REGULAR'}
+            </span>
+            <span style={{ fontSize: 10, color: '#64748b' }}>
+              {item.designation || 'DRIVER'}
+            </span>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'institution_name',
+      label: 'Campus & Domicile',
+      render: (val, item) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontWeight: 700, color: '#334155', fontSize: 12 }}>
+            {val || '—'}
+          </span>
+          {(item.native_place || item.district) && (
+            <span style={{ fontSize: 10.5, color: '#64748b' }}>
+              📍 {[item.native_place, item.district].filter(Boolean).join(', ')}
+            </span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (val) => {
+        const isActive = (val || '').toLowerCase() === 'active';
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 8px',
+              borderRadius: 12,
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              background: isActive ? '#dcfce7' : '#fee2e2',
+              color: isActive ? '#15803d' : '#b91c1c',
+              border: `1px solid ${isActive ? '#86efac' : '#fca5a5'}`
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
+            {isActive ? 'Active' : 'Inactive'}
+          </span>
+        );
+      }
+    },
+    {
+      key: 'dossier_btn',
+      label: 'Dossier',
+      render: (_, item) => {
+        const isExp = expandedId === item.id;
+        return (
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpandedId(prev => (prev === item.id ? null : item.id));
+            }}
+            style={{
+              padding: '3px 8px',
+              fontSize: 11,
+              fontWeight: 700,
+              background: isExp ? '#7c6cfc' : '#f5f3ff',
+              color: isExp ? '#ffffff' : '#7c6cfc',
+              border: '1px solid #ddd6fe',
+              borderRadius: 5,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              cursor: 'pointer'
+            }}
+            title="Toggle full staff bio-data and database dossier"
+          >
+            <DrvIcon name="badge" size={13} color={isExp ? '#fff' : '#7c6cfc'} />
+            {isExp ? 'Close' : 'Dossier ▾'}
+          </button>
+        );
+      }
+    }
+  ], [expandedId]);
+
+  const renderSubRow = (item) => {
+    if (expandedId !== item.id) return null;
+    const totalCols = columns.length + 2;
+
+    return (
+      <tr
+        key={`drv-sub-${item.id}`}
+        style={{
+          background: 'linear-gradient(180deg, #fbfbfe 0%, #f8fafc 100%)',
+          borderLeft: '4px solid #7c6cfc',
+          borderBottom: '2px solid #e2e8f0'
+        }}
+      >
+        <td colSpan={totalCols} style={{ padding: '16px 20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>
+                  👤 Staff Master Dossier: {item.name}
+                </span>
+                {item.employee_code && (
+                  <span style={{ fontSize: 11.5, fontWeight: 700, background: '#7c6cfc', color: '#fff', padding: '2px 8px', borderRadius: 4 }}>
+                    EMP ID #{item.employee_code}
+                  </span>
+                )}
+                {item.blood_group && (
+                  <span style={{ fontSize: 11, fontWeight: 800, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '1px 7px', borderRadius: 4 }}>
+                    🩸 {item.blood_group}
+                  </span>
+                )}
+                {item.institution_name && (
+                  <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                    • Campus: <b style={{ color: '#0f172a' }}>{item.institution_name}</b>
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => handlePrintSingleDriver(item)}
+                  style={{ padding: '3px 9px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  title="Print Official Bio-Data Sheet"
+                >
+                  🖨️ Print Sheet
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => setExpandedId(null)}
+                  style={{ padding: '3px 8px', fontSize: 11 }}
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+
+            {/* Grid of full database fields */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+              {/* Card 1: Personal & Bio */}
+              <div style={{ background: '#ffffff', borderRadius: 8, padding: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#7c6cfc', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.5px' }}>
+                  👤 Personal & Identity
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                  <div><span style={{ color: '#64748b' }}>Father's Name:</span> <b>{item.father_name || '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Date of Birth:</span> <b>{fmtDate(item.date_of_birth)}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Gender:</span> <b style={{ textTransform: 'capitalize' }}>{item.gender || '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Aadhaar No:</span> <b className="mono">{item.aadhaar_no || '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Native Place:</span> <b>{item.native_place || '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>District / State:</span> <b>{[item.district, item.state].filter(Boolean).join(', ') || '—'}</b></div>
+                </div>
+              </div>
+
+              {/* Card 2: Contact & Residential */}
+              <div style={{ background: '#ffffff', borderRadius: 8, padding: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.5px' }}>
+                  📞 Contact & Address
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                  <div><span style={{ color: '#64748b' }}>Primary Phone:</span> <b className="mono">{item.phone || '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Alternate Phone:</span> <b className="mono">{item.alternate_mobile || '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Email:</span> <b>{item.email || '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Pincode:</span> <b className="mono">{item.pincode || '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Current Address:</span> <span style={{ fontSize: 11 }}>{item.current_address || '—'}</span></div>
+                  <div><span style={{ color: '#64748b' }}>Permanent Address:</span> <span style={{ fontSize: 11 }}>{item.permanent_address || '—'}</span></div>
+                </div>
+              </div>
+
+              {/* Card 3: Licence & Authorities */}
+              <div style={{ background: '#ffffff', borderRadius: 8, padding: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.5px' }}>
+                  🪪 Licence & Authorities
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                  <div><span style={{ color: '#64748b' }}>Licence No:</span> <b className="mono">{item.license_number || '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Licence Type:</span> <b>{item.license_type || 'Transport / Heavy'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Issue Date:</span> <b className="mono">{fmtDate(item.license_issue_date)}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Expiry Date:</span> <b className="mono">{fmtDate(item.license_expiry)}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Badge Number:</span> <b className="mono">{item.badge_no || '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Badge Expiry:</span> <b className="mono">{fmtDate(item.badge_expiry_date)}</b></div>
+                </div>
+              </div>
+
+              {/* Card 4: Employment, PF & Emergency */}
+              <div style={{ background: '#ffffff', borderRadius: 8, padding: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.5px' }}>
+                  💼 Service, PF & Emergency
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                  <div><span style={{ color: '#64748b' }}>Designation:</span> <b>{item.designation || 'DRIVER'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Employment:</span> <b>{item.employment_type || 'REGULAR'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Date of Joining:</span> <b className="mono">{fmtDate(item.joining_date)}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Experience:</span> <b>{item.experience_years ? `${item.experience_years} Years` : '—'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>EPF UAN:</span> <b className="mono">{item.epf_uan_no ? `${item.epf_uan_no} (Active)` : 'Not Applicable'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>ESI No:</span> <b className="mono">{item.esi_no ? `${item.esi_no} (Active)` : 'Not Applicable'}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Emergency Contact:</span> <b>{item.emergency_contact_name || '—'} {item.emergency_contact_relation ? `(${item.emergency_contact_relation})` : ''}</b></div>
+                  <div><span style={{ color: '#64748b' }}>Emergency Phone:</span> <b className="mono" style={{ color: '#dc2626' }}>{item.emergency_contact_phone || item.emergency_contact_no || '—'}</b></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
   const load = (inst) => {
     setLoading(true);
     const filter = (inst && inst !== 'all') ? { institution_id: inst } : { institution_id: 'all' };
@@ -193,6 +550,11 @@ export default function Drivers() {
         }
       }
     });
+    if (cleanData.emergency_contact_phone && !cleanData.emergency_contact_no) {
+      cleanData.emergency_contact_no = cleanData.emergency_contact_phone;
+    } else if (cleanData.emergency_contact_no && !cleanData.emergency_contact_phone) {
+      cleanData.emergency_contact_phone = cleanData.emergency_contact_no;
+    }
     await api.saveRes('drivers', cleanData, id);
     toast(id ? 'Saved' : 'Added');
     load(instFilter);
@@ -1170,11 +1532,12 @@ export default function Drivers() {
         </div>
 
         <DataTable
-          columns={COLUMNS}
+          columns={columns}
           data={filteredItems}
           onEdit={canEdit ? setEditing : undefined}
           onDelete={canEdit ? handleDel : undefined}
           onPdf={handlePrintSingleDriver}
+          renderSubRow={renderSubRow}
           emptyIcon="👤"
           emptyText="No drivers found matching your criteria."
         />

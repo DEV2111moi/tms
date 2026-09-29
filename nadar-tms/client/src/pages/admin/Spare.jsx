@@ -4,6 +4,38 @@ import DataTable from '../../components/UI/DataTable';
 import { useToast } from '../../components/UI/Toast';
 import { useAuth } from '../../context/AuthContext';
 
+function SpareIcon({ name, size = 16, color = 'currentColor', style = {} }) {
+  const icons = {
+    bus: <><rect x="3" y="4" width="18" height="15" rx="3"/><circle cx="7.5" cy="16" r="1.5"/><circle cx="16.5" cy="16" r="1.5"/><path d="M3 10h18"/><path d="M7 4v3"/><path d="M17 4v3"/></>,
+    zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
+    route: <><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/></>,
+    check: <path d="M20 6L9 17l-5-5"/>,
+    alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+    tools: <><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>,
+    shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+    search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    calendar: <><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
+    filter: <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>,
+    chevronDown: <polyline points="6 9 12 15 18 9"/>,
+    chevronUp: <polyline points="18 15 12 9 6 15"/>,
+  };
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ verticalAlign: 'middle', flexShrink: 0, ...style }}
+    >
+      {icons[name] || icons.bus}
+    </svg>
+  );
+}
+
 const ACTION_CONFIG = {
   breakdown: {
     label: 'Breakdown',
@@ -28,7 +60,7 @@ const ACTION_CONFIG = {
     ]
   },
   fc: {
-    label: 'FC (Fitness Cert)',
+    label: 'FC Renewal',
     icon: '📋',
     headerBg: '#1e3a8a',
     headerTitle: '📋 Bus FC Renewal / Inspection & Assign Substitute',
@@ -90,7 +122,7 @@ const ACTION_CONFIG = {
     ]
   },
   other: {
-    label: 'Other',
+    label: 'Other Reassignment',
     icon: '⚙️',
     headerBg: '#334155',
     headerTitle: '⚙️ Report Vehicle Status & Assign Substitute',
@@ -118,7 +150,8 @@ export default function Spare() {
   const [instFilter, setInstFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
-  const [statusTab, setStatusTab] = useState('all'); // 'all', 'spare', 'active_route', 'breakdown', 'fc', 'emergency', 'maintenance', 'other'
+  const [statusTab, setStatusTab] = useState('all');
+  const [activeDropdownBusId, setActiveDropdownBusId] = useState(null);
 
   // Action / Substitution Modal state
   const [actionModal, setActionModal] = useState(null);
@@ -127,6 +160,13 @@ export default function Spare() {
   const toast = useToast();
   const { user } = useAuth();
   const canEdit = user?.role === 'admin' || user?.role === 'institution';
+
+  // Close open action dropdowns when clicking outside
+  useEffect(() => {
+    const handleDocumentClick = () => setActiveDropdownBusId(null);
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, []);
 
   const load = (inst = instFilter, dateVal = selectedDate) => {
     setLoading(true);
@@ -159,7 +199,7 @@ export default function Spare() {
     load(v, selectedDate);
   };
 
-  // Helper to extract driver id and name for any bus
+  // Helper to resolve driver id and name for any bus
   const getBusDriverInfo = (busId) => {
     if (!busId) return { id: '', name: '' };
     const busItem = items.find(b => String(b.id) === String(busId));
@@ -201,11 +241,12 @@ export default function Spare() {
     return { id: driverId ? String(driverId) : '', name: driverName || '' };
   };
 
-  // Open modal for a specific action (breakdown, fc, emergency, maintenance, other)
+  // Open action modal for a specific bus and action category
   const openActionModal = (bus, actionType = 'breakdown') => {
+    setActiveDropdownBusId(null);
     const primaryRouteId = (bus.assigned_route_ids && bus.assigned_route_ids.split(',')[0]) || bus.route_id || '';
-    const config = ACTION_CONFIG[actionType] || ACTION_CONFIG.breakdown;
     const origDriverInfo = getBusDriverInfo(bus.id);
+    const config = ACTION_CONFIG[actionType] || ACTION_CONFIG.breakdown;
 
     setActionModal({
       bus,
@@ -222,18 +263,20 @@ export default function Spare() {
     });
   };
 
-  // Save substitution & action
+  // Save the substitution action
   const handleSaveAction = async (e) => {
     e.preventDefault();
     if (!actionModal.substitute_bus_id) {
-      toast('Please select an alternate / replacement bus.');
+      toast('Please select an alternate / substitute bus from the list.');
       return;
     }
     setSavingSub(true);
-    try {
-      const config = ACTION_CONFIG[actionModal.actionType] || ACTION_CONFIG.breakdown;
-      const fullReason = `${config.label.toUpperCase()}: ${actionModal.reason || config.defaultReason}`;
+    const config = ACTION_CONFIG[actionModal.actionType] || ACTION_CONFIG.breakdown;
+    const finalReason = actionModal.reason.includes(':') 
+      ? actionModal.reason 
+      : `${config.label}: ${actionModal.reason}`;
 
+    try {
       await api.createSubstitution({
         sub_date: actionModal.sub_date,
         original_bus_id: actionModal.original_bus_id,
@@ -242,11 +285,10 @@ export default function Spare() {
         substitute_bus_id: actionModal.substitute_bus_id,
         substitute_driver_id: actionModal.substitute_driver_id || null,
         shifts: actionModal.shifts || 'all',
-        reason: fullReason,
+        reason: finalReason,
         is_extra_trip: 0,
         notes: actionModal.notes || ''
       });
-
       toast(`Bus ${actionModal.bus.registration_number} recorded as ${config.label}. Substitute dispatched.`);
       setActionModal(null);
       load(instFilter, selectedDate);
@@ -348,7 +390,7 @@ export default function Spare() {
     return { total, spares, activeRoutes, breakdown, fc, emergency, maintenance, other, totalActions };
   }, [items]);
 
-  // Table Columns (Matches user requirement: S.NO, Reg. Number, Assigned Route, Driver Name, Status, Actions)
+  // Table Columns (S.NO, Reg. Number, Assigned Route, Driver Name, Status, Action)
   const COLUMNS = useMemo(() => [
     {
       key: 'registration_number',
@@ -362,48 +404,57 @@ export default function Spare() {
             <span className="mono" style={{ textDecoration: 'line-through', color: '#94a3b8', fontWeight: 700, fontSize: 13 }}>
               {v}
             </span>
-            <span style={{
-              marginLeft: 8,
-              fontSize: 10.5,
-              fontWeight: 800,
-              background: config?.tagBg || '#fee2e2',
-              color: config?.tagColor || '#b91c1c',
-              border: `1px solid ${config?.borderColor || '#fecaca'}`,
-              padding: '2px 7px',
-              borderRadius: 4,
-              display: 'inline-block',
-              textTransform: 'uppercase'
-            }}>
-              {config?.icon || '⚠️'} {config?.label.toUpperCase() || 'ACTION ACTIVE'}
-            </span>
+            <div style={{ marginTop: 2 }}>
+              <span style={{
+                fontSize: 10,
+                fontWeight: 800,
+                background: config?.tagBg || '#fee2e2',
+                color: config?.tagColor || '#b91c1c',
+                border: `1px solid ${config?.borderColor || '#fecaca'}`,
+                padding: '2px 6px',
+                borderRadius: 4,
+                display: 'inline-block',
+                textTransform: 'uppercase'
+              }}>
+                {config?.icon || '⚠️'} {config?.label.toUpperCase() || 'ACTION ACTIVE'}
+              </span>
+            </div>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span 
-              className="mono" 
-              style={{
-                fontWeight: 800,
-                fontSize: 13,
-                background: '#0f172a',
-                color: '#ffffff',
-                padding: '2px 8px',
-                borderRadius: 4,
-                display: 'inline-block'
-              }}
-            >
-              {v}
-            </span>
-            {!item.assigned_route_code && (
-              <span style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                background: '#e0f2fe',
-                color: '#0369a1',
-                border: '1px solid #bae6fd',
-                padding: '2px 6px',
-                borderRadius: 4
-              }}>
-                STANDBY SPARE
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span 
+                className="mono" 
+                style={{
+                  fontWeight: 800,
+                  fontSize: 13,
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  display: 'inline-block',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                {v}
+              </span>
+              {!item.assigned_route_code && (
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  background: '#e0f2fe',
+                  color: '#0369a1',
+                  border: '1px solid #bae6fd',
+                  padding: '2px 6px',
+                  borderRadius: 4
+                }}>
+                  STANDBY
+                </span>
+              )}
+            </div>
+            {item.institution_name && (
+              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>
+                {item.institution_name}
               </span>
             )}
           </div>
@@ -418,17 +469,46 @@ export default function Spare() {
           {v || '—'}
         </span>
       ) : v ? (
-        <span>
-          <strong className="mono" style={{ color: '#0369a1' }}>{v}</strong>
+        <div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+            {v.split(',').map((rc, idx) => (
+              <span 
+                key={idx}
+                className="mono"
+                style={{
+                  background: '#f0f9ff',
+                  color: '#0369a1',
+                  border: '1px solid #bae6fd',
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  fontWeight: 700,
+                  fontSize: 11.5
+                }}
+              >
+                {rc.trim()}
+              </span>
+            ))}
+          </div>
           {item.assigned_route_name && (
-            <span className="muted" style={{ fontSize: 12, marginLeft: 6 }}>
-              · {item.assigned_route_name}
-            </span>
+            <div style={{ fontSize: 11.5, color: '#475569', marginTop: 3 }}>
+              {item.assigned_route_name}
+            </div>
           )}
-        </span>
+        </div>
       ) : (
-        <span style={{ color: '#0284c7', fontStyle: 'italic', fontWeight: 600, fontSize: 12 }}>
-          ⚡ Standby (Available as Spare)
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+          color: '#0284c7',
+          background: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          padding: '2px 8px',
+          borderRadius: 4,
+          fontSize: 11.5,
+          fontWeight: 600
+        }}>
+          <span>⚡</span> <span>Standby in Depot (Available as Spare)</span>
         </span>
       )
     },
@@ -440,9 +520,9 @@ export default function Spare() {
           {v || '—'}
         </span>
       ) : v && v !== '—' ? (
-        <strong style={{ color: '#1e293b' }}>{v}</strong>
+        <strong style={{ color: '#1e293b', fontSize: 12.5 }}>{v}</strong>
       ) : (
-        <span style={{ color: '#94a3b8' }}>—</span>
+        <span style={{ color: '#94a3b8', fontSize: 12, fontStyle: 'italic' }}>— (Standby)</span>
       )
     },
     {
@@ -468,8 +548,17 @@ export default function Spare() {
         }
         if (!item.assigned_route_code) {
           return (
-            <span className="tag" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', fontWeight: 700 }}>
-              STANDBY / SPARE
+            <span style={{
+              background: '#e0f2fe',
+              color: '#0369a1',
+              border: '1px solid #bae6fd',
+              fontWeight: 800,
+              fontSize: 10.5,
+              padding: '3px 8px',
+              borderRadius: 4,
+              letterSpacing: '0.4px'
+            }}>
+              ⚡ STANDBY SPARE
             </span>
           );
         }
@@ -611,13 +700,13 @@ export default function Spare() {
     );
   };
 
-  // Actions column rendering with 5 requested actions
+  // Actions column rendering with clean action button & floating dropdown
   const extraAction = (item) => {
     if (!canEdit) return null;
 
     if (item.is_breakdown) {
       return (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
           <button
             type="button"
             className="btn btn-xs"
@@ -627,105 +716,346 @@ export default function Spare() {
               color: '#ffffff',
               border: 'none',
               fontWeight: 700,
-              padding: '4px 10px',
-              borderRadius: 4,
-              fontSize: 11
+              padding: '5px 12px',
+              borderRadius: 6,
+              fontSize: 11.5,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              boxShadow: '0 1px 2px rgba(22, 101, 52, 0.2)'
             }}
             title="Mark bus as ready to return to normal route"
           >
-            ✅ Bus Ready
+            <span>✅</span> <span>Bus Ready</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-xs btn-outline"
+            onClick={() => openActionModal(item, getActionCategory(item) || 'breakdown')}
+            style={{
+              borderColor: '#ca8a04',
+              color: '#a16207',
+              fontWeight: 600,
+              padding: '4px 9px',
+              borderRadius: 6,
+              fontSize: 11
+            }}
+            title="Edit substitution details"
+          >
+            ✏️ Sub
           </button>
         </div>
       );
     }
 
+    const isSpareBus = !item.assigned_route_code;
+    const isMenuOpen = activeDropdownBusId === item.id;
+
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          className="btn btn-xs"
-          onClick={() => openActionModal(item, 'breakdown')}
-          style={{
-            background: '#fee2e2',
-            color: '#b91c1c',
-            border: '1px solid #fecaca',
-            fontWeight: 700,
-            padding: '3px 7px',
-            fontSize: 11,
-            borderRadius: 4
-          }}
-          title="Mark bus as broken down and assign replacement"
-        >
-          ⚠️ Breakdown
-        </button>
-        <button
-          type="button"
-          className="btn btn-xs"
-          onClick={() => openActionModal(item, 'fc')}
-          style={{
-            background: '#dbeafe',
-            color: '#1d4ed8',
-            border: '1px solid #bfdbfe',
-            fontWeight: 700,
-            padding: '3px 7px',
-            fontSize: 11,
-            borderRadius: 4
-          }}
-          title="Send for FC inspection and deploy substitute"
-        >
-          📋 FC
-        </button>
-        <button
-          type="button"
-          className="btn btn-xs"
-          onClick={() => openActionModal(item, 'emergency')}
-          style={{
-            background: '#ffe4e6',
-            color: '#be123c',
-            border: '1px solid #fecdd3',
-            fontWeight: 700,
-            padding: '3px 7px',
-            fontSize: 11,
-            borderRadius: 4
-          }}
-          title="Emergency substitute deployment"
-        >
-          🚨 Emergency
-        </button>
-        <button
-          type="button"
-          className="btn btn-xs"
-          onClick={() => openActionModal(item, 'maintenance')}
-          style={{
-            background: '#ccfbf1',
-            color: '#0f766e',
-            border: '1px solid #99f6e4',
-            fontWeight: 700,
-            padding: '3px 7px',
-            fontSize: 11,
-            borderRadius: 4
-          }}
-          title="Send for workshop maintenance & assign standby"
-        >
-          🔧 Maint.
-        </button>
-        <button
-          type="button"
-          className="btn btn-xs"
-          onClick={() => openActionModal(item, 'other')}
-          style={{
-            background: '#f1f5f9',
-            color: '#334155',
-            border: '1px solid #cbd5e1',
-            fontWeight: 600,
-            padding: '3px 7px',
-            fontSize: 11,
-            borderRadius: 4
-          }}
-          title="Other operational change / replacement"
-        >
-          ⚙️ Other
-        </button>
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+          {isSpareBus ? (
+            <button
+              type="button"
+              className="btn btn-xs"
+              onClick={() => openActionModal(item, 'breakdown')}
+              style={{
+                background: 'linear-gradient(135deg, #7c6cfc 0%, #6854ec 100%)',
+                border: 'none',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: 11.5,
+                padding: '5px 12px',
+                borderRadius: 6,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                boxShadow: '0 2px 8px rgba(124, 108, 252, 0.3)',
+                cursor: 'pointer'
+              }}
+              title="Deploy this standby bus to cover an incident or route"
+            >
+              <span>⚡</span> <span>Deploy as Spare</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveDropdownBusId(isMenuOpen ? null : item.id);
+              }}
+              style={{
+                background: isMenuOpen ? '#f1f5f9' : '#ffffff',
+                border: '1.5px solid #cbd5e1',
+                color: '#0f172a',
+                fontWeight: 700,
+                fontSize: 12,
+                padding: '5px 12px',
+                borderRadius: 6,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span style={{ fontSize: 13 }}>⚡</span>
+              <span>Action / Sub</span>
+              <span style={{ fontSize: 9, color: '#64748b' }}>{isMenuOpen ? '▲' : '▼'}</span>
+            </button>
+          )}
+
+          {/* More actions trigger for spare bus */}
+          {isSpareBus && (
+            <button
+              type="button"
+              className="btn btn-xs btn-outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveDropdownBusId(isMenuOpen ? null : item.id);
+              }}
+              style={{
+                padding: '4px 8px',
+                borderRadius: 6,
+                fontSize: 11,
+                borderColor: '#cbd5e1',
+                color: '#475569'
+              }}
+              title="Other fleet status actions"
+            >
+              ▾
+            </button>
+          )}
+        </div>
+
+        {/* Floating Action Menu */}
+        {isMenuOpen && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 'calc(100% + 6px)',
+              background: '#ffffff',
+              borderRadius: 8,
+              boxShadow: '0 12px 28px -4px rgba(0, 0, 0, 0.18), 0 0 1px 1px rgba(0, 0, 0, 0.08)',
+              border: '1px solid #e2e8f0',
+              width: 240,
+              zIndex: 100,
+              overflow: 'hidden',
+              padding: '6px',
+              animation: 'fadeIn 0.12s ease'
+            }}
+          >
+            <div style={{
+              fontSize: 11,
+              fontWeight: 800,
+              color: '#64748b',
+              padding: '4px 8px 8px',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <span>SELECT ACTION:</span>
+              <span className="mono" style={{ color: '#0f172a' }}>{item.registration_number}</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => { setActiveDropdownBusId(null); openActionModal(item, 'breakdown'); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'transparent',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  background: '#fee2e2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 14,
+                  flexShrink: 0
+                }}>
+                  ⚠️
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: '#b91c1c' }}>Breakdown</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>Mechanical / engine failure</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setActiveDropdownBusId(null); openActionModal(item, 'fc'); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'transparent',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  background: '#dbeafe',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 14,
+                  flexShrink: 0
+                }}>
+                  📋
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: '#1d4ed8' }}>FC Renewal</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>RTO fitness test & inspection</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setActiveDropdownBusId(null); openActionModal(item, 'emergency'); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'transparent',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#fff1f2'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  background: '#ffe4e6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 14,
+                  flexShrink: 0
+                }}>
+                  🚨
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: '#be123c' }}>Emergency</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>Driver or urgent route incident</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setActiveDropdownBusId(null); openActionModal(item, 'maintenance'); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'transparent',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f0fdfa'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  background: '#ccfbf1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 14,
+                  flexShrink: 0
+                }}>
+                  🔧
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: '#0f766e' }}>Maintenance</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>Periodic service & workshop</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setActiveDropdownBusId(null); openActionModal(item, 'other'); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'transparent',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  background: '#f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 14,
+                  flexShrink: 0
+                }}>
+                  ⚙️
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: '#334155' }}>Other Duty</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>Special event / reorganization</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -736,7 +1066,13 @@ export default function Spare() {
     <>
       <div className="page-head hide-on-print">
         <div>
-          <div className="page-title">Spare & Fleet Status Management</div>
+          <div className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span>Spare & Fleet Status Management</span>
+            <span className="live-badge" style={{ background: '#f0eeff', color: '#6854ec', borderColor: '#e0dcfc' }}>
+              <span className="dot" />
+              <span>STANDBY DISPATCH</span>
+            </span>
+          </div>
           <div className="page-sub">
             Date-wise standby fleet, spare deployment & emergency substitutions ({filteredItems.length} buses shown)
           </div>
@@ -744,24 +1080,57 @@ export default function Spare() {
       </div>
 
       <div className="page-body">
-        {/* Top Summary Stats Cards */}
-        <div className="cards-grid hide-on-print" style={{ marginBottom: 16 }}>
-          <div className="stat-card">
-            <div className="stat-card__label">Total Fleet Buses</div>
-            <div className="stat-card__value">{stats.total}</div>
+        {/* Top Summary Stats Cards (Modern KPI Ribbon) */}
+        <div className="att-kpi-ribbon hide-on-print" style={{ marginBottom: 16 }}>
+          {/* Total Fleet */}
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--purple">
+              <SpareIcon name="bus" size={22} color="#7c6cfc" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val">{stats.total}</div>
+              <div className="att-kpi-label">Total Fleet</div>
+              <div className="att-kpi-sub">Registered vehicles</div>
+            </div>
           </div>
-          <div className="stat-card" style={{ borderLeft: '4px solid #0284c7' }}>
-            <div className="stat-card__label">Available Standby Spares</div>
-            <div className="stat-card__value" style={{ color: '#0284c7' }}>{stats.spares}</div>
+
+          {/* Standby Spares Available */}
+          <div className="att-kpi-card" style={{ borderColor: stats.spares > 0 ? '#38bdf8' : undefined }}>
+            <div className="att-kpi-icon att-kpi-icon--blue" style={{ background: '#e0f2fe' }}>
+              <SpareIcon name="zap" size={22} color="#0284c7" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#0284c7' }}>{stats.spares}</div>
+              <div className="att-kpi-label">Available Standby Spares</div>
+              <div className="att-kpi-sub">Ready in yard for deployment</div>
+            </div>
           </div>
-          <div className="stat-card" style={{ borderLeft: '4px solid #16a34a' }}>
-            <div className="stat-card__label">Active On Routes</div>
-            <div className="stat-card__value" style={{ color: '#16a34a' }}>{stats.activeRoutes}</div>
+
+          {/* Active on Routes */}
+          <div className="att-kpi-card">
+            <div className="att-kpi-icon att-kpi-icon--green">
+              <SpareIcon name="route" size={22} color="#10b981" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#10b981' }}>{stats.activeRoutes}</div>
+              <div className="att-kpi-label">Active on Routes</div>
+              <div className="att-kpi-sub">{Math.round((stats.activeRoutes / (stats.total || 1)) * 100)}% route coverage</div>
+            </div>
           </div>
-          <div className="stat-card" style={{ borderLeft: stats.totalActions > 0 ? '4px solid #dc2626' : undefined }}>
-            <div className="stat-card__label">Buses Under Action ({selectedDate})</div>
-            <div className="stat-card__value" style={{ color: stats.totalActions > 0 ? '#dc2626' : 'inherit' }}>
-              {stats.totalActions}
+
+          {/* Buses Under Action / Incident */}
+          <div className={`att-kpi-card ${stats.totalActions > 0 ? 'att-kpi-card--alert' : ''}`}>
+            <div className="att-kpi-icon att-kpi-icon--amber" style={{ background: stats.totalActions > 0 ? '#fee2e2' : undefined }}>
+              <SpareIcon name="alert" size={22} color={stats.totalActions > 0 ? '#ef4444' : '#f59e0b'} />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: stats.totalActions > 0 ? '#dc2626' : '#64748b' }}>
+                {stats.totalActions}
+              </div>
+              <div className="att-kpi-label">Buses Under Action ({selectedDate})</div>
+              <div className="att-kpi-sub">
+                {stats.totalActions > 0 ? `${stats.totalActions} replacement(s) active` : 'All routes operating normally'}
+              </div>
             </div>
           </div>
         </div>
@@ -785,7 +1154,7 @@ export default function Spare() {
               <span style={{ fontSize: 20 }}>🚨</span>
               <div>
                 <div>
-                  <b>{stats.totalActions} bus(es)</b> reported under action on <b>{selectedDate}</b>:
+                  <b>{stats.totalActions} bus(es)</b> under action on <b>{selectedDate}</b>:
                   {stats.breakdown > 0 && <span> ⚠️ {stats.breakdown} Breakdown</span>}
                   {stats.fc > 0 && <span> · 📋 {stats.fc} FC Work</span>}
                   {stats.emergency > 0 && <span> · 🚨 {stats.emergency} Emergency</span>}
@@ -793,7 +1162,7 @@ export default function Spare() {
                   {stats.other > 0 && <span> · ⚙️ {stats.other} Other</span>}
                 </div>
                 <div style={{ fontSize: 12, color: '#b91c1c', fontWeight: 500, marginTop: 2 }}>
-                  Standby / alternate buses are currently deployed with cover duties.
+                  Standby / substitute buses are currently deployed with cover duties.
                 </div>
               </div>
             </div>
@@ -803,19 +1172,23 @@ export default function Spare() {
           </div>
         )}
 
-        {/* Toolbar: Search, Date Picker, Campus Filter */}
+        {/* Unified Modern Toolbar */}
         <div className="card hide-on-print" style={{ padding: '14px 18px', marginBottom: 16 }}>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Top Line: Search, Date Picker, Campus Filter */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
               {/* Search Bar */}
               <div style={{ position: 'relative', minWidth: 260, flex: 1, maxWidth: 360 }}>
+                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }}>
+                  <SpareIcon name="search" size={15} color="#94a3b8" />
+                </span>
                 <input
                   type="text"
                   className="finput"
-                  placeholder="🔍 Search Reg. Number, Route, Driver..."
+                  placeholder="Search Reg. Number, Route, Driver..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  style={{ width: '100%', height: 38, paddingLeft: 12 }}
+                  style={{ width: '100%', height: 38, paddingLeft: 34 }}
                 />
                 {searchQuery && (
                   <button
@@ -828,16 +1201,28 @@ export default function Spare() {
                 )}
               </div>
 
-              {/* Date-wise Picker */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '4px 10px', borderRadius: 8, border: '1px solid #cbd5e1' }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#334155' }}>📅 Date:</span>
+              {/* Date-wise Picker with Quick "Today" shortcut */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '3px 8px', borderRadius: 8, border: '1px solid #cbd5e1' }}>
+                <SpareIcon name="calendar" size={15} color="#475569" />
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>Date:</span>
                 <input
                   type="date"
                   className="finput"
                   value={selectedDate}
                   onChange={e => handleDateChange(e.target.value)}
-                  style={{ height: 30, padding: '2px 8px', fontSize: 12.5, border: 'none', background: 'transparent', fontWeight: 700 }}
+                  style={{ height: 30, padding: '2px 6px', fontSize: 12.5, border: 'none', background: 'transparent', fontWeight: 700 }}
                 />
+                {selectedDate !== new Date().toLocaleDateString('en-CA') && (
+                  <button
+                    type="button"
+                    className="btn btn-xs"
+                    onClick={() => handleDateChange(new Date().toLocaleDateString('en-CA'))}
+                    style={{ background: '#e2e8f0', color: '#0f172a', fontWeight: 700, padding: '2px 6px', fontSize: 11, borderRadius: 4 }}
+                    title="Jump to today's date"
+                  >
+                    Today
+                  </button>
+                )}
               </div>
 
               {/* Campus Filter */}
@@ -858,75 +1243,123 @@ export default function Spare() {
               )}
             </div>
 
-            {/* Quick Status Count Chips */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className={`btn btn-xs ${statusTab === 'all' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setStatusTab('all')}
-              >
-                All ({stats.total})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-xs ${statusTab === 'spare' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setStatusTab('spare')}
-                style={{ borderColor: '#0284c7', color: statusTab === 'spare' ? '#fff' : '#0284c7' }}
-              >
-                ⚡ Spares ({stats.spares})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-xs ${statusTab === 'active_route' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setStatusTab('active_route')}
-              >
-                Active Route ({stats.activeRoutes})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-xs ${statusTab === 'breakdown' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setStatusTab('breakdown')}
-                style={{ borderColor: '#ef4444', color: statusTab === 'breakdown' ? '#fff' : '#b91c1c' }}
-              >
-                ⚠️ Breakdown ({stats.breakdown})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-xs ${statusTab === 'fc' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setStatusTab('fc')}
-                style={{ borderColor: '#3b82f6', color: statusTab === 'fc' ? '#fff' : '#1d4ed8' }}
-              >
-                📋 FC ({stats.fc})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-xs ${statusTab === 'emergency' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setStatusTab('emergency')}
-                style={{ borderColor: '#f43f5e', color: statusTab === 'emergency' ? '#fff' : '#be123c' }}
-              >
-                🚨 Emergency ({stats.emergency})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-xs ${statusTab === 'maintenance' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setStatusTab('maintenance')}
-                style={{ borderColor: '#14b8a6', color: statusTab === 'maintenance' ? '#fff' : '#0f766e' }}
-              >
-                🔧 Maint. ({stats.maintenance})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-xs ${statusTab === 'other' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setStatusTab('other')}
-                style={{ borderColor: '#64748b', color: statusTab === 'other' ? '#fff' : '#334155' }}
-              >
-                ⚙️ Other ({stats.other})
-              </button>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              Showing <b>{filteredItems.length}</b> of {items.length} buses
             </div>
+          </div>
+
+          {/* Bottom Line: Segmented Filter Tabs */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
+            <button
+              type="button"
+              className={`btn btn-xs ${statusTab === 'all' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setStatusTab('all')}
+              style={{ fontWeight: 700, height: 30, borderRadius: 6 }}
+            >
+              All Buses ({stats.total})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${statusTab === 'spare' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setStatusTab('spare')}
+              style={{
+                borderColor: '#7c6cfc',
+                color: statusTab === 'spare' ? '#fff' : '#6854ec',
+                background: statusTab === 'spare' ? 'linear-gradient(135deg, #7c6cfc 0%, #6854ec 100%)' : '#f0eeff',
+                fontWeight: 700,
+                height: 30,
+                borderRadius: 6
+              }}
+            >
+              ⚡ Standby Spares ({stats.spares})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${statusTab === 'active_route' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setStatusTab('active_route')}
+              style={{ fontWeight: 700, height: 30, borderRadius: 6 }}
+            >
+              Active Routes ({stats.activeRoutes})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${statusTab === 'breakdown' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setStatusTab('breakdown')}
+              style={{
+                borderColor: '#ef4444',
+                color: statusTab === 'breakdown' ? '#fff' : '#b91c1c',
+                background: statusTab === 'breakdown' ? '#b91c1c' : stats.breakdown > 0 ? '#fef2f2' : undefined,
+                fontWeight: 700,
+                height: 30,
+                borderRadius: 6
+              }}
+            >
+              ⚠️ Breakdown ({stats.breakdown})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${statusTab === 'fc' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setStatusTab('fc')}
+              style={{
+                borderColor: '#3b82f6',
+                color: statusTab === 'fc' ? '#fff' : '#1d4ed8',
+                background: statusTab === 'fc' ? '#1d4ed8' : stats.fc > 0 ? '#eff6ff' : undefined,
+                fontWeight: 700,
+                height: 30,
+                borderRadius: 6
+              }}
+            >
+              📋 FC Renewal ({stats.fc})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${statusTab === 'emergency' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setStatusTab('emergency')}
+              style={{
+                borderColor: '#f43f5e',
+                color: statusTab === 'emergency' ? '#fff' : '#be123c',
+                background: statusTab === 'emergency' ? '#be123c' : stats.emergency > 0 ? '#fff1f2' : undefined,
+                fontWeight: 700,
+                height: 30,
+                borderRadius: 6
+              }}
+            >
+              🚨 Emergency ({stats.emergency})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${statusTab === 'maintenance' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setStatusTab('maintenance')}
+              style={{
+                borderColor: '#14b8a6',
+                color: statusTab === 'maintenance' ? '#fff' : '#0f766e',
+                background: statusTab === 'maintenance' ? '#0f766e' : stats.maintenance > 0 ? '#f0fdfa' : undefined,
+                fontWeight: 700,
+                height: 30,
+                borderRadius: 6
+              }}
+            >
+              🔧 In Workshop ({stats.maintenance})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-xs ${statusTab === 'other' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setStatusTab('other')}
+              style={{
+                borderColor: '#64748b',
+                color: statusTab === 'other' ? '#fff' : '#334155',
+                background: statusTab === 'other' ? '#334155' : undefined,
+                fontWeight: 600,
+                height: 30,
+                borderRadius: 6
+              }}
+            >
+              ⚙️ Other ({stats.other})
+            </button>
           </div>
         </div>
 
-        {/* Main Table: S.NO, Reg. Number, Assigned Route, Driver Name, Status, Actions */}
+        {/* Clean Master Fleet & Spares Table */}
         <DataTable
           columns={COLUMNS}
           data={filteredItems}
@@ -939,7 +1372,7 @@ export default function Spare() {
       </div>
 
       {/* ========================================================================= */}
-      {/* ACTION & SUBSTITUTION MODAL (MATCHES USER ATTACHED IMAGE)                  */}
+      {/* ACTION & SUBSTITUTION MODAL WITH CATEGORY SELECTOR TABS                    */}
       {/* ========================================================================= */}
       {actionModal && activeModalConfig && (
         <div style={{
@@ -958,7 +1391,7 @@ export default function Spare() {
         }}>
           <div className="card" style={{
             width: '100%',
-            maxWidth: 540,
+            maxWidth: 560,
             background: '#ffffff',
             borderRadius: 12,
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25)',
@@ -986,18 +1419,62 @@ export default function Spare() {
               <button
                 type="button"
                 onClick={() => setActionModal(null)}
-                style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}
+                style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}
               >
                 ✕
               </button>
+            </div>
+
+            {/* Quick Category Switcher Tabs inside Modal */}
+            <div style={{
+              display: 'flex',
+              background: '#f1f5f9',
+              padding: '4px',
+              gap: '4px',
+              borderBottom: '1px solid #e2e8f0'
+            }}>
+              {Object.entries(ACTION_CONFIG).map(([key, cfg]) => {
+                const isSel = actionModal.actionType === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActionModal(prev => ({
+                      ...prev,
+                      actionType: key,
+                      reason: cfg.defaultReason
+                    }))}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                      padding: '8px 4px',
+                      borderRadius: 6,
+                      border: 'none',
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      background: isSel ? '#ffffff' : 'transparent',
+                      color: isSel ? cfg.tagColor : '#64748b',
+                      boxShadow: isSel ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span>{cfg.icon}</span>
+                    <span>{cfg.label.split(' ')[0]}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Modal Form */}
             <form onSubmit={handleSaveAction} style={{ padding: '20px' }}>
               {/* Bus Information Banner */}
               <div style={{
-                background: '#fef2f2',
-                border: '1.5px solid #fecaca',
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
                 padding: '10px 14px',
                 borderRadius: 8,
                 marginBottom: 16,
@@ -1005,10 +1482,10 @@ export default function Spare() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                   <span>
-                    Selected Bus: <strong style={{ color: activeModalConfig.btnColor }}>{actionModal.bus.registration_number}</strong>
+                    Selected Bus: <strong className="mono" style={{ color: activeModalConfig.btnColor, fontSize: 14 }}>{actionModal.bus.registration_number}</strong>
                   </span>
                   <span>
-                    Route: <strong>{actionModal.bus.assigned_route_code || '— (Spare / Unassigned)'}</strong>
+                    Route: <strong style={{ color: '#0369a1' }}>{actionModal.bus.assigned_route_code || '— (Standby Spare)'}</strong>
                   </span>
                 </div>
                 <div style={{ color: '#475569', fontSize: 12 }}>
@@ -1029,7 +1506,7 @@ export default function Spare() {
                   />
                 </div>
                 <div>
-                  <label className="flabel"><span style={{ fontWeight: 600 }}>{activeModalConfig.label} Issue / Detail</span></label>
+                  <label className="flabel"><span style={{ fontWeight: 600 }}>{activeModalConfig.label} Reason</span></label>
                   <select
                     className="fselect"
                     value={actionModal.reason}
@@ -1068,7 +1545,7 @@ export default function Spare() {
                 >
                   <option value="">-- Choose available substitute bus --</option>
                   {/* First, list Standby Spare buses at top */}
-                  <optgroup label="⭐ Standby Spare Buses (Unassigned)">
+                  <optgroup label="⭐ Standby Spare Buses (Unassigned & Ready)">
                     {items
                       .filter(b => b.id !== actionModal.original_bus_id && !b.is_breakdown && !b.assigned_route_code)
                       .map(b => (
@@ -1077,7 +1554,7 @@ export default function Spare() {
                         </option>
                       ))}
                   </optgroup>
-                  {/* Second, list other normally assigned fleet buses */}
+                  {/* Second, list other fleet buses */}
                   <optgroup label="──────── Other Fleet Buses ────────">
                     {items
                       .filter(b => b.id !== actionModal.original_bus_id && !b.is_breakdown && b.assigned_route_code)
@@ -1149,7 +1626,7 @@ export default function Spare() {
                 <input
                   type="text"
                   className="finput"
-                  placeholder="e.g. Sent to workshop, replacement bus dispatched for morning/evening shifts."
+                  placeholder="e.g. Sent to workshop, replacement bus dispatched for shifts."
                   value={actionModal.notes}
                   onChange={e => setActionModal({ ...actionModal, notes: e.target.value })}
                 />

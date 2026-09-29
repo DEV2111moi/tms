@@ -11,7 +11,7 @@ const TABLES = {
     order: 'registration_number',
   },
   drivers: {
-    cols: ['name', 'license_number', 'license_expiry', 'phone', 'route_id', 'user_id', 'status', 'institution_id', 'employee_code', 'father_name', 'date_of_birth', 'gender', 'blood_group', 'alternate_mobile', 'email', 'current_address', 'permanent_address', 'native_place', 'district', 'state', 'pincode', 'aadhaar_no', 'photo', 'joining_date', 'employment_type', 'designation', 'experience_years', 'previous_employer', 'epf_applicable', 'epf_uan_no', 'esi_applicable', 'esi_no', 'license_type', 'license_issue_date', 'badge_no', 'badge_expiry_date', 'emergency_contact_name', 'emergency_contact_relation', 'emergency_contact_no', 'daily_trips'],
+    cols: ['name', 'license_number', 'license_expiry', 'phone', 'route_id', 'user_id', 'status', 'institution_id', 'employee_code', 'father_name', 'date_of_birth', 'gender', 'blood_group', 'alternate_mobile', 'email', 'current_address', 'permanent_address', 'native_place', 'district', 'state', 'pincode', 'aadhaar_no', 'photo', 'joining_date', 'employment_type', 'designation', 'experience_years', 'previous_employer', 'epf_applicable', 'epf_uan_no', 'esi_applicable', 'esi_no', 'license_type', 'license_issue_date', 'badge_no', 'badge_expiry_date', 'emergency_contact_name', 'emergency_contact_relation', 'emergency_contact_no', 'emergency_contact_phone', 'daily_trips'],
     order: 'name',
   },
   students: {
@@ -114,9 +114,7 @@ exports.list = (table) => async (req, res) => {
     if (table === 'buses') {
       const targetDate = req.query.date || new Date().toLocaleDateString('en-CA');
       let sql = `
-        SELECT b.id, b.registration_number, b.bus_model, b.capacity, b.status,
-               b.fc_expiry, b.insurance_expiry, b.permit_expiry, b.puc_expiry,
-               b.bus_code, b.bus_name, b.vehicle_type, b.institution_id,
+        SELECT b.*,
                GROUP_CONCAT(DISTINCT r.id ORDER BY r.route_code SEPARATOR ',') AS assigned_route_ids,
                GROUP_CONCAT(DISTINCT r.route_code ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_code,
                GROUP_CONCAT(DISTINCT r.route_name ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_name,

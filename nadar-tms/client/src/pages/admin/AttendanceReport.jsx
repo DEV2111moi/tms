@@ -497,6 +497,7 @@ export default function AttendanceReport() {
   const campusRoster = data?.campusRoster || [];
   const absentStudentsList = data?.absentStudentsList || [];
   const institutions = data?.institutions || data?.institutionSummary || [];
+  const inchargesList = data?.inchargesList || [];
   const kpis = data?.kpis || {};
   const institution = data?.institution;
   const isInstitution = data?.isInstitution || user?.role === 'institution';
@@ -1115,7 +1116,7 @@ export default function AttendanceReport() {
                   style={{ width: '100%', height: 38 }}
                 >
                   <option value="">-- No Incharge (Leave Unassigned) --</option>
-                  {inchargesList.map(inc => (
+                  {(inchargesList || []).map(inc => (
                     <option key={inc.id} value={inc.id}>
                       {inc.name} {inc.phone ? `(${inc.phone})` : ''}
                     </option>

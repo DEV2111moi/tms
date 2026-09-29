@@ -210,12 +210,6 @@ const GROUPS_ADMIN = [
     ],
   },
   {
-    title: 'Payroll & Accounts',
-    items: [
-      { to: '/admin/driver-salary', icon: 'salary', label: 'Driver Salary & Bata' },
-    ],
-  },
-  {
     title: 'Fleet & Maintenance',
     items: [
       { to: '/admin/diesel', icon: 'fuel', label: 'Diesel Usage' },
@@ -257,12 +251,6 @@ const GROUPS_INST = [
       { to: '/admin/driver-master-edit', icon: 'edit', label: 'Driver Master Edit' },
     ],
   },
-  {
-    title: 'Payroll & Accounts',
-    items: [
-      { to: '/admin/driver-salary', icon: 'salary', label: 'Driver Salary & Bata' },
-    ],
-  },
 ];
 
 const GROUPS_EXEC = [
@@ -278,12 +266,6 @@ const GROUPS_EXEC = [
       { to: '/admin/attendance-report', icon: 'attendance', label: 'Attendance Report' },
       { to: '/admin/reports', icon: 'report', label: 'Reports' },
       { to: '/admin/spare', icon: 'spare', label: 'Spare' },
-    ],
-  },
-  {
-    title: 'Payroll & Accounts',
-    items: [
-      { to: '/admin/driver-salary', icon: 'salary', label: 'Driver Salaries & Bata' },
     ],
   },
   {
