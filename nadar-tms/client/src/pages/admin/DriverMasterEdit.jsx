@@ -117,29 +117,33 @@ function MultiBusSearchPicker({ buses = [], selectedBusIds = [], onChange, activ
         }}
       >
         {/* Selected Bus Chips */}
-        {selectedBuses.map(b => (
-          <span
-            key={b.id}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 3,
-              background: '#eff6ff',
-              color: '#1d4ed8',
-              border: '1px solid #bfdbfe',
-              borderRadius: 4,
-              padding: '2px 6px',
-              fontSize: 11.5,
-              fontWeight: 700,
-              fontFamily: 'JetBrains Mono, monospace'
-            }}
-          >
-            <span>🚌 {b.registration_number}</span>
+        {selectedBuses.map(b => {
+          const vt = (b.vehicle_type || 'bus').toLowerCase();
+          const isTractor = vt === 'tractor';
+          const isWinger = vt === 'winger';
+          return (
             <span
-              onClick={(e) => {
-                e.stopPropagation();
-                removeBus(b.id);
+              key={b.id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                background: isTractor ? '#fffbeb' : isWinger ? '#f5f3ff' : '#eff6ff',
+                color: isTractor ? '#b45309' : isWinger ? '#6d28d9' : '#1d4ed8',
+                border: isTractor ? '1px solid #fde68a' : isWinger ? '1px solid #ddd6fe' : '1px solid #bfdbfe',
+                borderRadius: 4,
+                padding: '2px 6px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                fontFamily: 'JetBrains Mono, monospace'
               }}
+            >
+              <span>{isTractor ? '🚜' : isWinger ? '🚐' : '🚌'} {b.registration_number}</span>
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeBus(b.id);
+                }}
               style={{
                 cursor: 'pointer',
                 color: '#dc2626',
@@ -153,7 +157,8 @@ function MultiBusSearchPicker({ buses = [], selectedBusIds = [], onChange, activ
               ✕
             </span>
           </span>
-        ))}
+          );
+        })}
 
         {/* Search & Enter Input */}
         <input
@@ -249,9 +254,19 @@ function MultiBusSearchPicker({ buses = [], selectedBusIds = [], onChange, activ
                   onMouseLeave={e => e.currentTarget.style.background = (i === 0 && query ? '#f0f9ff' : 'transparent')}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#1d4ed8' }}>
-                      🚌 {b.registration_number}
+                    <span style={{ fontWeight: 700, fontFamily: 'monospace', color: b.vehicle_type === 'tractor' ? '#b45309' : b.vehicle_type === 'winger' ? '#6d28d9' : '#1d4ed8' }}>
+                      {b.vehicle_type === 'tractor' ? '🚜' : b.vehicle_type === 'winger' ? '🚐' : '🚌'} {b.registration_number}
                     </span>
+                    {b.vehicle_type === 'winger' && (
+                      <span style={{ fontSize: 9.5, background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe', padding: '1px 4px', borderRadius: 3, fontWeight: 700 }}>
+                        Winger
+                      </span>
+                    )}
+                    {b.vehicle_type === 'tractor' && (
+                      <span style={{ fontSize: 9.5, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '1px 4px', borderRadius: 3, fontWeight: 700 }}>
+                        Tractor (Utility)
+                      </span>
+                    )}
                     {b.capacity && (
                       <span style={{ fontSize: 11, color: '#64748b' }}>({b.capacity} seats)</span>
                     )}
@@ -469,9 +484,19 @@ function SingleBusSearchPicker({ buses = [], selectedBusId, onChange, activeInst
                   onMouseLeave={e => e.currentTarget.style.background = (isSelected ? '#eff6ff' : (i === 0 && query ? '#f8fafc' : 'transparent'))}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontWeight: 800, fontFamily: 'monospace', color: '#1d4ed8', fontSize: 12.5 }}>
-                      🚌 {b.registration_number}
+                    <span style={{ fontWeight: 800, fontFamily: 'monospace', color: b.vehicle_type === 'tractor' ? '#b45309' : b.vehicle_type === 'winger' ? '#6d28d9' : '#1d4ed8', fontSize: 12.5 }}>
+                      {b.vehicle_type === 'tractor' ? '🚜' : b.vehicle_type === 'winger' ? '🚐' : '🚌'} {b.registration_number}
                     </span>
+                    {b.vehicle_type === 'winger' && (
+                      <span style={{ fontSize: 9.5, background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>
+                        Winger
+                      </span>
+                    )}
+                    {b.vehicle_type === 'tractor' && (
+                      <span style={{ fontSize: 9.5, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>
+                        Tractor (Utility)
+                      </span>
+                    )}
                     {b.bus_code && (
                       <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>({b.bus_code})</span>
                     )}
@@ -1039,13 +1064,14 @@ export default function DriverMasterEdit() {
   const [modalDriver, setModalDriver] = useState(null);
   const [driverTrips, setDriverTrips] = useState([]);
   const [activeTripTab, setActiveTripTab] = useState(0);
-  const [driverForm, setDriverForm] = useState({ name: '', phone: '', status: 'active', institution_id: '' });
+  const [driverForm, setDriverForm] = useState({ name: '', phone: '', status: 'active', institution_id: '', driver_type: 'regular' });
   const [modalSaving, setModalSaving] = useState(false);
 
-  // Add new driver modal state (asks only Name, Assigned Bus No (Multiple), Assigned Route, Campus / Institution)
+  // Add new driver modal state (asks only Name, Role, Assigned Bus No (Multiple), Assigned Route, Campus / Institution)
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({
     name: '',
+    driver_type: 'regular',
     bus_ids: [],
     route_id: '',
     institution_id: '',
@@ -1116,6 +1142,7 @@ export default function DriverMasterEdit() {
     setRowForm({
       driver_id: d.id,
       name: d.name || '',
+      driver_type: d.driver_type || 'regular',
       institution_id: d.current_institution_id ? String(d.current_institution_id) : (d.institution_id ? String(d.institution_id) : ''),
       route_id: d.current_route_id ? String(d.current_route_id) : (d.route_id ? String(d.route_id) : ''),
       bus_ids: initialBusIds,
@@ -1139,6 +1166,11 @@ export default function DriverMasterEdit() {
       return;
     }
 
+    if (rowForm.status === 'inactive' && (rowForm.route_id || (rowForm.bus_ids && rowForm.bus_ids.length > 0))) {
+      toast('⚠️ Cannot assign route or bus to an Inactive driver. Please activate status first.');
+      return;
+    }
+
     setSavingId(driverId);
     try {
       await api.driverMasterEdit(driverId, rowForm);
@@ -1157,6 +1189,7 @@ export default function DriverMasterEdit() {
           return {
             ...d,
             name: rowForm.name.trim(),
+            driver_type: rowForm.driver_type || 'regular',
             current_institution_id: rowForm.institution_id || null,
             institution_id: rowForm.institution_id || null,
             current_route_id: rowForm.route_id || null,
@@ -1193,6 +1226,7 @@ export default function DriverMasterEdit() {
       name: d.name || '',
       phone: d.phone || '',
       status: d.status || 'active',
+      driver_type: d.driver_type || 'regular',
       institution_id: d.current_institution_id ? String(d.current_institution_id) : (d.institution_id ? String(d.institution_id) : '')
     });
 
@@ -1385,6 +1419,11 @@ export default function DriverMasterEdit() {
       return;
     }
 
+    if (driverForm.status === 'inactive' && driverTrips.some(t => t.route_id || t.bus_id)) {
+      toast('⚠️ Cannot assign trips/routes/buses to an Inactive driver. Please activate driver status first.');
+      return;
+    }
+
     setModalSaving(true);
     try {
       await api.driverMasterEdit(modalDriver.id, {
@@ -1406,6 +1445,7 @@ export default function DriverMasterEdit() {
   const openAddModal = () => {
     setAddForm({
       name: '',
+      driver_type: 'regular',
       bus_ids: [],
       route_id: '',
       institution_id: instFilter !== 'ALL' ? String(instFilter) : '',
@@ -1418,7 +1458,7 @@ export default function DriverMasterEdit() {
     setShowAddModal(true);
   };
 
-  // Save New Driver (asks only Driver Name, Assigned Bus No (Multiple), Assigned Route, Campus / Institution)
+  // Save New Driver (asks Driver Name, Duty Role, Assigned Bus No (Multiple), Assigned Route, Campus / Institution)
   const handleSaveNewDriver = async (e) => {
     if (e) e.preventDefault();
     if (!addForm.name || !addForm.name.trim()) {
@@ -1426,10 +1466,16 @@ export default function DriverMasterEdit() {
       return;
     }
 
+    if (addForm.status === 'inactive' && (addForm.route_id || (addForm.bus_ids && addForm.bus_ids.length > 0))) {
+      toast('⚠️ Cannot assign route or bus to an Inactive driver. Please activate status first.');
+      return;
+    }
+
     setAddSaving(true);
     try {
       await api.driverMasterAdd({
         name: addForm.name.trim(),
+        driver_type: addForm.driver_type || 'regular',
         bus_ids: addForm.bus_ids || [],
         route_id: addForm.route_id || null,
         institution_id: addForm.institution_id || null,
@@ -1461,6 +1507,7 @@ export default function DriverMasterEdit() {
       (d.assigned_route_name || '').toLowerCase().includes(q) ||
       (d.institution_name || '').toLowerCase().includes(q) ||
       (d.phone || '').toLowerCase().includes(q) ||
+      (d.driver_type || '').toLowerCase().includes(q) ||
       (q && refs.routes?.some(r => {
         const isDriverRoute = d.current_route_ids
           ? d.current_route_ids.split(',').map(s => s.trim()).includes(String(r.id))
@@ -1472,18 +1519,46 @@ export default function DriverMasterEdit() {
       String(d.current_institution_id) === String(instFilter) ||
       String(d.institution_id) === String(instFilter);
 
+    const isActive = (d.status || 'active').toLowerCase() === 'active';
+    const isInactive = !isActive;
     const isAssigned = !!(d.assigned_bus_numbers || d.assigned_route_code);
+    const dtype = (d.driver_type || 'regular').toLowerCase();
+    const isSpare = dtype === 'spare' || dtype === 'spare_driver';
+    const isOther = dtype === 'others' || dtype === 'other';
+
+    // CRITICAL USER RULES:
+    // 1. If marked as spare or others, DO NOT show in unassigned until route is assigned for him!
+    // 2. Inactive drivers must NEVER show in unassigned, and route assignment is blocked!
     const matchesStatus = statusFilter === 'ALL' ||
       (statusFilter === 'assigned' && isAssigned) ||
-      (statusFilter === 'unassigned' && !isAssigned);
+      (statusFilter === 'spare' && isSpare) ||
+      (statusFilter === 'others' && isOther) ||
+      (statusFilter === 'unassigned' && isActive && !isAssigned && !isSpare && !isOther) ||
+      (statusFilter === 'inactive' && isInactive);
 
     return matchesSearch && matchesInst && matchesStatus;
   });
 
   // KPIs
   const totalCount = drivers.length;
-  const assignedCount = drivers.filter(d => !!(d.assigned_bus_numbers && d.assigned_route_code)).length;
-  const unassignedCount = totalCount - assignedCount;
+  const activeCount = drivers.filter(d => (d.status || 'active').toLowerCase() === 'active').length;
+  const inactiveCount = totalCount - activeCount;
+  const assignedCount = drivers.filter(d => !!(d.assigned_bus_numbers || d.assigned_route_code)).length;
+  const spareCount = drivers.filter(d => {
+    const dt = (d.driver_type || '').toLowerCase();
+    return dt === 'spare' || dt === 'spare_driver';
+  }).length;
+  const othersCount = drivers.filter(d => {
+    const dt = (d.driver_type || '').toLowerCase();
+    return dt === 'others' || dt === 'other';
+  }).length;
+  // Unassigned includes ONLY ACTIVE regular route drivers awaiting route assignment (spare, others, and inactive excluded)
+  const unassignedCount = drivers.filter(d => {
+    const isActive = (d.status || 'active').toLowerCase() === 'active';
+    const isAssigned = !!(d.assigned_bus_numbers || d.assigned_route_code);
+    const dt = (d.driver_type || 'regular').toLowerCase();
+    return isActive && !isAssigned && dt !== 'spare' && dt !== 'spare_driver' && dt !== 'others' && dt !== 'other';
+  }).length;
 
   if (loading) return <div className="loading-center"><div className="spinner" /> Loading Driver Master Editor...</div>;
 
@@ -1554,18 +1629,18 @@ export default function DriverMasterEdit() {
       <div className="page-body">
         {/* KPI Summary Ribbon (Dashboard UI Theme) */}
         <div className="att-kpi-ribbon" style={{ marginBottom: 18 }}>
-          <div className="att-kpi-card">
+          <div className="att-kpi-card" onClick={() => setStatusFilter('ALL')} style={{ cursor: 'pointer' }}>
             <div className="att-kpi-icon att-kpi-icon--purple">
               <DmIcon name="driver" size={22} color="#7c6cfc" />
             </div>
             <div className="att-kpi-body">
               <div className="att-kpi-val">{totalCount}</div>
-              <div className="att-kpi-label">Total Registered Drivers</div>
-              <div className="att-kpi-sub">In TMHNU central roster</div>
+              <div className="att-kpi-label">Total Registered Staff</div>
+              <div className="att-kpi-sub">In central roster</div>
             </div>
           </div>
 
-          <div className="att-kpi-card">
+          <div className="att-kpi-card" onClick={() => setStatusFilter('assigned')} style={{ cursor: 'pointer' }}>
             <div className="att-kpi-icon att-kpi-icon--green">
               <DmIcon name="check" size={22} color="#10b981" />
             </div>
@@ -1576,7 +1651,18 @@ export default function DriverMasterEdit() {
             </div>
           </div>
 
-          <div className={`att-kpi-card ${unassignedCount > 0 ? 'att-kpi-card--warn' : ''}`}>
+          <div className="att-kpi-card" onClick={() => setStatusFilter('spare')} style={{ cursor: 'pointer' }}>
+            <div className="att-kpi-icon" style={{ background: '#fef3c7', color: '#b45309' }}>
+              <span style={{ fontSize: 20 }}>🔄</span>
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: '#b45309' }}>{spareCount}</div>
+              <div className="att-kpi-label">Spare Relievers</div>
+              <div className="att-kpi-sub">Coverage & Standby</div>
+            </div>
+          </div>
+
+          <div className={`att-kpi-card ${unassignedCount > 0 ? 'att-kpi-card--warn' : ''}`} onClick={() => setStatusFilter('unassigned')} style={{ cursor: 'pointer' }}>
             <div className="att-kpi-icon att-kpi-icon--amber">
               <DmIcon name="alert" size={22} color={unassignedCount > 0 ? '#f59e0b' : '#10b981'} />
             </div>
@@ -1584,8 +1670,8 @@ export default function DriverMasterEdit() {
               <div className="att-kpi-val" style={{ color: unassignedCount > 0 ? '#d97706' : '#10b981' }}>
                 {unassignedCount}
               </div>
-              <div className="att-kpi-label">Standby / Unassigned</div>
-              <div className="att-kpi-sub">{unassignedCount > 0 ? 'Reserve drivers available' : 'All drivers mapped'}</div>
+              <div className="att-kpi-label">Unassigned Route Drivers</div>
+              <div className="att-kpi-sub">{unassignedCount > 0 ? 'Route drivers awaiting bus' : 'All route drivers mapped'}</div>
             </div>
           </div>
 
@@ -1614,7 +1700,7 @@ export default function DriverMasterEdit() {
                 <input
                   type="text"
                   className="finput"
-                  placeholder="Search driver name, bus no, route, mobile..."
+                  placeholder="Search driver name, bus no, route, mobile, role..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   style={{ width: '100%', height: 38, paddingLeft: 34 }}
@@ -1650,11 +1736,18 @@ export default function DriverMasterEdit() {
                 className="fselect"
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
-                style={{ maxWidth: 200, height: 38, fontWeight: 600 }}
+                style={{ maxWidth: 240, height: 38, fontWeight: 600 }}
               >
                 <option value="ALL">All Drivers ({drivers.length})</option>
-                <option value="assigned">✅ Assigned to Bus & Route ({assignedCount})</option>
-                <option value="unassigned">⚠️ Standby (Unassigned) ({unassignedCount})</option>
+                <option value="assigned">✅ Assigned to Route/Bus ({assignedCount})</option>
+                <option value="spare">🔄 Spare Relievers ({spareCount})</option>
+                <option value="unassigned">⚠️ Unassigned Route Drivers ({unassignedCount})</option>
+                {othersCount > 0 && (
+                  <option value="others">🚙 Other / Utility ({othersCount})</option>
+                )}
+                {inactiveCount > 0 && (
+                  <option value="inactive">🚫 Inactive Staff ({inactiveCount})</option>
+                )}
               </select>
             </div>
 
@@ -1663,6 +1756,42 @@ export default function DriverMasterEdit() {
                 Showing <b>{filteredDrivers.length}</b> of {drivers.length} drivers
               </span>
             </div>
+          </div>
+
+          {/* Quick Filter Chips */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginRight: 4 }}>Filter Roster:</span>
+            {[
+              { id: 'ALL', label: `All Staff (${drivers.length})` },
+              { id: 'assigned', label: `🚌 Assigned (${assignedCount})` },
+              { id: 'spare', label: `🔄 Spare / Relievers (${spareCount})` },
+              { id: 'unassigned', label: `⏳ Unassigned Route Drivers (${unassignedCount})` },
+              ...(othersCount > 0 ? [{ id: 'others', label: `🚙 Other / Utility (${othersCount})` }] : []),
+              ...(inactiveCount > 0 ? [{ id: 'inactive', label: `🚫 Inactive Staff (${inactiveCount})` }] : [])
+            ].map(chip => {
+              const active = statusFilter === chip.id;
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setStatusFilter(chip.id)}
+                  style={{
+                    padding: '3px 10px',
+                    borderRadius: 14,
+                    fontSize: 11.5,
+                    fontWeight: active ? 700 : 500,
+                    cursor: 'pointer',
+                    border: active ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                    background: active ? '#eff6ff' : '#ffffff',
+                    color: active ? '#1d4ed8' : '#475569',
+                    boxShadow: active ? '0 1px 3px rgba(37,99,235,0.15)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -1696,7 +1825,7 @@ export default function DriverMasterEdit() {
                           {idx + 1}
                         </td>
 
-                        {/* 1. Driver Name (Input) */}
+                        {/* 1. Driver Name & Duty Role (Inputs) */}
                         <td style={{ verticalAlign: 'top', paddingTop: 10 }}>
                           <input
                             type="text"
@@ -1716,49 +1845,90 @@ export default function DriverMasterEdit() {
                             }}
                             autoFocus
                           />
+                          <div style={{ marginTop: 4 }}>
+                            <select
+                              className="fselect"
+                              value={rowForm.driver_type || 'regular'}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setRowForm(prev => ({
+                                  ...prev,
+                                  driver_type: val,
+                                  ...(val === 'spare' ? { status: 'active' } : {})
+                                }));
+                              }}
+                              style={{
+                                width: '100%',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                padding: '3px 6px',
+                                borderRadius: 4,
+                                border: '1px solid #93c5fd',
+                                background: '#ffffff',
+                                color: rowForm.driver_type === 'spare' ? '#b45309' : rowForm.driver_type === 'others' ? '#6d28d9' : '#1d4ed8'
+                              }}
+                              title="Select Driver Role: Spare drivers won't show in unassigned until route is assigned"
+                            >
+                              <option value="regular">🚌 Regular Route Driver</option>
+                              <option value="spare">🔄 Spare / Reliever</option>
+                              <option value="others">🚙 Other / Utility Pilot</option>
+                            </select>
+                          </div>
                         </td>
 
                         {/* 2. Assigned Bus No (Multi-Bus Search & Enter) */}
                         <td style={{ verticalAlign: 'top', paddingTop: 10 }}>
-                          <MultiBusSearchPicker
-                            buses={refs.buses || []}
-                            selectedBusIds={rowForm.bus_ids || []}
-                            activeInstId={rowForm.institution_id}
-                            onChange={(newBusIds) => {
-                              setRowForm(prev => {
-                                const updated = { ...prev, bus_ids: newBusIds };
-                                // Auto-set campus from bus if not set
-                                if (newBusIds.length > 0 && !prev.institution_id) {
-                                  const firstBus = refs.buses?.find(b => Number(b.id) === Number(newBusIds[0]));
-                                  if (firstBus?.institution_id) {
-                                    updated.institution_id = String(firstBus.institution_id);
+                          {rowForm.status === 'inactive' ? (
+                            <div style={{ padding: '6px 8px', background: '#fee2e2', borderRadius: 6, border: '1px solid #fca5a5', color: '#b91c1c', fontSize: 11, fontWeight: 700 }}>
+                              🚫 Blocked: Inactive Driver
+                            </div>
+                          ) : (
+                            <MultiBusSearchPicker
+                              buses={refs.buses || []}
+                              selectedBusIds={rowForm.bus_ids || []}
+                              activeInstId={rowForm.institution_id}
+                              onChange={(newBusIds) => {
+                                setRowForm(prev => {
+                                  const updated = { ...prev, bus_ids: newBusIds };
+                                  // Auto-set campus from bus if not set
+                                  if (newBusIds.length > 0 && !prev.institution_id) {
+                                    const firstBus = refs.buses?.find(b => Number(b.id) === Number(newBusIds[0]));
+                                    if (firstBus?.institution_id) {
+                                      updated.institution_id = String(firstBus.institution_id);
+                                    }
                                   }
-                                }
-                                return updated;
-                              });
-                            }}
-                          />
+                                  return updated;
+                                });
+                              }}
+                            />
+                          )}
                         </td>
 
                         {/* 3. Assigned Route (Search & Enter Picker) */}
                         <td style={{ verticalAlign: 'top', paddingTop: 10 }}>
-                          <RouteSearchPicker
-                            routes={refs.routes || []}
-                            selectedRouteId={rowForm.route_id}
-                            activeInstId={rowForm.institution_id}
-                            onChange={(newRouteId) => {
-                              setRowForm(prev => {
-                                const updated = { ...prev, route_id: newRouteId };
-                                if (newRouteId) {
-                                  const rMatch = refs.routes?.find(r => String(r.id) === String(newRouteId));
-                                  if (rMatch?.institution_id && (!prev.institution_id || prev.institution_id !== String(rMatch.institution_id))) {
-                                    updated.institution_id = String(rMatch.institution_id);
+                          {rowForm.status === 'inactive' ? (
+                            <div style={{ padding: '6px 8px', background: '#fee2e2', borderRadius: 6, border: '1px solid #fca5a5', color: '#b91c1c', fontSize: 11, fontWeight: 700 }}>
+                              🚫 Route assignment blocked
+                            </div>
+                          ) : (
+                            <RouteSearchPicker
+                              routes={refs.routes || []}
+                              selectedRouteId={rowForm.route_id}
+                              activeInstId={rowForm.institution_id}
+                              onChange={(newRouteId) => {
+                                setRowForm(prev => {
+                                  const updated = { ...prev, route_id: newRouteId };
+                                  if (newRouteId) {
+                                    const rMatch = refs.routes?.find(r => String(r.id) === String(newRouteId));
+                                    if (rMatch?.institution_id && (!prev.institution_id || prev.institution_id !== String(rMatch.institution_id))) {
+                                      updated.institution_id = String(rMatch.institution_id);
+                                    }
                                   }
-                                }
-                                return updated;
-                              });
-                            }}
-                          />
+                                  return updated;
+                                });
+                              }}
+                            />
+                          )}
                         </td>
 
                         {/* 4. Campus / Institution (Search & Enter Picker) */}
@@ -1796,15 +1966,26 @@ export default function DriverMasterEdit() {
                           <select
                             className="fselect"
                             value={rowForm.status || 'active'}
-                            onChange={e => setRowForm(prev => ({ ...prev, status: e.target.value }))}
+                            onChange={e => {
+                              const newStatus = e.target.value;
+                              if (newStatus === 'inactive' && (rowForm.route_id || (rowForm.bus_ids && rowForm.bus_ids.length > 0))) {
+                                if (!confirm('Marking this driver as Inactive will unassign all routes and buses. Inactive drivers cannot be assigned routes. Continue?')) {
+                                  return;
+                                }
+                                setRowForm(prev => ({ ...prev, status: 'inactive', route_id: '', bus_ids: [] }));
+                              } else {
+                                setRowForm(prev => ({ ...prev, status: newStatus }));
+                              }
+                            }}
                             style={{
                               width: '100%',
                               fontSize: 11.5,
                               fontWeight: 700,
                               padding: '5px 4px',
                               borderRadius: 6,
-                              border: '1px solid #cbd5e1',
-                              background: '#ffffff'
+                              border: rowForm.status === 'inactive' ? '1.5px solid #fca5a5' : '1px solid #cbd5e1',
+                              background: rowForm.status === 'inactive' ? '#fee2e2' : '#ffffff',
+                              color: rowForm.status === 'inactive' ? '#b91c1c' : '#0f172a'
                             }}
                           >
                             <option value="active">Active</option>
@@ -1869,6 +2050,20 @@ export default function DriverMasterEdit() {
                               </span>
                               <span style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: 4, fontWeight: 700, color: '#0f172a' }}>
                                 👤 {rowForm.name || 'Unnamed Driver'}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  background: (rowForm.driver_type === 'spare') ? '#fef3c7' : (rowForm.driver_type === 'others') ? '#f5f3ff' : '#eff6ff',
+                                  color: (rowForm.driver_type === 'spare') ? '#b45309' : (rowForm.driver_type === 'others') ? '#6d28d9' : '#1d4ed8',
+                                  border: `1px solid ${(rowForm.driver_type === 'spare') ? '#fde68a' : (rowForm.driver_type === 'others') ? '#ddd6fe' : '#bfdbfe'}`,
+                                  padding: '1px 6px',
+                                  borderRadius: 4
+                                }}
+                              >
+                                {rowForm.driver_type === 'spare' ? '🔄 SPARE' : rowForm.driver_type === 'others' ? '🚙 OTHER' : '🚌 REGULAR'}
                               </span>
                               <span style={{ color: '#15803d', fontWeight: 800 }}>➔</span>
 
@@ -1963,17 +2158,33 @@ export default function DriverMasterEdit() {
                       {idx + 1}
                     </td>
 
-                    {/* 1. Driver Name */}
+                    {/* 1. Driver Name & Duty Role */}
                     <td>
                       <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13.5 }}>{d.name}</div>
-                      {d.employee_code && (
-                        <div style={{ fontSize: 11, color: '#2563eb' }} className="mono">
-                          ID: {d.employee_code}
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                        <span
+                          style={{
+                            fontSize: 9.5,
+                            fontWeight: 800,
+                            textTransform: 'uppercase',
+                            background: (d.driver_type === 'spare') ? '#fef3c7' : (d.driver_type === 'others') ? '#f5f3ff' : '#eff6ff',
+                            color: (d.driver_type === 'spare') ? '#b45309' : (d.driver_type === 'others') ? '#6d28d9' : '#1d4ed8',
+                            border: `1px solid ${(d.driver_type === 'spare') ? '#fde68a' : (d.driver_type === 'others') ? '#ddd6fe' : '#bfdbfe'}`,
+                            padding: '1px 5px',
+                            borderRadius: 3
+                          }}
+                        >
+                          {d.driver_type === 'spare' ? '🔄 SPARE' : d.driver_type === 'others' ? '🚙 OTHER' : '🚌 REGULAR'}
+                        </span>
+                        {d.employee_code && (
+                          <span style={{ fontSize: 11, color: '#2563eb' }} className="mono">
+                            ID: {d.employee_code}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
-                    {/* 2. Assigned Bus Number (Supports multiple bus badges) */}
+                    {/* 2. Assigned Bus Number (Supports multiple bus badges & Spare designation) */}
                     <td>
                       {d.assigned_bus_numbers ? (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -1998,8 +2209,50 @@ export default function DriverMasterEdit() {
                             </span>
                           ))}
                         </div>
+                      ) : d.driver_type === 'spare' ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            background: '#fef3c7',
+                            color: '#b45309',
+                            border: '1px solid #fde68a',
+                            padding: '2px 7px',
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 700
+                          }}
+                          title="Spare / Reliever Driver on standby (hidden from unassigned until route mapped)"
+                        >
+                          🔄 Spare Driver
+                        </span>
+                      ) : d.driver_type === 'others' ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            background: '#f5f3ff',
+                            color: '#6d28d9',
+                            border: '1px solid #ddd6fe',
+                            padding: '2px 7px',
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 700
+                          }}
+                          title="Campus Internal Utility Pilot"
+                        >
+                          🚙 Utility Pilot
+                        </span>
+                      ) : !isActive ? (
+                        <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 11, fontWeight: 600 }}>
+                          🚫 Inactive (Off-duty)
+                        </span>
                       ) : (
-                        <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 12 }}>— No Bus (Standby)</span>
+                        <span style={{ color: '#dc2626', fontStyle: 'italic', fontSize: 12, fontWeight: 600 }}>
+                          ⏳ Standby (Unassigned)
+                        </span>
                       )}
                     </td>
 
@@ -2034,6 +2287,11 @@ export default function DriverMasterEdit() {
                       <span className={`tag ${isActive ? 'tag--ok' : 'tag--off'}`}>
                         {isActive ? 'Active' : 'Inactive'}
                       </span>
+                      {!isActive && (
+                        <div style={{ fontSize: 9.5, color: '#dc2626', fontWeight: 700, marginTop: 2 }}>
+                          🚫 Blocked
+                        </div>
+                      )}
                     </td>
 
                     {/* Action button */}
@@ -2176,6 +2434,41 @@ export default function DriverMasterEdit() {
                     autoFocus
                     required
                   />
+                </div>
+
+                {/* Driver Duty Role & Allocation */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#1e293b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                    Driver Duty Role & Allocation
+                  </label>
+                  <select
+                    className="fselect"
+                    value={addForm.driver_type || 'regular'}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setAddForm(prev => ({
+                        ...prev,
+                        driver_type: val,
+                        ...(val === 'spare' ? { status: 'active' } : {})
+                      }));
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      borderRadius: 7,
+                      border: '1.5px solid #94a3b8',
+                      background: '#ffffff'
+                    }}
+                  >
+                    <option value="regular">🚌 Regular Route Driver (Scheduled Bus Route Duty)</option>
+                    <option value="spare">🔄 Spare / Reliever Driver (Standby reserve, hidden from unassigned)</option>
+                    <option value="others">🚙 Other / Campus Utility Pilot (Internal/Non-Route)</option>
+                  </select>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                    💡 Drivers marked as <b>Spare</b> or <b>Others</b> will not appear in the unassigned list unless a route is explicitly assigned.
+                  </div>
                 </div>
 
                 {/* 2. Assigned Bus No (Multiple) */}
@@ -2472,6 +2765,26 @@ export default function DriverMasterEdit() {
                         placeholder="Mobile number"
                         style={{ padding: '3px 8px', fontSize: 12, width: 130, background: '#ffffff' }}
                       />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Role:</span>
+                      <select
+                        className="fselect"
+                        value={driverForm.driver_type || 'regular'}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setDriverForm(prev => ({
+                            ...prev,
+                            driver_type: val,
+                            ...(val === 'spare' ? { status: 'active' } : {})
+                          }));
+                        }}
+                        style={{ padding: '3px 8px', fontSize: 12, background: '#ffffff', fontWeight: 700, color: driverForm.driver_type === 'spare' ? '#b45309' : driverForm.driver_type === 'others' ? '#6d28d9' : '#1d4ed8' }}
+                      >
+                        <option value="regular">🚌 Regular Route Driver</option>
+                        <option value="spare">🔄 Spare / Reliever</option>
+                        <option value="others">🚙 Other / Utility Pilot</option>
+                      </select>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ color: '#64748b', fontWeight: 600 }}>Campus:</span>

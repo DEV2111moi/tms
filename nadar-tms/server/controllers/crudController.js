@@ -11,7 +11,7 @@ const TABLES = {
     order: 'registration_number',
   },
   drivers: {
-    cols: ['name', 'license_number', 'license_expiry', 'phone', 'route_id', 'user_id', 'status', 'institution_id', 'employee_code', 'father_name', 'date_of_birth', 'gender', 'blood_group', 'alternate_mobile', 'email', 'current_address', 'permanent_address', 'native_place', 'district', 'state', 'pincode', 'aadhaar_no', 'photo', 'joining_date', 'employment_type', 'designation', 'experience_years', 'previous_employer', 'epf_applicable', 'epf_uan_no', 'esi_applicable', 'esi_no', 'license_type', 'license_issue_date', 'badge_no', 'badge_expiry_date', 'emergency_contact_name', 'emergency_contact_relation', 'emergency_contact_no', 'emergency_contact_phone', 'daily_trips'],
+    cols: ['name', 'license_number', 'license_expiry', 'phone', 'route_id', 'user_id', 'status', 'institution_id', 'employee_code', 'father_name', 'date_of_birth', 'gender', 'blood_group', 'alternate_mobile', 'email', 'current_address', 'permanent_address', 'native_place', 'district', 'state', 'pincode', 'aadhaar_no', 'photo', 'joining_date', 'employment_type', 'designation', 'experience_years', 'previous_employer', 'epf_applicable', 'epf_uan_no', 'esi_applicable', 'esi_no', 'license_type', 'license_issue_date', 'badge_no', 'badge_expiry_date', 'emergency_contact_name', 'emergency_contact_relation', 'emergency_contact_no', 'emergency_contact_phone', 'daily_trips', 'driver_type'],
     order: 'name',
   },
   students: {
@@ -279,6 +279,23 @@ exports.update = (table) => async (req, res) => {
   const keys = Object.keys(data);
   if (!keys.length) return res.status(400).json({ error: 'Nothing to update.' });
   try {
+    if (table === 'drivers') {
+      if (data.status === 'inactive') {
+        if (data.route_id) {
+          return res.status(400).json({ error: 'Cannot assign route to an inactive driver. Please activate status first.' });
+        }
+        data.route_id = null;
+        try {
+          await query('UPDATE assignments SET driver_id = NULL WHERE driver_id = ?', [req.params.id]);
+        } catch {}
+      } else if (data.route_id) {
+        const [drv] = await query('SELECT status FROM drivers WHERE id = ?', [req.params.id]);
+        if (drv && String(drv.status).toLowerCase() === 'inactive' && data.status !== 'active') {
+          return res.status(400).json({ error: 'Cannot assign route to an inactive driver. Please activate status first.' });
+        }
+      }
+    }
+
     const sql = `UPDATE \`${table}\` SET ${keys.map((k) => `\`${k}\`=?`).join(',')} WHERE id=?`;
     await query(sql, [...keys.map((k) => data[k]), req.params.id]);
     res.json({ id: Number(req.params.id), ...data });

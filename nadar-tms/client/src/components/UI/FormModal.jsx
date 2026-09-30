@@ -54,7 +54,11 @@ export default function FormModal({ title, fields, initial, onSave, onClose, ref
     if (f.type === 'select') {
       return (
         <select className="fselect" value={val} onChange={e => set(f.key, e.target.value)}>
-          {(f.options || []).map(o => <option key={o} value={o}>{o}</option>)}
+          {(f.options || []).map(o => {
+            const valStr = typeof o === 'object' && o !== null ? o.value : o;
+            const lblStr = typeof o === 'object' && o !== null ? o.label : o;
+            return <option key={valStr} value={valStr}>{lblStr}</option>;
+          })}
         </select>
       );
     }

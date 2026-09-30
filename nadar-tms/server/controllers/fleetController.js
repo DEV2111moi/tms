@@ -66,6 +66,13 @@ exports.assign = async (req, res) => {
 
   const inchargeOnly = req.user.role === 'institution';
   try {
+    if (driver_id) {
+      const [drv] = await query('SELECT id, name, status FROM drivers WHERE id = ?', [driver_id]);
+      if (drv && String(drv.status).toLowerCase() === 'inactive') {
+        return res.status(400).json({ error: `Cannot assign route: Driver ${drv.name} is Inactive. Please activate driver first.` });
+      }
+    }
+
     if (inchargeOnly) {
       for (const sh of shifts) {
         await query(
@@ -273,7 +280,7 @@ exports.refs = async (req, res) => {
         ORDER BY r.route_code
       `),
       query(`
-        SELECT b.id, b.registration_number, b.institution_id,
+        SELECT b.id, b.registration_number, b.institution_id, b.vehicle_type, b.capacity, b.bus_model,
                COALESCE(
                  (SELECT d.name FROM assignments a JOIN drivers d ON d.id = a.driver_id WHERE a.bus_id = b.id ORDER BY a.id DESC LIMIT 1),
                  (SELECT td.name FROM trips t JOIN drivers td ON td.id = t.driver_id WHERE t.bus_id = b.id AND t.trip_date = CURDATE() ORDER BY t.id DESC LIMIT 1)
@@ -285,7 +292,7 @@ exports.refs = async (req, res) => {
         FROM buses b
         ORDER BY b.registration_number
       `),
-      query('SELECT id, name FROM drivers ORDER BY name'),
+      query('SELECT id, name, status, driver_type FROM drivers ORDER BY name'),
       query("SELECT id, name, institution_id FROM users WHERE role='incharge' ORDER BY name"),
       query('SELECT id, code, name, short_name FROM institutions ORDER BY name'),
     ]);
@@ -345,7 +352,7 @@ exports.deleteAssignment = async (req, res) => {
 // PUT /api/drivers/:id/master-edit
 exports.driverMasterEdit = async (req, res) => {
   const driverId = Number(req.params.id);
-  const { name, institution_id, route_id, bus_id, bus_ids, shift, phone, status } = req.body || {};
+  const { name, institution_id, route_id, bus_id, bus_ids, shift, phone, status, driver_type } = req.body || {};
 
   if (!driverId) return res.status(400).json({ error: 'Driver ID is required.' });
 
@@ -359,12 +366,28 @@ exports.driverMasterEdit = async (req, res) => {
     const cleanBus = bus_id ? Number(bus_id) : null;
     const cleanPhone = phone !== undefined ? (phone ? String(phone).trim() : null) : driver.phone;
     const cleanStatus = status || driver.status || 'active';
+    const cleanDriverType = driver_type ? String(driver_type).trim().toLowerCase() : (driver.driver_type || 'regular');
+
+    if (cleanStatus === 'inactive' && (cleanRoute || (req.body.bus_ids && req.body.bus_ids.length > 0) || req.body.bus_id)) {
+      return res.status(400).json({ error: 'Cannot assign route or bus to an inactive driver. Please activate status first or clear the route & bus.' });
+    }
 
     // 1. Update drivers table
     await query(
-      `UPDATE drivers SET name = ?, institution_id = ?, route_id = ?, phone = ?, status = ? WHERE id = ?`,
-      [newName, cleanInst, cleanRoute, cleanPhone, cleanStatus, driverId]
+      `UPDATE drivers SET name = ?, institution_id = ?, route_id = ?, phone = ?, status = ?, driver_type = ? WHERE id = ?`,
+      [newName, cleanInst, cleanStatus === 'inactive' ? null : cleanRoute, cleanPhone, cleanStatus, cleanDriverType, driverId]
     );
+
+    if (cleanStatus === 'inactive') {
+      await query(`UPDATE assignments SET driver_id = NULL WHERE driver_id = ?`, [driverId]);
+      return res.json({
+        ok: true,
+        driver_id: driverId,
+        name: newName,
+        status: 'inactive',
+        message: 'Driver marked inactive and all route assignments cleared.'
+      });
+    }
 
     // If trips array is provided from the multi-tab popup modal
     if (Array.isArray(req.body.trips) && req.body.trips.length > 0) {
@@ -681,7 +704,7 @@ exports.driverMasterEdit = async (req, res) => {
 // Creates a new driver asking only for: Driver Name, Assigned Bus No (Multiple), Assigned Route, Campus/Institution
 // Balance fields (Licence, Mobile, Expiry, Status) stay empty / default
 exports.driverMasterAdd = async (req, res) => {
-  const { name, institution_id, route_id, bus_id, bus_ids, shift, phone, status, license_number, license_expiry } = req.body || {};
+  const { name, institution_id, route_id, bus_id, bus_ids, shift, phone, status, license_number, license_expiry, driver_type } = req.body || {};
 
   if (!name || !String(name).trim()) {
     return res.status(400).json({ error: 'Driver name is required.' });
@@ -701,12 +724,17 @@ exports.driverMasterAdd = async (req, res) => {
       else if (expStr && expStr !== 'null' && expStr !== 'undefined') cleanExpiry = expStr.slice(0, 10);
     }
     const cleanStatus = status || 'active';
+    const cleanDriverType = driver_type ? String(driver_type).trim().toLowerCase() : 'regular';
+
+    if (cleanStatus === 'inactive' && (cleanRoute || (selectedBusIds && selectedBusIds.length > 0))) {
+      return res.status(400).json({ error: 'Cannot assign route or bus to an inactive driver. Set status to Active or remove route & bus.' });
+    }
 
     // 1. Insert into drivers table
     const result = await query(
-      `INSERT INTO drivers (name, institution_id, route_id, phone, license_number, license_expiry, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [cleanName, cleanInst, cleanRoute, cleanPhone, cleanLicense, cleanExpiry, cleanStatus]
+      `INSERT INTO drivers (name, institution_id, route_id, phone, license_number, license_expiry, status, driver_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [cleanName, cleanInst, cleanStatus === 'inactive' ? null : cleanRoute, cleanPhone, cleanLicense, cleanExpiry, cleanStatus, cleanDriverType]
     );
     const driverId = result.insertId;
 

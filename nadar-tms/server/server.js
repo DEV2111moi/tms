@@ -20,6 +20,23 @@ const { query } = require('./db/pool');
   }
 
   try {
+    await query(`ALTER TABLE buses MODIFY COLUMN vehicle_type VARCHAR(50) DEFAULT 'bus'`);
+    console.log('✅ Ensured buses.vehicle_type is VARCHAR(50)');
+  } catch (e) {
+    console.error('Note on vehicle_type column:', e.message);
+  }
+
+  try {
+    await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS driver_type VARCHAR(50) DEFAULT 'regular'`);
+    console.log('✅ Ensured drivers.driver_type is VARCHAR(50)');
+  } catch (e) {
+    try {
+      await query(`ALTER TABLE drivers ADD COLUMN driver_type VARCHAR(50) DEFAULT 'regular'`);
+      console.log('✅ Added drivers.driver_type column');
+    } catch (e2) {}
+  }
+
+  try {
     await query(`
       CREATE TABLE IF NOT EXISTS daily_substitutions (
         id INT AUTO_INCREMENT PRIMARY KEY,

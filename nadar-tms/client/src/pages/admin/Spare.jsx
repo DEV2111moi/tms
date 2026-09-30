@@ -1544,23 +1544,26 @@ export default function Spare() {
                   style={{ border: '2px solid #0284c7', background: '#f0f9ff', fontWeight: 600 }}
                 >
                   <option value="">-- Choose available substitute bus --</option>
-                  {/* First, list Standby Spare buses at top */}
-                  <optgroup label="⭐ Standby Spare Buses (Unassigned & Ready)">
+                  {/* First, list Standby Spare buses and Wingers at top (excluding utility tractors) */}
+                  <optgroup label="⭐ Standby Spare Buses & Wingers (Ready for Relief)">
                     {items
-                      .filter(b => b.id !== actionModal.original_bus_id && !b.is_breakdown && !b.assigned_route_code)
-                      .map(b => (
-                        <option key={b.id} value={b.id}>
-                          ⭐ {b.registration_number} ({b.bus_model || 'Bus'}, Seats: {b.capacity}) · [STANDBY SPARE] {b.driver_name && b.driver_name !== '—' ? `· Driver: ${b.driver_name}` : ''}
-                        </option>
-                      ))}
+                      .filter(b => b.id !== actionModal.original_bus_id && !b.is_breakdown && !b.assigned_route_code && (b.vehicle_type || '').toLowerCase() !== 'tractor')
+                      .map(b => {
+                        const isWinger = (b.vehicle_type || '').toLowerCase() === 'winger';
+                        return (
+                          <option key={b.id} value={b.id}>
+                            {isWinger ? '🚐' : '⭐'} {b.registration_number} ({isWinger ? 'Winger' : b.bus_model || 'Bus'}, Seats: {b.capacity}) · [{isWinger ? 'WINGER RELIEF' : 'STANDBY SPARE'}] {b.driver_name && b.driver_name !== '—' ? `· Driver: ${b.driver_name}` : ''}
+                          </option>
+                        );
+                      })}
                   </optgroup>
-                  {/* Second, list other fleet buses */}
-                  <optgroup label="──────── Other Fleet Buses ────────">
+                  {/* Second, list other fleet buses (excluding tractors) */}
+                  <optgroup label="──────── Other Fleet Route Buses ────────">
                     {items
-                      .filter(b => b.id !== actionModal.original_bus_id && !b.is_breakdown && b.assigned_route_code)
+                      .filter(b => b.id !== actionModal.original_bus_id && !b.is_breakdown && b.assigned_route_code && (b.vehicle_type || '').toLowerCase() !== 'tractor')
                       .map(b => (
                         <option key={b.id} value={b.id}>
-                          {b.registration_number} ({b.bus_model || 'Bus'}, Seats: {b.capacity}) · Normally {b.assigned_route_code} {b.driver_name && b.driver_name !== '—' ? `· Driver: ${b.driver_name}` : ''}
+                          🚌 {b.registration_number} ({b.bus_model || 'Bus'}, Seats: {b.capacity}) · Normally {b.assigned_route_code} {b.driver_name && b.driver_name !== '—' ? `· Driver: ${b.driver_name}` : ''}
                         </option>
                       ))}
                   </optgroup>

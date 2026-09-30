@@ -14,9 +14,8 @@ function BusIcon({ name, size = 16, color = 'currentColor', style = {} }) {
     shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
     plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
     search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
-    gauge: <><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></>,
-    file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>,
-    satellite: <><path d="M13 7 9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4"/><path d="m16 8-4-4"/><circle cx="12" cy="12" r="2"/></>,
+    file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
+    download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
     info: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
   };
   return (
@@ -56,10 +55,10 @@ function checkComplianceStatus(dateStr) {
     now.setHours(0, 0, 0, 0);
     const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24));
     if (diffDays < 0) {
-      return { status: 'expired', label: `Expired (${Math.abs(diffDays)}d ago)`, isAlert: true, color: '#dc2626', bg: '#fee2e2', border: '#fca5a5' };
+      return { status: 'expired', label: 'Expired', daysAgo: Math.abs(diffDays), isAlert: true, color: '#dc2626', bg: '#fee2e2', border: '#fca5a5' };
     }
     if (diffDays <= 60) {
-      return { status: 'due', label: `Due in ${diffDays}d`, isWarn: true, color: '#d97706', bg: '#fef3c7', border: '#fde68a' };
+      return { status: 'due', label: 'Due Soon', daysLeft: diffDays, isWarn: true, color: '#d97706', bg: '#fef3c7', border: '#fde68a' };
     }
     return { status: 'valid', label: 'Valid', isValid: true, color: '#16a34a', bg: '#dcfce7', border: '#86efac' };
   } catch {
@@ -71,9 +70,20 @@ const FIELDS = [
   { key: 'registration_number', label: 'Registration Number', required: true },
   { key: 'bus_code', label: 'Bus Code (e.g. 054, 301)' },
   { key: 'bus_name', label: 'Bus Name / Fleet Label' },
-  { key: 'vehicle_type', label: 'Vehicle Type', type: 'select', options: ['bus', 'mini_bus', 'van'] },
-  { key: 'manufacturer', label: 'Manufacturer (e.g. ASHOK LEYLAND, MAHINDRA)' },
-  { key: 'bus_model', label: 'Bus Model (e.g. SEMI SALOON, SALOON)' },
+  { 
+    key: 'vehicle_type', 
+    label: 'Vehicle Classification & Route Role', 
+    type: 'select', 
+    options: [
+      { value: 'bus', label: '🚌 Bus (Standard Student Route Transport)' },
+      { value: 'winger', label: '🚐 Winger (Route Relief / Support)' },
+      { value: 'tractor', label: '🚜 Tractor (Campus Utility / Farm / Non-Route)' },
+      { value: 'mini_bus', label: '🚐 Mini Bus (Campus Shuttle)' },
+      { value: 'van', label: '🚙 Van (Staff / Utility)' },
+    ] 
+  },
+  { key: 'manufacturer', label: 'Manufacturer (e.g. ASHOK LEYLAND, MAHINDRA, TATA)' },
+  { key: 'bus_model', label: 'Bus Model (e.g. SEMI SALOON, SALOON, WINGER)' },
   { key: 'manufacturing_year', label: 'Year of Manufacture', type: 'number' },
   { key: 'capacity', label: 'Seating Capacity (seats)', type: 'number', required: true },
   { key: 'fuel_type', label: 'Fuel Type', type: 'select', options: ['diesel', 'petrol', 'cng', 'electric'] },
@@ -105,8 +115,12 @@ export default function Buses() {
   const [refs, setRefs] = useState({});
   const [instFilter, setInstFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all'); // 'all', 'bus', 'winger', 'tractor', 'mini_bus', 'van'
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportType, setReportType] = useState('overall'); // 'overall' (2nd image) or 'detailed' (3rd image)
+  const [selectedVehicleId, setSelectedVehicleId] = useState('all');
   const toast = useToast();
   const { user } = useAuth();
   const canEdit = user?.role === 'admin';
@@ -146,6 +160,25 @@ export default function Buses() {
     load(instFilter);
   };
 
+  // Quick Inline Type Changer (Bus, Winger, Tractor, Mini Bus, Van)
+  const handleQuickTypeChange = async (busId, newType, regNo) => {
+    setItems(prev => prev.map(b => b.id === busId ? { ...b, vehicle_type: newType } : b));
+    try {
+      await api.saveRes('buses', { vehicle_type: newType }, busId);
+      const labels = {
+        bus: 'Bus (Route Fleet) 🚌',
+        winger: 'Winger (Route / Relief) 🚐',
+        tractor: 'Tractor (Non-Route Utility) 🚜',
+        mini_bus: 'Mini Bus 🚐',
+        van: 'Van 🚙'
+      };
+      toast(`${regNo} marked as ${labels[newType] || newType}`);
+    } catch (err) {
+      toast(err.message || 'Failed to update vehicle classification');
+      load(instFilter);
+    }
+  };
+
   const handleDel = async (item) => { 
     if (!confirm(`Are you sure you want to delete bus ${item.registration_number}?`)) return; 
     await api.delRes('buses', item.id); 
@@ -153,13 +186,583 @@ export default function Buses() {
     load(instFilter); 
   };
 
-  // KPIs without Assigned Route
+  // Institution Name for Official Reports
+  const institutionTitle = useMemo(() => {
+    if (instFilter && instFilter !== 'all' && refs.institutions) {
+      const inst = refs.institutions.find(i => String(i.id) === String(instFilter));
+      return inst ? (inst.name || inst.short_name).toUpperCase() : 'CENTRAL TRANSPORT DIVISION';
+    }
+    return 'THENI MELAPETTAI HINDU NADARGAL URAVINMURAI - CENTRAL FLEET';
+  }, [instFilter, refs.institutions]);
+
+  // Standard Printable Report Window Generator (A4 Landscape / Portrait)
+  const printReportWindow = (title, htmlBody, landscape = false) => {
+    const printWin = window.open('', '_blank', 'width=1180,height=820');
+    if (!printWin) {
+      alert('Please allow popups in your browser to print / save the PDF report.');
+      return;
+    }
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <meta charset="utf-8" />
+        <style>
+          @page {
+            size: ${landscape ? 'A4 landscape' : 'A4 portrait'};
+            margin: 8mm 8mm;
+          }
+          * { box-sizing: border-box; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #0f172a;
+            padding: 14px;
+            margin: 0;
+            background: #ffffff;
+            font-size: 11px;
+            line-height: 1.45;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .report-header {
+            text-align: center;
+            border-bottom: 2.5px solid #0f172a;
+            padding-bottom: 12px;
+            margin-bottom: 14px;
+          }
+          .inst-name {
+            font-size: 17px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.5px;
+            margin: 0 0 4px 0;
+          }
+          .report-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #7c6cfc;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin: 0 0 3px 0;
+          }
+          .report-subtitle {
+            font-size: 11px;
+            color: #475569;
+            font-weight: 500;
+          }
+          .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 10.5px;
+          }
+          .kpi-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 14px;
+          }
+          .kpi-card {
+            flex: 1;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            padding: 8px 10px;
+            border-radius: 6px;
+            text-align: center;
+          }
+          .kpi-val {
+            font-size: 16px;
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .kpi-lbl {
+            font-size: 9.5px;
+            color: #64748b;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 2px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10.5px;
+            margin-bottom: 18px;
+            table-layout: auto;
+          }
+          thead {
+            display: table-header-group;
+          }
+          th {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.4px;
+            border: 1px solid #94a3b8;
+            padding: 9px 8px;
+            text-align: left;
+            vertical-align: middle;
+          }
+          td {
+            border: 1px solid #cbd5e1;
+            padding: 8.5px 8px;
+            vertical-align: middle;
+            color: #1e293b;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          tr:nth-child(even) td {
+            background-color: #f8fafc !important;
+          }
+          .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 10px;
+          }
+          .tag-pill {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+          }
+          .tag-active {
+            background: #dcfce7 !important;
+            color: #15803d !important;
+            border: 1px solid #86efac;
+          }
+          .tag-inactive {
+            background: #fee2e2 !important;
+            color: #b91c1c !important;
+            border: 1px solid #fca5a5;
+          }
+          .signature-section {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 36px;
+            padding-top: 14px;
+            page-break-inside: avoid;
+          }
+          .sig-box {
+            text-align: center;
+            width: 180px;
+            border-top: 1.5px solid #0f172a;
+            padding-top: 5px;
+            font-size: 10.5px;
+            font-weight: 600;
+            color: #1e293b;
+          }
+          .sig-title {
+            font-size: 9.5px;
+            color: #64748b;
+            font-weight: 500;
+          }
+          @media print {
+            body { padding: 0; }
+            .no-print { display: none !important; }
+          }
+        </style>
+      </head>
+      <body>
+        ${htmlBody}
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => {
+      printWin.print();
+    }, 450);
+  };
+
+  // Helper: Generates HTML string for single vehicle dossier
+  const generateSingleBusDossierHtml = (bus, timestamp) => {
+    const vtype = (bus.vehicle_type || 'bus').toLowerCase();
+    const isTractor = vtype === 'tractor';
+    const isWinger = vtype === 'winger';
+    const fc = checkComplianceStatus(bus.fc_expiry);
+    const ins = checkComplianceStatus(bus.insurance_expiry);
+    const permit = checkComplianceStatus(bus.permit_expiry);
+    const puc = checkComplianceStatus(bus.puc_expiry);
+
+    const typeLabel = isTractor 
+      ? '🚜 TRACTOR (CAMPUS UTILITY / NON-ROUTE)' 
+      : isWinger 
+      ? '🚐 WINGER (ROUTE / RELIEF FLEET)' 
+      : vtype === 'mini_bus'
+      ? '🚐 MINI BUS (CAMPUS SHUTTLE)'
+      : vtype === 'van'
+      ? '🚙 VAN (STAFF UTILITY)'
+      : '🚌 BUS (STANDARD ROUTE FLEET)';
+
+    return `
+      <div class="report-header">
+        <div class="inst-name">${institutionTitle}</div>
+        <div class="report-title">VEHICLE TECHNICAL SPECIFICATIONS & COMPLIANCE DOSSIER</div>
+        <div class="report-subtitle">Official Transport Asset Registration, Specifications & Statutory Validity Record</div>
+      </div>
+
+      <div class="meta-row">
+        <div><b>Vehicle Reg No:</b> <span class="mono" style="font-size: 14px; font-weight: 800; color: #1e293b;">${bus.registration_number}</span> ${bus.bus_code ? `(#${bus.bus_code})` : ''}</div>
+        <div><b>Classification:</b> <b>${typeLabel}</b></div>
+        <div><b>Status:</b> <span class="tag-pill ${bus.status === 'active' ? 'tag-active' : 'tag-inactive'}">${(bus.status || 'active').toUpperCase()}</span></div>
+        <div><b>Generated:</b> ${timestamp}</div>
+      </div>
+
+      ${isTractor ? `
+        <div style="background: #fffbeb; border: 1.5px solid #fde68a; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; color: #92400e;">
+          <b>🚜 TRACTOR / CAMPUS UTILITY NOTICE:</b> This vehicle is classified for campus maintenance, agricultural grounds, and freight hauling only. It is <u>strictly restricted from scheduled student passenger routes</u>.
+        </div>
+      ` : isWinger ? `
+        <div style="background: #f5f3ff; border: 1.5px solid #ddd6fe; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; color: #5b21b6;">
+          <b>🚐 WINGER FLEET NOTICE:</b> Multi-purpose asset authorized for scheduled student routes, faculty transit, and rapid breakdown standby / relief substitution.
+        </div>
+      ` : `
+        <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; color: #1e40af;">
+          <b>🚌 STANDARD PASSENGER FLEET:</b> Primary student transportation vehicle allocated to scheduled morning and evening route operations.
+        </div>
+      `}
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+        <!-- Card 1: Mechanical & Identity -->
+        <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: #ffffff;">
+          <div style="font-weight: 700; font-size: 11px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+            ⚙️ MECHANICAL & IDENTITY SPECIFICATIONS
+          </div>
+          <table style="margin: 0;">
+            <tr><td style="width: 130px; font-weight: 600; background: #f8fafc;">Registration Number</td><td class="mono"><b>${bus.registration_number || '—'}</b></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Manufacturer / Make</td><td><b>${bus.manufacturer || '—'}</b></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Model Name</td><td>${bus.bus_model || '—'}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Year of Manufacture</td><td class="mono">${bus.manufacturing_year || '—'}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Chassis Number</td><td class="mono"><b>${bus.chassis_no || '—'}</b></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Engine Number</td><td class="mono"><b>${bus.engine_no || '—'}</b></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Fuel Type</td><td style="text-transform: capitalize;">${bus.fuel_type || 'Diesel'}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Purchase Date</td><td class="mono">${formatDate(bus.purchase_date)}</td></tr>
+          </table>
+        </div>
+
+        <!-- Card 2: Fitness & Environmental -->
+        <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: #ffffff;">
+          <div style="font-weight: 700; font-size: 11px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+            🛡️ FITNESS (FC) & ENVIRONMENTAL COMPLIANCE
+          </div>
+          <table style="margin: 0;">
+            <tr><td style="width: 130px; font-weight: 600; background: #f8fafc;">FC Certificate No</td><td class="mono"><b>${bus.fc_number || '—'}</b></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">FC Expiry Date</td><td class="mono"><b>${formatDate(bus.fc_expiry)}</b> <span class="tag-pill" style="background:${fc.bg};color:${fc.color};border:1px solid ${fc.border};">${fc.label}</span></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">PUC Certificate No</td><td class="mono">${bus.pollution_certificate_no || '—'}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">PUC Expiry Date</td><td class="mono">${formatDate(bus.puc_expiry)} <span class="tag-pill" style="background:${puc.bg};color:${puc.color};border:1px solid ${puc.border};">${puc.label}</span></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">RC Book Status</td><td>Attached in Transport Office</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Campus Allocation</td><td><b>${bus.institution_name || 'Central Roster'}</b></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+        <!-- Card 3: Insurance & Permit -->
+        <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: #ffffff;">
+          <div style="font-weight: 700; font-size: 11px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+            📜 INSURANCE POLICY & TRANSPORT PERMIT
+          </div>
+          <table style="margin: 0;">
+            <tr><td style="width: 130px; font-weight: 600; background: #f8fafc;">Insurance Provider</td><td><b>${bus.insurance_company || '—'}</b></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Policy Number</td><td class="mono"><b>${bus.insurance_no || '—'}</b></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Policy Expiry Date</td><td class="mono"><b>${formatDate(bus.insurance_expiry)}</b> <span class="tag-pill" style="background:${ins.bg};color:${ins.color};border:1px solid ${ins.border};">${ins.label}</span></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Permit Number</td><td class="mono">${bus.permit_no || '—'}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Permit Type</td><td>${bus.permit_type || 'Educational Institution'}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Permit Expiry Date</td><td class="mono">${formatDate(bus.permit_expiry)} <span class="tag-pill" style="background:${permit.bg};color:${permit.color};border:1px solid ${permit.border};">${permit.label}</span></td></tr>
+          </table>
+        </div>
+
+        <!-- Card 4: Telematics & Telemetry -->
+        <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: #ffffff;">
+          <div style="font-weight: 700; font-size: 11px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+            📡 TELEMATICS, CAPACITY & OPERATIONAL DATA
+          </div>
+          <table style="margin: 0;">
+            <tr><td style="width: 130px; font-weight: 600; background: #f8fafc;">Seating Capacity</td><td class="mono"><b>${isTractor ? 'Utility Unit' : bus.capacity ? `${bus.capacity} Passengers` : '—'}</b></td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Odometer Reading</td><td class="mono">${bus.current_odometer_km ? `${Number(bus.current_odometer_km).toLocaleString('en-IN')} KM` : '—'}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">GPS Telemetry</td><td>${bus.gps_enabled ? '✅ Active Live GPS Tracking' : '❌ Inactive / Not Fitted'}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">GPS Device ID</td><td class="mono">${bus.gps_device_id || '—'}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Asset Ownership</td><td style="text-transform: capitalize;">${bus.ownership_type || 'Owned'}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Operational State</td><td><span class="tag-pill ${bus.status === 'active' ? 'tag-active' : 'tag-inactive'}">${bus.status || 'Active'}</span></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="signature-section" style="margin-top: 45px;">
+        <div class="sig-box">
+          <div>Maintenance Engineer / Mechanic</div>
+          <div class="sig-title">Vehicle Roadworthiness Verified</div>
+        </div>
+        <div class="sig-box">
+          <div>Transport Manager / Incharge</div>
+          <div class="sig-title">Roster & Documents Endorsed</div>
+        </div>
+        <div class="sig-box">
+          <div>Secretary / Principal</div>
+          <div class="sig-title">Official Institutional Sign-Off</div>
+        </div>
+      </div>
+    `;
+  };
+
+  // 1. Download / Print Single Bus Technical Dossier (3rd Image Format)
+  const handlePrintSingleBus = (bus) => {
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    const htmlBody = generateSingleBusDossierHtml(bus, timestamp);
+    printReportWindow(`Vehicle Dossier - ${bus.registration_number}`, htmlBody, false);
+  };
+
+  // 1b. Download / Print Detailed Dossier by Selection or All (3rd Image Format)
+  const handlePrintDetailedDossier = (vehicleId) => {
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    if (vehicleId && vehicleId !== 'all') {
+      const bus = items.find(b => String(b.id) === String(vehicleId) || b.registration_number === vehicleId);
+      if (bus) {
+        handlePrintSingleBus(bus);
+        return;
+      }
+    }
+    // All filtered vehicles dossier book
+    const list = filteredItems;
+    if (!list.length) {
+      alert('No vehicles found in current filter to generate dossiers.');
+      return;
+    }
+    const htmlBody = list.map((bus, idx) => `
+      <div style="${idx > 0 ? 'page-break-before: always; padding-top: 14px;' : ''}">
+        ${generateSingleBusDossierHtml(bus, timestamp)}
+      </div>
+    `).join('');
+
+    printReportWindow(`Fleet Detailed Dossiers - ${institutionTitle}`, htmlBody, false);
+  };
+
+  // 2. Download / Print Full Fleet Register (All Vehicles)
+  const handlePrintAllBuses = () => {
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    const exportList = filteredItems;
+    const rowsHtml = exportList.map((b, idx) => {
+      const vtype = (b.vehicle_type || 'bus').toLowerCase();
+      const fc = checkComplianceStatus(b.fc_expiry);
+      const ins = checkComplianceStatus(b.insurance_expiry);
+      const isActive = (b.status || '').toLowerCase() === 'active';
+      const typeIcon = vtype === 'tractor' ? '🚜' : vtype === 'winger' ? '🚐' : '🚌';
+      const typeName = vtype === 'tractor' ? 'Tractor' : vtype === 'winger' ? 'Winger' : vtype === 'mini_bus' ? 'Mini Bus' : vtype === 'van' ? 'Van' : 'Bus';
+
+      return `
+        <tr>
+          <td style="text-align: center; font-weight: 600; color: #64748b;" class="mono">${idx + 1}</td>
+          <td>
+            <div style="font-weight: 800; color: #0f172a; font-size: 11.5px;" class="mono">${b.registration_number}</div>
+            ${b.bus_code ? `<div style="font-size: 9.5px; color: #7c6cfc;" class="mono">Code: #${b.bus_code}</div>` : ''}
+          </td>
+          <td style="font-weight: 700;">
+            <span>${typeIcon} ${typeName}</span>
+          </td>
+          <td>
+            <div style="font-weight: 700; color: #0f172a;">${b.manufacturer || b.bus_model || '—'}</div>
+            ${b.bus_model ? `<div style="font-size: 9.5px; color: #64748b;">${b.bus_model} ${b.manufacturing_year ? `(${b.manufacturing_year})` : ''}</div>` : ''}
+          </td>
+          <td style="text-align: center;" class="mono">
+            ${vtype === 'tractor' ? 'Utility' : b.capacity ? `${b.capacity} Seats` : '—'}
+          </td>
+          <td style="text-align: center; text-transform: capitalize;">
+            ${b.fuel_type || 'Diesel'}
+          </td>
+          <td>
+            <div class="mono" style="font-weight: 600;">${formatDate(b.fc_expiry)}</div>
+            <span class="tag-pill" style="background: ${fc.bg} !important; color: ${fc.color} !important; border: 1px solid ${fc.border}; margin-top: 2px;">
+              ${fc.label}
+            </span>
+          </td>
+          <td>
+            <div class="mono" style="font-weight: 600;">${formatDate(b.insurance_expiry)}</div>
+            <span class="tag-pill" style="background: ${ins.bg} !important; color: ${ins.color} !important; border: 1px solid ${ins.border}; margin-top: 2px;">
+              ${b.insurance_company || ins.label}
+            </span>
+          </td>
+          <td class="mono" style="font-size: 9.5px;">
+            ${b.chassis_no || '—'}
+          </td>
+          <td style="font-size: 10px; color: #334155;">
+            ${b.institution_name || 'Central Roster'}
+          </td>
+          <td style="text-align: center;">
+            <span class="tag-pill ${isActive ? 'tag-active' : 'tag-inactive'}">
+              ${isActive ? 'Active' : 'Inactive'}
+            </span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const htmlBody = `
+      <div class="report-header">
+        <div class="inst-name">${institutionTitle}</div>
+        <div class="report-title">FLEET ASSET REGISTER & TECHNICAL COMPLIANCE REPORT</div>
+        <div class="report-subtitle">Official Transport Fleet Inventory, Vehicle Classification (Bus, Winger, Tractor), Fitness & Insurance Records</div>
+      </div>
+
+      <div class="meta-row">
+        <div><b>Filter Scope:</b> ${typeFilter === 'all' ? 'All Fleet Vehicles' : typeFilter.toUpperCase()} | ${statusFilter === 'all' ? 'All Status' : statusFilter.toUpperCase()}</div>
+        <div><b>Total Vehicles in Scope:</b> <b class="mono" style="color: #7c6cfc; font-size: 13px;">${exportList.length}</b></div>
+        <div><b>Report Date:</b> ${timestamp}</div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #7c6cfc;">${stats.total}</div>
+          <div class="kpi-lbl">Total Fleet</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #15803d;">${stats.active}</div>
+          <div class="kpi-lbl">Active & Ready</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #1d4ed8;">${stats.busesCount}</div>
+          <div class="kpi-lbl">Route Buses</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #7c3aed;">${stats.wingersCount}</div>
+          <div class="kpi-lbl">Wingers</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #b45309;">${stats.tractorsCount}</div>
+          <div class="kpi-lbl">Tractors</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #dc2626;">${stats.fcDue}</div>
+          <div class="kpi-lbl">FC Due</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #d97706;">${stats.insDue}</div>
+          <div class="kpi-lbl">Insurance Due</div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 35px; text-align: center;">#</th>
+            <th style="width: 110px;">Reg Number</th>
+            <th style="width: 100px;">Classification</th>
+            <th style="width: 140px;">Make & Model</th>
+            <th style="width: 70px; text-align: center;">Capacity</th>
+            <th style="width: 60px; text-align: center;">Fuel</th>
+            <th style="width: 100px;">Fitness (FC)</th>
+            <th style="width: 110px;">Insurance</th>
+            <th style="width: 120px;">Chassis No</th>
+            <th style="width: 140px;">Campus</th>
+            <th style="width: 65px; text-align: center;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <div class="signature-section">
+        <div class="sig-box">
+          <div>Prepared By</div>
+          <div class="sig-title">Transport Operations Assistant</div>
+        </div>
+        <div class="sig-box">
+          <div>Verified By</div>
+          <div class="sig-title">Transport Manager / Incharge</div>
+        </div>
+        <div class="sig-box">
+          <div>Approved By</div>
+          <div class="sig-title">Principal / Director</div>
+        </div>
+      </div>
+    `;
+
+    printReportWindow(`Fleet Register - ${institutionTitle}`, htmlBody, true);
+  };
+
+  // 3. Export CSV of all filtered vehicles
+  const handleExportCSV = () => {
+    const headers = [
+      '#', 'Registration Number', 'Bus Code', 'Vehicle Type', 'Make / Manufacturer',
+      'Model', 'Mfg Year', 'Seating Capacity', 'Fuel Type', 'Ownership',
+      'Fitness Expiry', 'FC Certificate Number', 'Insurance Expiry', 'Insurance Company', 'Insurance Policy No',
+      'Permit Expiry', 'Permit Number', 'PUC Expiry', 'Pollution Cert No',
+      'Chassis Number', 'Engine Number', 'Odometer (KM)', 'GPS Enabled', 'GPS Device ID',
+      'Campus / Institution', 'Status'
+    ];
+    const rows = filteredItems.map((b, i) => [
+      i + 1,
+      b.registration_number || '',
+      b.bus_code || '',
+      b.vehicle_type || 'bus',
+      b.manufacturer || '',
+      b.bus_model || '',
+      b.manufacturing_year || '',
+      b.capacity || '',
+      b.fuel_type || 'diesel',
+      b.ownership_type || 'owned',
+      formatDate(b.fc_expiry),
+      b.fc_number || '',
+      formatDate(b.insurance_expiry),
+      b.insurance_company || '',
+      b.insurance_no || '',
+      formatDate(b.permit_expiry),
+      b.permit_no || '',
+      formatDate(b.puc_expiry),
+      b.pollution_certificate_no || '',
+      b.chassis_no || '',
+      b.engine_no || '',
+      b.current_odometer_km || '',
+      b.gps_enabled ? 'Yes' : 'No',
+      b.gps_device_id || '',
+      b.institution_name || '',
+      b.status || 'active'
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' +
+      [headers.join(','), ...rows.map(e => e.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `tms_fleet_master_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast('Fleet register downloaded as Excel / CSV');
+  };
+
+  // KPIs & Vehicle Type Breakdown
   const stats = useMemo(() => {
     const total = items.length;
     let active = 0;
     let inRepair = 0;
     let fcDue = 0;
     let insDue = 0;
+    let busesCount = 0;
+    let wingersCount = 0;
+    let tractorsCount = 0;
+    let miniBusesCount = 0;
+    let vansCount = 0;
 
     items.forEach(b => {
       const st = (b.status || '').toLowerCase();
@@ -169,9 +772,27 @@ export default function Buses() {
       if (fc.isAlert || fc.isWarn) fcDue++;
       const ins = checkComplianceStatus(b.insurance_expiry);
       if (ins.isAlert || ins.isWarn) insDue++;
+
+      const vt = (b.vehicle_type || 'bus').toLowerCase();
+      if (vt === 'winger') wingersCount++;
+      else if (vt === 'tractor') tractorsCount++;
+      else if (vt === 'mini_bus') miniBusesCount++;
+      else if (vt === 'van') vansCount++;
+      else busesCount++;
     });
 
-    return { total, active, inRepair, fcDue, insDue };
+    return { 
+      total, 
+      active, 
+      inRepair, 
+      fcDue, 
+      insDue,
+      busesCount,
+      wingersCount,
+      tractorsCount,
+      miniBusesCount,
+      vansCount
+    };
   }, [items]);
 
   const filteredItems = useMemo(() => {
@@ -179,15 +800,23 @@ export default function Buses() {
       const st = (item.status || '').toLowerCase();
       const fc = checkComplianceStatus(item.fc_expiry);
       const ins = checkComplianceStatus(item.insurance_expiry);
-      const vtype = (item.vehicle_type || '').toLowerCase();
+      const vt = (item.vehicle_type || 'bus').toLowerCase();
 
+      // Vehicle Type Filter
+      if (typeFilter !== 'all') {
+        if (typeFilter === 'bus' && vt !== 'bus') return false;
+        if (typeFilter === 'winger' && vt !== 'winger') return false;
+        if (typeFilter === 'tractor' && vt !== 'tractor') return false;
+        if (typeFilter === 'mini_bus' && vt !== 'mini_bus') return false;
+        if (typeFilter === 'van' && vt !== 'van') return false;
+      }
+
+      // Operational Status Filter
       if (statusFilter === 'active' && st !== 'active') return false;
       if (statusFilter === 'repair' && st !== 'repair') return false;
       if (statusFilter === 'inactive' && st !== 'inactive') return false;
       if (statusFilter === 'fc_due' && !fc.isAlert && !fc.isWarn) return false;
       if (statusFilter === 'ins_due' && !ins.isAlert && !ins.isWarn) return false;
-      if (statusFilter === 'mini_bus' && vtype !== 'mini_bus') return false;
-      if (statusFilter === 'bus' && vtype !== 'bus') return false;
 
       const query = searchQuery.toLowerCase().trim();
       if (!query) return true;
@@ -195,6 +824,7 @@ export default function Buses() {
         (item.registration_number || '').toLowerCase().includes(query) ||
         (item.bus_code || '').toLowerCase().includes(query) ||
         (item.bus_name || '').toLowerCase().includes(query) ||
+        (item.vehicle_type || '').toLowerCase().includes(query) ||
         (item.manufacturer || '').toLowerCase().includes(query) ||
         (item.bus_model || '').toLowerCase().includes(query) ||
         (item.chassis_no || '').toLowerCase().includes(query) ||
@@ -204,117 +834,181 @@ export default function Buses() {
         (item.institution_name || '').toLowerCase().includes(query)
       );
     });
-  }, [items, statusFilter, searchQuery]);
+  }, [items, statusFilter, typeFilter, searchQuery]);
 
-  // Table Columns with comprehensive database details — NO Assigned Route
+  // Table Columns with comprehensive database details & Quick Type Changer
   const COLUMNS = useMemo(() => [
     {
       key: 'registration_number',
-      label: 'Vehicle & Reg. Plate',
-      render: (val, item) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span
-              style={{
-                fontFamily: 'JetBrains Mono, monospace',
-                fontWeight: 800,
-                fontSize: 13,
-                letterSpacing: '0.6px',
-                color: '#1e293b',
-                background: '#f8fafc',
-                border: '1.5px solid #cbd5e1',
-                padding: '2px 8px',
-                borderRadius: 5,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-              }}
-            >
-              {val}
-            </span>
-            {item.bus_code && (
+      label: 'Vehicle & Classification',
+      render: (val, item) => {
+        const vtype = (item.vehicle_type || 'bus').toLowerCase();
+        const isTractor = vtype === 'tractor';
+        const isWinger = vtype === 'winger';
+        const isBus = vtype === 'bus';
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <span
                 style={{
-                  fontSize: 10.5,
-                  fontWeight: 700,
-                  background: '#f5f3ff',
-                  color: '#7c6cfc',
-                  border: '1px solid #ddd6fe',
-                  padding: '1px 6px',
-                  borderRadius: 4
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontWeight: 800,
+                  fontSize: 13,
+                  letterSpacing: '0.6px',
+                  color: isTractor ? '#92400e' : isWinger ? '#5b21b6' : '#1e293b',
+                  background: isTractor ? '#fef3c7' : isWinger ? '#f5f3ff' : '#f8fafc',
+                  border: isTractor ? '1.5px solid #fde68a' : isWinger ? '1.5px solid #ddd6fe' : '1.5px solid #cbd5e1',
+                  padding: '2px 8px',
+                  borderRadius: 5,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                 }}
               >
-                #{item.bus_code}
+                {val}
               </span>
-            )}
+              {item.bus_code && (
+                <span
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    background: '#f5f3ff',
+                    color: '#7c6cfc',
+                    border: '1px solid #ddd6fe',
+                    padding: '1px 6px',
+                    borderRadius: 4
+                  }}
+                >
+                  #{item.bus_code}
+                </span>
+              )}
+            </div>
+
+            {/* Quick Type Changer Dropdown */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
+              <select
+                value={vtype}
+                onClick={e => e.stopPropagation()}
+                onChange={e => handleQuickTypeChange(item.id, e.target.value, item.registration_number)}
+                title="Click to mark vehicle as Bus, Winger, Tractor, Mini Bus, or Van"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.3px',
+                  padding: '2px 6px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  height: 25,
+                  border: isTractor
+                    ? '1.5px solid #f59e0b'
+                    : isWinger
+                    ? '1.5px solid #8b5cf6'
+                    : vtype === 'mini_bus'
+                    ? '1.5px solid #06b6d4'
+                    : vtype === 'van'
+                    ? '1.5px solid #64748b'
+                    : '1.5px solid #3b82f6',
+                  background: isTractor
+                    ? '#fffbeb'
+                    : isWinger
+                    ? '#f5f3ff'
+                    : vtype === 'mini_bus'
+                    ? '#ecfeff'
+                    : vtype === 'van'
+                    ? '#f8fafc'
+                    : '#eff6ff',
+                  color: isTractor
+                    ? '#b45309'
+                    : isWinger
+                    ? '#6d28d9'
+                    : vtype === 'mini_bus'
+                    ? '#0e7490'
+                    : vtype === 'van'
+                    ? '#334155'
+                    : '#1d4ed8',
+                  outline: 'none',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+              >
+                <option value="bus">🚌 BUS (Route Fleet)</option>
+                <option value="winger">🚐 WINGER (Route / Relief)</option>
+                <option value="tractor">🚜 TRACTOR (Non-Route)</option>
+                <option value="mini_bus">🚐 MINI BUS</option>
+                <option value="van">🚙 VAN</option>
+              </select>
+
+              {isTractor && (
+                <span 
+                  style={{ 
+                    fontSize: 9.5, 
+                    fontWeight: 700, 
+                    background: '#fee2e2', 
+                    color: '#b91c1c', 
+                    border: '1px solid #fca5a5', 
+                    padding: '1px 5px', 
+                    borderRadius: 4 
+                  }}
+                  title="Tractors cannot be assigned to student routes"
+                >
+                  Non-Route
+                </span>
+              )}
+              {isWinger && (
+                <span 
+                  style={{ 
+                    fontSize: 9.5, 
+                    fontWeight: 700, 
+                    background: '#ede9fe', 
+                    color: '#6d28d9', 
+                    border: '1px solid #ddd6fe', 
+                    padding: '1px 5px', 
+                    borderRadius: 4 
+                  }}
+                  title="Winger can be used for routes or relief duty"
+                >
+                  Relief / Route
+                </span>
+              )}
+              {item.ownership_type && (
+                <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'capitalize' }}>
+                  • {item.ownership_type}
+                </span>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                background: '#f1f5f9',
-                color: '#475569',
-                padding: '1px 5px',
-                borderRadius: 3
-              }}
-            >
-              {item.vehicle_type ? item.vehicle_type.replace('_', ' ') : 'BUS'}
-            </span>
-            {item.ownership_type && (
-              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'capitalize' }}>
-                • {item.ownership_type}
-              </span>
-            )}
-            {item.bus_name && (
-              <span style={{ fontSize: 10, color: '#7c6cfc', fontWeight: 600 }}>
-                • {item.bus_name}
-              </span>
-            )}
-          </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'manufacturer',
-      label: 'Make, Model & Year',
+      label: 'Make',
       render: (_, item) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 12.5 }}>
-            {item.manufacturer || item.bus_model || '—'}
-          </span>
-          <div style={{ display: 'flex', gap: 6, fontSize: 11, color: '#64748b' }}>
-            {item.bus_model && <span>{item.bus_model}</span>}
-            {item.manufacturing_year && <span>({item.manufacturing_year})</span>}
-          </div>
-        </div>
+        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
+          {item.manufacturer || item.bus_model || '—'}
+        </span>
       )
     },
     {
       key: 'capacity',
-      label: 'Seats & Specs',
+      label: 'Capacity',
       render: (val, item) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 12.5, fontFamily: 'JetBrains Mono, monospace' }}>
-            {val ? `${val} Seats` : '—'}
-          </span>
-          <div style={{ display: 'flex', gap: 6, fontSize: 10.5, color: '#64748b', textTransform: 'capitalize' }}>
-            {item.fuel_type && <span>⛽ {item.fuel_type}</span>}
-            {item.current_odometer_km ? <span>• {Number(item.current_odometer_km).toLocaleString('en-IN')} km</span> : null}
-          </div>
-        </div>
+        <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 12.5, fontFamily: 'JetBrains Mono, monospace' }}>
+          {item.vehicle_type === 'tractor' ? 'Utility Unit' : val ? `${val} Seats` : '—'}
+        </span>
       )
     },
     {
       key: 'fc_expiry',
       label: 'Fitness (FC)',
-      render: (val, item) => {
+      render: (val) => {
         const fc = checkComplianceStatus(val);
+        if (!val) return <span style={{ color: '#94a3b8' }}>—</span>;
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
               {formatDate(val)}
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+            <div>
               <span
                 style={{
                   display: 'inline-block',
@@ -329,22 +1023,6 @@ export default function Buses() {
               >
                 {fc.label}
               </span>
-              {item.fc_number && (
-                <span
-                  style={{
-                    fontFamily: 'JetBrains Mono, monospace',
-                    fontSize: 9.5,
-                    color: '#64748b',
-                    maxWidth: 110,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                  title={item.fc_number}
-                >
-                  #{item.fc_number}
-                </span>
-              )}
             </div>
           </div>
         );
@@ -352,15 +1030,16 @@ export default function Buses() {
     },
     {
       key: 'insurance_expiry',
-      label: 'Insurance Policy',
-      render: (val, item) => {
+      label: 'Insurance',
+      render: (val) => {
         const ins = checkComplianceStatus(val);
+        if (!val) return <span style={{ color: '#94a3b8' }}>—</span>;
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
               {formatDate(val)}
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+            <div>
               <span
                 style={{
                   display: 'inline-block',
@@ -373,47 +1052,7 @@ export default function Buses() {
                   border: `1px solid ${ins.border}`
                 }}
               >
-                {item.insurance_company || ins.label}
-              </span>
-              {item.insurance_no && (
-                <span
-                  style={{
-                    fontFamily: 'JetBrains Mono, monospace',
-                    fontSize: 9.5,
-                    color: '#64748b',
-                    maxWidth: 100,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                  title={item.insurance_no}
-                >
-                  Pol: {item.insurance_no}
-                </span>
-              )}
-            </div>
-          </div>
-        );
-      }
-    },
-    {
-      key: 'permit_expiry',
-      label: 'Permit & PUC',
-      render: (_, item) => {
-        const permitStatus = checkComplianceStatus(item.permit_expiry);
-        const pucStatus = checkComplianceStatus(item.puc_expiry);
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
-              <span style={{ fontWeight: 600, color: '#475569' }}>Permit:</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: permitStatus.color, fontWeight: 700 }}>
-                {formatDate(item.permit_expiry)}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
-              <span style={{ fontWeight: 600, color: '#475569' }}>PUC:</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: pucStatus.color, fontWeight: 700 }}>
-                {formatDate(item.puc_expiry)}
+                {ins.label}
               </span>
             </div>
           </div>
@@ -489,6 +1128,7 @@ export default function Buses() {
   const renderSubRow = (item) => {
     if (expandedId !== item.id) return null;
     const totalCols = COLUMNS.length + 2;
+    const vtype = (item.vehicle_type || 'bus').toLowerCase();
 
     return (
       <tr
@@ -501,14 +1141,14 @@ export default function Buses() {
       >
         <td colSpan={totalCols} style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>
-                  🚌 Vehicle Technical Dossier: {item.registration_number}
+                  {vtype === 'tractor' ? '🚜' : vtype === 'winger' ? '🚐' : '🚌'} Vehicle Technical Dossier: {item.registration_number}
                 </span>
                 {item.bus_code && (
                   <span style={{ fontSize: 12, fontWeight: 700, background: '#7c6cfc', color: '#fff', padding: '2px 8px', borderRadius: 4 }}>
-                    Bus Code #{item.bus_code}
+                    Code #{item.bus_code}
                   </span>
                 )}
                 {item.institution_name && (
@@ -517,15 +1157,59 @@ export default function Buses() {
                   </span>
                 )}
               </div>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline"
-                onClick={() => setExpandedId(null)}
-                style={{ padding: '2px 8px', fontSize: 11 }}
-              >
-                ✕ Close
-              </button>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => handlePrintSingleBus(item)}
+                  title="Print / Save this vehicle's technical dossier as PDF"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: '#7c6cfc',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '3px 9px',
+                    borderRadius: 5,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <BusIcon name="download" size={13} color="#fff" />
+                  <span>Download Dossier (PDF)</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => setExpandedId(null)}
+                  style={{ padding: '2px 8px', fontSize: 11 }}
+                >
+                  ✕ Close
+                </button>
+              </div>
             </div>
+
+            {/* Route Role & Operational Suitability Notice */}
+            {vtype === 'tractor' && (
+              <div style={{ padding: '8px 12px', borderRadius: 6, background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🚜</span>
+                <span><b>TRACTOR CLASSIFICATION:</b> Dedicated utility, ground maintenance, and farm vehicle. Not eligible for student route dispatch.</span>
+              </div>
+            )}
+            {vtype === 'winger' && (
+              <div style={{ padding: '8px 12px', borderRadius: 6, background: '#f5f3ff', border: '1px solid #ddd6fe', color: '#5b21b6', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🚐</span>
+                <span><b>WINGER CLASSIFICATION:</b> Flexible relief and route support vehicle. Can be deployed for designated routes or breakdown standby.</span>
+              </div>
+            )}
+            {vtype === 'bus' && (
+              <div style={{ padding: '8px 12px', borderRadius: 6, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e40af', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🚌</span>
+                <span><b>STANDARD BUS CLASSIFICATION:</b> Primary student transportation vehicle allocated to scheduled morning and evening route assignments.</span>
+              </div>
+            )}
 
             {/* Grid of full database fields */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
@@ -598,17 +1282,63 @@ export default function Buses() {
       <div className="page-head">
         <div>
           <div className="page-title">Fleet & Buses</div>
-          <div className="page-sub">Asset registry, technical specifications, and compliance monitoring</div>
+          <div className="page-sub">Asset registry, vehicle classification (Bus, Winger, Tractor), and compliance monitoring</div>
         </div>
-        {canEdit && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button 
-            className="btn btn-sm btn-primary" 
-            onClick={() => setEditing({ status: 'active', vehicle_type: 'bus', fuel_type: 'diesel', ownership_type: 'owned' })}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setShowReportModal(true)}
+            title="Choose Fleet Report format: Overall Summary Register or Detailed Vehicle Dossier"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontWeight: 700,
+              background: '#f5f3ff',
+              color: '#7c6cfc',
+              border: '1.5px solid #ddd6fe',
+              padding: '6px 12px',
+              borderRadius: 6,
+              cursor: 'pointer'
+            }}
           >
-            <BusIcon name="plus" size={15} color="#fff" /> Add Bus
+            <BusIcon name="file" size={15} color="#7c6cfc" />
+            <span>📄 Fleet Report (PDF) ▾</span>
           </button>
-        )}
+
+          <button 
+            type="button"
+            className="btn btn-sm" 
+            onClick={handleExportCSV}
+            title="Download Full Fleet Specifications to Excel / CSV"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontWeight: 700,
+              background: '#ecfdf5',
+              color: '#059669',
+              border: '1.5px solid #a7f3d0',
+              padding: '6px 12px',
+              borderRadius: 6,
+              cursor: 'pointer'
+            }}
+          >
+            <BusIcon name="download" size={15} color="#059669" />
+            <span>📥 Export CSV</span>
+          </button>
+
+          {canEdit && (
+            <button 
+              className="btn btn-sm btn-primary" 
+              onClick={() => setEditing({ status: 'active', vehicle_type: 'bus', fuel_type: 'diesel', ownership_type: 'owned' })}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+            >
+              <BusIcon name="plus" size={15} color="#fff" /> Add Vehicle
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="page-body">
@@ -674,6 +1404,119 @@ export default function Buses() {
           </div>
         </div>
 
+        {/* Quick Vehicle Type Filter Chips */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-dim, #64748b)', marginRight: 4 }}>
+            Vehicle Filter:
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setTypeFilter('all')}
+            style={{
+              padding: '4px 10px',
+              fontSize: 11.5,
+              fontWeight: 700,
+              borderRadius: 20,
+              background: typeFilter === 'all' ? '#7c6cfc' : '#ffffff',
+              color: typeFilter === 'all' ? '#ffffff' : '#334155',
+              border: typeFilter === 'all' ? '1px solid #7c6cfc' : '1px solid #cbd5e1',
+              cursor: 'pointer'
+            }}
+          >
+            All Fleet ({items.length})
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setTypeFilter('bus')}
+            style={{
+              padding: '4px 10px',
+              fontSize: 11.5,
+              fontWeight: 700,
+              borderRadius: 20,
+              background: typeFilter === 'bus' ? '#1d4ed8' : '#ffffff',
+              color: typeFilter === 'bus' ? '#ffffff' : '#1d4ed8',
+              border: typeFilter === 'bus' ? '1px solid #1d4ed8' : '1px solid #bfdbfe',
+              cursor: 'pointer'
+            }}
+          >
+            🚌 Buses ({stats.busesCount})
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setTypeFilter('winger')}
+            style={{
+              padding: '4px 10px',
+              fontSize: 11.5,
+              fontWeight: 700,
+              borderRadius: 20,
+              background: typeFilter === 'winger' ? '#7c3aed' : '#ffffff',
+              color: typeFilter === 'winger' ? '#ffffff' : '#7c3aed',
+              border: typeFilter === 'winger' ? '1px solid #7c3aed' : '1px solid #ddd6fe',
+              cursor: 'pointer'
+            }}
+          >
+            🚐 Wingers ({stats.wingersCount})
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setTypeFilter('tractor')}
+            style={{
+              padding: '4px 10px',
+              fontSize: 11.5,
+              fontWeight: 700,
+              borderRadius: 20,
+              background: typeFilter === 'tractor' ? '#b45309' : '#ffffff',
+              color: typeFilter === 'tractor' ? '#ffffff' : '#b45309',
+              border: typeFilter === 'tractor' ? '1px solid #b45309' : '1px solid #fde68a',
+              cursor: 'pointer'
+            }}
+          >
+            🚜 Tractors ({stats.tractorsCount})
+          </button>
+          {stats.miniBusesCount > 0 && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setTypeFilter('mini_bus')}
+              style={{
+                padding: '4px 10px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                borderRadius: 20,
+                background: typeFilter === 'mini_bus' ? '#0f766e' : '#ffffff',
+                color: typeFilter === 'mini_bus' ? '#ffffff' : '#0f766e',
+                border: typeFilter === 'mini_bus' ? '1px solid #0f766e' : '1px solid #99f6e4',
+                cursor: 'pointer'
+              }}
+            >
+              🚐 Mini Buses ({stats.miniBusesCount})
+            </button>
+          )}
+          {stats.vansCount > 0 && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setTypeFilter('van')}
+              style={{
+                padding: '4px 10px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                borderRadius: 20,
+                background: typeFilter === 'van' ? '#475569' : '#ffffff',
+                color: typeFilter === 'van' ? '#ffffff' : '#475569',
+                border: typeFilter === 'van' ? '1px solid #475569' : '1px solid #cbd5e1',
+                cursor: 'pointer'
+              }}
+            >
+              🚙 Vans ({stats.vansCount})
+            </button>
+          )}
+        </div>
+
         {/* Toolbar & Filters */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: 260, maxWidth: 360 }}>
@@ -683,7 +1526,7 @@ export default function Buses() {
             <input
               type="text"
               className="fselect"
-              placeholder="Search reg plate, model, make, chassis..."
+              placeholder="Search reg plate, model, make, tractor, winger..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{ width: '100%', paddingLeft: 34, height: 38 }}
@@ -697,7 +1540,7 @@ export default function Buses() {
               onChange={e => handleInstChange(e.target.value)}
               style={{ maxWidth: 280, fontWeight: 600, height: 38 }}
             >
-              <option value="all">All Fleet Buses</option>
+              <option value="all">All Fleet Vehicles</option>
               {refs.institutions.map(i => (
                 <option key={i.id} value={String(i.id)}>
                   {i.short_name || i.name} {String(i.id) === String(user?.institution_id) ? '(My Campus)' : ''}
@@ -717,13 +1560,11 @@ export default function Buses() {
             <option value="fc_due">FC Due / Alert ({stats.fcDue})</option>
             <option value="ins_due">Insurance Due ({stats.insDue})</option>
             <option value="repair">In Repair ({items.filter(b => (b.status || '').toLowerCase() === 'repair').length})</option>
-            <option value="mini_bus">Mini Buses Only</option>
-            <option value="bus">Standard Buses Only</option>
           </select>
 
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              Showing <b>{filteredItems.length}</b> of {items.length} buses
+              Showing <b>{filteredItems.length}</b> of {items.length} vehicles
             </span>
           </div>
         </div>
@@ -733,21 +1574,342 @@ export default function Buses() {
           data={filteredItems} 
           onEdit={canEdit ? setEditing : undefined} 
           onDelete={canEdit ? handleDel : undefined} 
+          extraAction={(item) => (
+            <button
+              type="button"
+              className="icon-btn"
+              title={`Download / Print Dossier for ${item.registration_number}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrintSingleBus(item);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#7c6cfc',
+                background: '#f5f3ff',
+                border: '1px solid #ddd6fe',
+                borderRadius: 5,
+                padding: '3px 6px',
+                cursor: 'pointer',
+                lineHeight: 1
+              }}
+            >
+              <span style={{ fontSize: 13 }}>📥</span>
+            </button>
+          )}
           renderSubRow={renderSubRow}
           emptyIcon="🚌" 
-          emptyText="No buses found matching your criteria." 
+          emptyText="No vehicles found matching your criteria." 
         />
       </div>
 
       {editing !== null && (
         <FormModal 
-          title={editing?.id ? `Edit Bus (${editing.registration_number})` : "Add Bus to Fleet"} 
+          title={editing?.id ? `Edit Vehicle (${editing.registration_number})` : "Add Vehicle to Fleet"} 
           fields={FIELDS} 
           initial={editing} 
           onSave={handleSave} 
           onClose={() => setEditing(null)} 
           refs={refs} 
         />
+      )}
+
+      {/* FLEET REPORT SELECTION MODAL */}
+      {showReportModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16
+          }}
+          onClick={() => setShowReportModal(false)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 16,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              maxWidth: 640,
+              width: '100%',
+              overflow: 'hidden',
+              border: '1px solid #e2e8f0'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+                borderBottom: '1px solid #f1f5f9',
+                background: 'linear-gradient(135deg, #fbfbfe 0%, #f5f3ff 100%)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: '#7c6cfc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontSize: 18,
+                    boxShadow: '0 4px 10px rgba(124, 108, 252, 0.3)'
+                  }}
+                >
+                  📄
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>
+                    Select Fleet Report Format
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>
+                    Choose between overall fleet summary or detailed vehicle technical dossier
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: 18,
+                  color: '#94a3b8',
+                  padding: 4
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Option 1: Overall Fleet Report (2nd Image) */}
+              <div
+                onClick={() => setReportType('overall')}
+                style={{
+                  border: reportType === 'overall' ? '2px solid #7c6cfc' : '1.5px solid #e2e8f0',
+                  borderRadius: 12,
+                  padding: '14px 16px',
+                  background: reportType === 'overall' ? '#f5f3ff' : '#ffffff',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      type="radio"
+                      name="fleetReportType"
+                      checked={reportType === 'overall'}
+                      onChange={() => setReportType('overall')}
+                      style={{ width: 17, height: 17, accentColor: '#7c6cfc', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 14.5, fontWeight: 800, color: '#1e293b' }}>
+                      📋 Overall Fleet Report (Summary Table)
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      background: '#ede9fe',
+                      color: '#7c6cfc'
+                    }}
+                  >
+                    2nd Image Format
+                  </span>
+                </div>
+                <p style={{ margin: '0 0 0 27px', fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+                  Consolidated master register table of all registered vehicles with vehicle classification (Bus, Winger, Tractor), seating capacity, fuel, fitness (FC) & insurance expiry, chassis number, and campus. Includes top KPI summary ribbon.
+                </p>
+                <div style={{ marginLeft: 27, display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 7px', borderRadius: 4, color: '#334155' }}>
+                    • A4 Landscape
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 7px', borderRadius: 4, color: '#334155' }}>
+                    • Scope: {filteredItems.length} vehicles
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 7px', borderRadius: 4, color: '#334155' }}>
+                    • Management & Audit Ready
+                  </span>
+                </div>
+              </div>
+
+              {/* Option 2: Detailed Vehicle Dossier (3rd Image) */}
+              <div
+                onClick={() => setReportType('detailed')}
+                style={{
+                  border: reportType === 'detailed' ? '2px solid #7c6cfc' : '1.5px solid #e2e8f0',
+                  borderRadius: 12,
+                  padding: '14px 16px',
+                  background: reportType === 'detailed' ? '#f5f3ff' : '#ffffff',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      type="radio"
+                      name="fleetReportType"
+                      checked={reportType === 'detailed'}
+                      onChange={() => setReportType('detailed')}
+                      style={{ width: 17, height: 17, accentColor: '#7c6cfc', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 14.5, fontWeight: 800, color: '#1e293b' }}>
+                      📑 Detailed Vehicle Technical Dossier
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      background: '#ede9fe',
+                      color: '#7c6cfc'
+                    }}
+                  >
+                    3rd Image Format
+                  </span>
+                </div>
+                <p style={{ margin: '0 0 0 27px', fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+                  In-depth technical profile featuring the 4 specification cards: Mechanical & Identity, Fitness & Pollution (PUC), Insurance & Permits, and Telematics & GPS.
+                </p>
+
+                {/* Select Vehicle Dropdown */}
+                <div style={{ marginLeft: 27, marginTop: 4 }} onClick={e => e.stopPropagation()}>
+                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                    Choose Vehicle for Dossier:
+                  </label>
+                  <select
+                    value={selectedVehicleId}
+                    onChange={e => setSelectedVehicleId(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: 38,
+                      borderRadius: 6,
+                      border: '1.5px solid #cbd5e1',
+                      padding: '0 10px',
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">📚 All Vehicles in Scope ({filteredItems.length} vehicles - Multi-page Dossier)</option>
+                    {filteredItems.map(b => (
+                      <option key={b.id} value={String(b.id)}>
+                        {b.registration_number} {b.bus_code ? `(#${b.bus_code})` : ''} — {(b.vehicle_type || 'bus').toUpperCase()} • {b.manufacturer || b.bus_model || 'Ashok Leyland'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 20px',
+                borderTop: '1px solid #f1f5f9',
+                background: '#fafafa',
+                flexWrap: 'wrap',
+                gap: 10
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() => setShowReportModal(false)}
+                style={{ padding: '7px 14px', fontWeight: 600 }}
+              >
+                Cancel
+              </button>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {reportType === 'overall' && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => {
+                      handleExportCSV();
+                      setShowReportModal(false);
+                    }}
+                    style={{
+                      background: '#ecfdf5',
+                      color: '#059669',
+                      border: '1px solid #a7f3d0',
+                      padding: '7px 14px',
+                      borderRadius: 6,
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📥 Export CSV
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => {
+                    setShowReportModal(false);
+                    if (reportType === 'overall') {
+                      handlePrintAllBuses();
+                    } else {
+                      handlePrintDetailedDossier(selectedVehicleId);
+                    }
+                  }}
+                  style={{
+                    background: '#7c6cfc',
+                    color: '#ffffff',
+                    padding: '7px 16px',
+                    borderRadius: 6,
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(124, 108, 252, 0.35)'
+                  }}
+                >
+                  <BusIcon name="file" size={15} color="#fff" />
+                  <span>Print / Save as PDF</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

@@ -286,10 +286,22 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                     {o.driver_name !== undefined ? (
                       <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                          <span style={{ fontSize: 13 }}>🚌</span>
+                          <span style={{ fontSize: 13 }}>
+                            {o.vehicle_type === 'tractor' ? '🚜' : o.vehicle_type === 'winger' ? '🚐' : '🚌'}
+                          </span>
                           <span style={{ fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: isSelected ? '#1d4ed8' : '#0f172a' }}>
                             {o.registration_number || o.label.split(' · ')[0]}
                           </span>
+                          {o.vehicle_type === 'winger' && (
+                            <span style={{ fontSize: 9.5, fontWeight: 700, background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe', padding: '1px 5px', borderRadius: 3 }}>
+                              Winger
+                            </span>
+                          )}
+                          {o.vehicle_type === 'tractor' && (
+                            <span style={{ fontSize: 9.5, fontWeight: 700, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '1px 5px', borderRadius: 3 }}>
+                              Tractor (Non-Route)
+                            </span>
+                          )}
                         </div>
                         {o.driver_name ? (
                           <span
@@ -410,6 +422,28 @@ export default function Assignments() {
     e.preventDefault();
     if (!form.route_id) { toast('Please select a route'); return; }
     if (!selectedShifts || selectedShifts.length === 0) { toast('Please select at least one session'); return; }
+
+    const isTractor = (busId) => {
+      const found = buses.find(b => String(b.id) === String(busId));
+      return (found?.vehicle_type || '').toLowerCase() === 'tractor';
+    };
+    if (isTractor(form.bus_id) || (!sameForBoth && isTractor(form.evening_bus_id))) {
+      toast('🚜 Tractors are campus utility units and cannot be assigned to student routes. Please select a Bus or Winger.');
+      return;
+    }
+
+    const checkActiveDriver = (driverId, shiftTitle) => {
+      if (!driverId) return true;
+      const d = drivers.find(drv => String(drv.id) === String(driverId));
+      if (d && (d.status || 'active').toLowerCase() === 'inactive') {
+        toast(`⚠️ Cannot assign route: Driver ${d.name} (${shiftTitle}) is Inactive. Please activate driver first.`);
+        return false;
+      }
+      return true;
+    };
+
+    if (!checkActiveDriver(form.driver_id, 'Morning')) return;
+    if (!sameForBoth && !checkActiveDriver(form.evening_driver_id, 'Evening')) return;
 
     try {
       const mShifts = selectedShifts.filter(s => s.toLowerCase().includes('morning'));
@@ -586,17 +620,35 @@ export default function Assignments() {
       if (dMatch) driverId = dMatch.id;
     }
 
+    const vt = (b.vehicle_type || 'bus').toLowerCase();
+
     return {
       value: b.id,
       registration_number: b.registration_number,
+      vehicle_type: vt,
       driver_name: driverName || '',
       driver_id: driverId || null,
       label: driverName ? `${b.registration_number} · ${driverName}` : `${b.registration_number} · Standby`,
-      searchText: `${b.registration_number} ${driverName || ''}`
+      searchText: `${b.registration_number} ${driverName || ''} ${vt}`
     };
   });
-
-  const driverOptions = drivers.map(d => ({ value: d.id, label: d.name }));
+  const driverOptions = drivers
+    .filter(d => {
+      const isActive = (d.status || 'active').toLowerCase() === 'active';
+      const isSelected = String(d.id) === String(form.driver_id) || String(d.id) === String(form.evening_driver_id);
+      return isActive || isSelected;
+    })
+    .map(d => {
+      const isActive = (d.status || 'active').toLowerCase() === 'active';
+      return {
+        value: d.id,
+        label: !isActive 
+          ? `🚫 ${d.name} (INACTIVE - Cannot Assign)` 
+          : d.driver_type === 'spare' 
+            ? `🔄 ${d.name} (Spare Driver)` 
+            : d.name
+      };
+    });
   const inchargeOptions = filteredIncharges.map(u => ({ value: u.id, label: u.name }));
 
   const handleRouteChange = (val) => {

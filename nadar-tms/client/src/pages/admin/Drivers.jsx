@@ -22,6 +22,7 @@ function DrvIcon({ name, size = 16, color = 'currentColor', style = {} }) {
     badge: <><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><line x1="15" y1="8" x2="17" y2="8"/><line x1="15" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="17" y2="16"/></>,
     phone: <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></>,
     id: <><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></>,
+    refresh: <><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>,
   };
   return (
     <svg
@@ -43,6 +44,16 @@ function DrvIcon({ name, size = 16, color = 'currentColor', style = {} }) {
 const FIELDS = [
   { key: 'name', label: 'Driver Name', required: true },
   { key: 'employee_code', label: 'Employee Code / ID' },
+  { 
+    key: 'driver_type', 
+    label: 'Driver Duty Role & Allocation', 
+    type: 'select', 
+    options: [
+      { value: 'regular', label: '🚌 Regular Route Driver (Scheduled Bus Route Duty)' },
+      { value: 'spare', label: '🔄 Spare / Reliever Driver (Standby & Substitution Duty)' },
+      { value: 'others', label: '🚙 Other / Campus Utility Pilot (Internal/Non-Route)' }
+    ] 
+  },
   { key: 'father_name', label: "Father's Name" },
   { key: 'date_of_birth', label: 'Date of Birth', type: 'date' },
   { key: 'gender', label: 'Gender', type: 'select', options: ['male', 'female', 'other'] },
@@ -57,9 +68,9 @@ const FIELDS = [
   { key: 'district', label: 'District (e.g. Theni)' },
   { key: 'state', label: 'State (e.g. Tamilnadu)' },
   { key: 'pincode', label: 'Pincode' },
-  { key: 'status', label: 'Operational Status', type: 'select', options: ['active', 'inactive'] },
+  { key: 'status', label: 'Operational Status (Active allows route duty; Inactive blocks routes)', type: 'select', options: ['active', 'inactive'] },
   { key: 'institution_id', label: 'Institution / Campus', type: 'instref' },
-  { key: 'route_id', label: 'Assigned Route', type: 'route' },
+  { key: 'route_id', label: 'Assigned Route (Only available for Active drivers)', type: 'route' },
   { key: 'user_id', label: 'Linked Login Account', type: 'userref', role: 'driver' },
   { key: 'designation', label: 'Designation (e.g. DRIVER)' },
   { key: 'employment_type', label: 'Employment Type', type: 'select', options: ['REGULAR', 'CONTRACT', 'TEMPORARY'] },
@@ -123,7 +134,9 @@ export default function Drivers() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'assigned', 'unassigned'
   const [showReportModal, setShowReportModal] = useState(false);
-  const [reportTab, setReportTab] = useState('all'); // 'all', 'assigned', 'unassigned'
+  const [reportType, setReportType] = useState('overall'); // 'overall', 'detailed', 'shift_backup'
+  const [rosterScope, setRosterScope] = useState('all'); // 'all', 'assigned', 'unassigned'
+  const [selectedDriverId, setSelectedDriverId] = useState('all');
   const toast = useToast();
   const { user } = useAuth();
   const canEdit = user?.role === 'admin';
@@ -234,8 +247,50 @@ export default function Drivers() {
                   </span>
                 ))}
               </div>
+            ) : item.driver_type === 'spare' ? (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  background: '#fef3c7',
+                  color: '#b45309',
+                  border: '1px solid #fde68a',
+                  padding: '2px 7px',
+                  borderRadius: 4,
+                  fontSize: 10.5,
+                  fontWeight: 700
+                }}
+                title="Spare / Reliever Pilot on Standby for Breakdown & Leave Coverage"
+              >
+                🔄 Spare Driver
+              </span>
+            ) : item.driver_type === 'others' ? (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  background: '#f5f3ff',
+                  color: '#6d28d9',
+                  border: '1px solid #ddd6fe',
+                  padding: '2px 7px',
+                  borderRadius: 4,
+                  fontSize: 10.5,
+                  fontWeight: 700
+                }}
+                title="Campus Internal Utility / Non-Route Pilot"
+              >
+                🚙 Utility Pilot
+              </span>
+            ) : (item.status || 'active').toLowerCase() === 'inactive' ? (
+              <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 11, fontWeight: 600 }}>
+                🚫 Inactive (Off-duty)
+              </span>
             ) : (
-              <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 11 }}>— Standby</span>
+              <span style={{ color: '#dc2626', fontStyle: 'italic', fontSize: 11, fontWeight: 600 }}>
+                ⏳ Standby (Unassigned)
+              </span>
             )}
             {item.assigned_route_code && (
               <span className="mono" style={{ fontSize: 11, color: '#475569', fontWeight: 600 }}>
@@ -284,35 +339,6 @@ export default function Drivers() {
       }
     },
     {
-      key: 'experience_years',
-      label: 'Service & Exp',
-      render: (val, item) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 12 }}>
-            {val ? `${val} Yrs Exp` : '—'}
-          </span>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                background: '#f1f5f9',
-                color: '#475569',
-                padding: '1px 5px',
-                borderRadius: 3
-              }}
-            >
-              {item.employment_type || 'REGULAR'}
-            </span>
-            <span style={{ fontSize: 10, color: '#64748b' }}>
-              {item.designation || 'DRIVER'}
-            </span>
-          </div>
-        </div>
-      )
-    },
-    {
       key: 'institution_name',
       label: 'Campus & Domicile',
       render: (val, item) => (
@@ -331,27 +357,92 @@ export default function Drivers() {
     {
       key: 'status',
       label: 'Status',
-      render: (val) => {
+      render: (val, item) => {
         const isActive = (val || '').toLowerCase() === 'active';
+        const dtype = (item.driver_type || 'regular').toLowerCase();
+        const isSpare = dtype === 'spare';
+        const isOther = dtype === 'others' || dtype === 'other';
+
         return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '2px 8px',
-              borderRadius: 12,
-              fontSize: 11,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              background: isActive ? '#dcfce7' : '#fee2e2',
-              color: isActive ? '#15803d' : '#b91c1c',
-              border: `1px solid ${isActive ? '#86efac' : '#fca5a5'}`
-            }}
-          >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
-            {isActive ? 'Active' : 'Inactive'}
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+            {/* Status Pill and Role Badge */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  background: isActive ? '#dcfce7' : '#fee2e2',
+                  color: isActive ? '#15803d' : '#b91c1c',
+                  border: `1px solid ${isActive ? '#86efac' : '#fca5a5'}`
+                }}
+                title={isActive ? 'Active Driver on Duty' : 'Inactive / Off-Duty (Cannot be assigned routes)'}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
+                {isActive ? 'Active' : 'Inactive'}
+              </span>
+
+              {isSpare ? (
+                <span
+                  style={{
+                    fontSize: 9.5,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    background: '#fef3c7',
+                    color: '#b45309',
+                    border: '1px solid #fde68a',
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3
+                  }}
+                  title="Spare / Reliever Driver on standby (available for substitutions)"
+                >
+                  🔄 SPARE DRIVER
+                </span>
+              ) : isOther ? (
+                <span
+                  style={{
+                    fontSize: 9.5,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    background: '#f5f3ff',
+                    color: '#6d28d9',
+                    border: '1px solid #ddd6fe',
+                    padding: '1px 6px',
+                    borderRadius: 4
+                  }}
+                  title="Campus Internal Utility Pilot"
+                >
+                  🚙 UTILITY
+                </span>
+              ) : null}
+            </div>
+
+            {/* Service & Experience details (transferred from removed Service & Exp column) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 1 }}>
+              <span style={{ fontSize: 10.5, color: '#334155', fontWeight: 600 }}>
+                {item.experience_years != null && item.experience_years !== '' 
+                  ? `${Number(item.experience_years).toFixed(1)} Yrs Exp` 
+                  : '—'}
+              </span>
+              <span style={{ fontSize: 9.5, color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                {item.employment_type ? `${item.employment_type} DRIVER` : 'REGULAR DRIVER'}
+              </span>
+            </div>
+
+            {!isActive && (
+              <span style={{ fontSize: 9.5, color: '#dc2626', fontWeight: 700, marginTop: 1 }}>
+                🚫 Route assignment blocked
+              </span>
+            )}
+          </div>
         );
       }
     },
@@ -426,16 +517,108 @@ export default function Drivers() {
                     • Campus: <b style={{ color: '#0f172a' }}>{item.institution_name}</b>
                   </span>
                 )}
+                {canEdit && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginLeft: 8, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>Role:</span>
+                      <select
+                        className="fselect"
+                        value={item.driver_type || 'regular'}
+                        onChange={async (e) => {
+                          const newType = e.target.value;
+                          try {
+                            const updatePayload = { driver_type: newType };
+                            if (newType === 'spare') {
+                              updatePayload.status = 'active';
+                            }
+                            await api.saveRes('drivers', updatePayload, item.id);
+                            toast(`Updated role to ${newType === 'spare' ? 'Spare Driver (Active)' : newType === 'others' ? 'Other Utility' : 'Regular Driver'}`);
+                            load(instFilter);
+                          } catch (err) {
+                            toast('Failed to update driver role');
+                          }
+                        }}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          height: 28,
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          background: item.driver_type === 'spare' ? '#fef3c7' : item.driver_type === 'others' ? '#f5f3ff' : '#eff6ff',
+                          color: item.driver_type === 'spare' ? '#b45309' : item.driver_type === 'others' ? '#6d28d9' : '#1d4ed8',
+                          border: item.driver_type === 'spare' ? '1.5px solid #fde68a' : item.driver_type === 'others' ? '1.5px solid #ddd6fe' : '1.5px solid #bfdbfe',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="regular">🚌 Regular Route Driver</option>
+                        <option value="spare">🔄 Spare / Reliever Driver</option>
+                        <option value="others">🚙 Other / Campus Utility</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>Status:</span>
+                      <select
+                        className="fselect"
+                        value={item.status || 'active'}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          if (newStatus === 'inactive' && (item.route_id || item.assigned_route_code)) {
+                            if (!confirm(`Warning: Setting ${item.name} to Inactive will remove them from route duty. Inactive drivers cannot be assigned routes. Continue?`)) {
+                              return;
+                            }
+                          }
+                          try {
+                            await api.saveRes('drivers', {
+                              status: newStatus,
+                              ...(newStatus === 'inactive' ? { route_id: null } : {})
+                            }, item.id);
+                            toast(`Status set to ${newStatus.toUpperCase()}${newStatus === 'inactive' ? ' (Route duty unassigned)' : ''}`);
+                            load(instFilter);
+                          } catch (err) {
+                            toast('Failed to update driver status');
+                          }
+                        }}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          height: 28,
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          background: item.status === 'inactive' ? '#fee2e2' : '#dcfce7',
+                          color: item.status === 'inactive' ? '#b91c1c' : '#15803d',
+                          border: item.status === 'inactive' ? '1.5px solid #fca5a5' : '1.5px solid #86efac',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="active">Active (On Duty / Available)</option>
+                        <option value="inactive">Inactive (Off Duty / Route Blocked)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline"
+                  className="btn btn-sm"
                   onClick={() => handlePrintSingleDriver(item)}
-                  style={{ padding: '3px 9px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                  title="Print Official Bio-Data Sheet"
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    background: '#7c6cfc',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 5,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer'
+                  }}
+                  title="Download / Print Driver Bio-Data Dossier PDF"
                 >
-                  🖨️ Print Sheet
+                  <span>📥 Download Dossier (PDF)</span>
                 </button>
                 <button
                   type="button"
@@ -540,6 +723,16 @@ export default function Drivers() {
   const handleInstChange = (v) => { setInstFilter(v); load(v); };
   const handleSave = async (data, id) => {
     const cleanData = { ...data };
+
+    // Check inactive route assignment rule
+    if (cleanData.status === 'inactive' && cleanData.route_id) {
+      toast('Cannot assign route to an inactive driver. Please set status to Active or remove the assigned route.');
+      return;
+    }
+    if (cleanData.status === 'inactive') {
+      cleanData.route_id = null;
+    }
+
     ['license_expiry', 'date_of_birth', 'joining_date', 'license_issue_date', 'badge_expiry_date'].forEach(k => {
       if (k in cleanData) {
         const v = cleanData[k];
@@ -563,8 +756,21 @@ export default function Drivers() {
 
   const filteredItems = items.filter(item => {
     const isAssigned = !!(item.assigned_bus_numbers || item.assigned_route_code);
+    const dtype = (item.driver_type || 'regular').toLowerCase();
+    const isSpare = dtype === 'spare';
+    const isOther = dtype === 'others' || dtype === 'other';
+    const isActive = (item.status || 'active').toLowerCase() === 'active';
+
     if (statusFilter === 'assigned' && !isAssigned) return false;
-    if (statusFilter === 'unassigned' && isAssigned) return false;
+    // CRITICAL USER RULES:
+    // 1. If marked as spare (or others), that should NOT show in unassigned until route is assigned for him!
+    // 2. If marked as inactive, that should NOT show in unassigned either!
+    if (statusFilter === 'unassigned') {
+      if (!isActive || isAssigned || isSpare || isOther) return false;
+    }
+    if (statusFilter === 'spare' && !isSpare) return false;
+    if (statusFilter === 'others' && !isOther) return false;
+    if (statusFilter === 'inactive' && isActive) return false;
 
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
@@ -576,15 +782,44 @@ export default function Drivers() {
       (item.license_number || '').toLowerCase().includes(query) ||
       (item.phone || '').toLowerCase().includes(query) ||
       (item.employee_code || '').toLowerCase().includes(query) ||
-      (item.institution_name || '').toLowerCase().includes(query)
+      (item.institution_name || '').toLowerCase().includes(query) ||
+      (item.driver_type || '').toLowerCase().includes(query)
     );
   });
 
   // Calculate quick summary metrics
   const totalCount = items.length;
   const activeCount = items.filter(d => (d.status || '').toLowerCase() === 'active').length;
+  const inactiveCount = totalCount - activeCount;
   const assignedCount = items.filter(d => !!(d.assigned_bus_numbers || d.assigned_route_code)).length;
-  const unassignedCount = totalCount - assignedCount;
+
+  // Spare drivers
+  const totalSpareCount = items.filter(d => (d.driver_type || '').toLowerCase() === 'spare').length;
+  const spareStandbyCount = items.filter(d => {
+    const isAssigned = !!(d.assigned_bus_numbers || d.assigned_route_code);
+    const dtype = (d.driver_type || 'regular').toLowerCase();
+    const isActive = (d.status || 'active').toLowerCase() === 'active';
+    return isActive && !isAssigned && dtype === 'spare';
+  }).length;
+
+  // Other / Utility pilots
+  const othersCount = items.filter(d => {
+    const isAssigned = !!(d.assigned_bus_numbers || d.assigned_route_code);
+    const dtype = (d.driver_type || 'regular').toLowerCase();
+    return !isAssigned && (dtype === 'others' || dtype === 'other');
+  }).length;
+
+  // Unassigned Route Drivers:
+  // ONLY ACTIVE regular drivers without route/bus assigned!
+  // Inactive drivers are excluded!
+  // Spare drivers and Others are excluded until route is assigned for him!
+  const unassignedCount = items.filter(d => {
+    const isActive = (d.status || 'active').toLowerCase() === 'active';
+    const isAssigned = !!(d.assigned_bus_numbers || d.assigned_route_code);
+    const dtype = (d.driver_type || 'regular').toLowerCase();
+    return isActive && !isAssigned && dtype !== 'spare' && dtype !== 'others' && dtype !== 'other';
+  }).length;
+
   const expiringOrExpiredCount = items.filter(d => {
     const st = getLicenseStatus(d.license_expiry);
     return st.isExpired || st.isExpiringSoon;
@@ -1046,7 +1281,7 @@ export default function Drivers() {
     printReportWindow(`Assigned Drivers Report - ${institutionTitle}`, htmlBody, true);
   };
 
-  // 1c. Generate Unassigned / Standby Drivers Only PDF Report
+  // 1c. Generate Unassigned / Standby Drivers Only PDF Report (Excluding Spare Drivers)
   const handlePrintUnassignedDrivers = () => {
     const timestamp = new Date().toLocaleString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric',
@@ -1054,10 +1289,14 @@ export default function Drivers() {
     });
 
     const baseList = searchQuery ? filteredItems : items;
-    const unassignedList = baseList.filter(d => !(d.assigned_bus_numbers || d.assigned_route_code));
+    const unassignedList = baseList.filter(d => {
+      const isAssigned = !!(d.assigned_bus_numbers || d.assigned_route_code);
+      const dtype = (d.driver_type || 'regular').toLowerCase();
+      return !isAssigned && dtype !== 'spare' && dtype !== 'others' && dtype !== 'other';
+    });
 
     if (unassignedList.length === 0) {
-      alert('All drivers are currently assigned to buses and routes. No standby drivers found.');
+      alert('All regular route drivers are assigned. (Spare and utility drivers are managed separately under Spare Roster).');
       return;
     }
 
@@ -1175,34 +1414,183 @@ export default function Drivers() {
     printReportWindow(`Unassigned Drivers Report - ${institutionTitle}`, htmlBody, true);
   };
 
-  // 2. Generate Single Driver Bio-Data Profile PDF
-  const handlePrintSingleDriver = (driver) => {
+  // 1d. Generate Spare & Reliever Drivers PDF Report
+  const handlePrintSpareDrivers = () => {
     const timestamp = new Date().toLocaleString('en-GB', {
-      day: '2-digit', month: 'short', year: 'numeric'
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
     });
-    const licStatus = getLicenseStatus(driver.license_expiry);
+
+    const baseList = searchQuery ? filteredItems : items;
+    const spareList = baseList.filter(d => {
+      const dtype = (d.driver_type || '').toLowerCase();
+      return dtype === 'spare';
+    });
+
+    if (spareList.length === 0) {
+      alert('No designated spare / reliever drivers found in the current filter.');
+      return;
+    }
+
+    const rowsHtml = spareList.map((d, idx) => {
+      const licStatus = getLicenseStatus(d.license_expiry);
+      const isAssigned = !!(d.assigned_bus_numbers || d.assigned_route_code);
+      const isActive = (d.status || '').toLowerCase() === 'active';
+
+      return `
+        <tr>
+          <td style="text-align: center; font-weight: 600; color: #64748b;" class="mono">${idx + 1}</td>
+          <td>
+            <div style="font-weight: 700; color: #0f172a; font-size: 11.5px;">${d.name || '—'}</div>
+            ${d.employee_code ? `<div style="font-size: 9.5px; color: #2563eb;" class="mono">ID: ${d.employee_code}</div>` : ''}
+            ${d.father_name ? `<div style="font-size: 9px; color: #64748b;">S/o ${d.father_name}</div>` : ''}
+          </td>
+          <td>
+            <span class="tag-pill" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 800;">
+              🔄 SPARE / RELIEVER
+            </span>
+          </td>
+          <td>
+            ${isAssigned 
+              ? `<b style="color: #0369a1;" class="mono">🚌 ${d.assigned_bus_numbers || ''} (${d.assigned_route_code || ''})</b>`
+              : `<span style="color: #059669; font-weight: 700;">🟢 Standby Available</span>`
+            }
+          </td>
+          <td style="font-weight: 600; color: #334155;">${d.institution_name || 'Central Roster'}</td>
+          <td class="mono" style="font-weight: 600;">${d.license_number || '—'}</td>
+          <td>
+            <div class="mono" style="font-weight: 600;">${fmtDate(d.license_expiry)}</div>
+            <span class="tag-pill" style="background: ${licStatus.bg} !important; color: ${licStatus.color} !important; border: 1px solid ${licStatus.border}; margin-top: 2px;">
+              ${licStatus.label}
+            </span>
+          </td>
+          <td class="mono" style="font-weight: 600;">
+            ${d.phone || '—'}
+            ${d.emergency_contact_no ? `<div style="font-size: 9.5px; color: #dc2626;">Emg: ${d.emergency_contact_no}</div>` : ''}
+          </td>
+          <td style="text-align: center;" class="mono">${d.experience_years ? `${d.experience_years} yrs` : '—'}</td>
+          <td style="text-align: center;" class="mono">${d.blood_group || '—'}</td>
+          <td style="text-align: center;">
+            <span class="tag-pill ${isActive ? 'tag-active' : 'tag-inactive'}">
+              ${isActive ? 'Active' : 'Inactive'}
+            </span>
+          </td>
+        </tr>
+      `;
+    }).join('');
 
     const htmlBody = `
       <div class="report-header">
-        <div class="inst-name">${driver.institution_name !== '—' ? driver.institution_name.toUpperCase() : institutionTitle}</div>
-        <div class="report-title">DRIVER SERVICE & CREDENTIALS BIO-DATA SHEET</div>
-        <div class="report-subtitle">Official Transport Staff Profile & Verification Record</div>
+        <div class="inst-name">${institutionTitle}</div>
+        <div class="report-title" style="color: #b45309;">SPARE & RELIEVER DRIVERS ROSTER REPORT</div>
+        <div class="report-subtitle">Designated Reserve Personnel Available for Breakdown Relief, Leave Substitution & Contingency</div>
       </div>
 
       <div class="meta-row">
-        <div><b>Driver Name:</b> ${driver.name || '—'} ${driver.employee_code ? `&bull; <b>Emp Code:</b> ${driver.employee_code}` : ''}</div>
-        <div><b>Status:</b> ${driver.status?.toUpperCase() || 'ACTIVE'} &bull; <b>Printed:</b> ${timestamp}</div>
+        <div><b>Report Scope:</b> ${activeInst ? activeInst.name : 'All Campuses'} &bull; <b>Spare Drivers:</b> ${spareList.length} of ${totalCount} Total</div>
+        <div><b>Generated:</b> ${timestamp} &bull; <b>By:</b> ${user?.name || 'Transport Admin'}</div>
       </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card" style="border-left: 4px solid #f59e0b;">
+          <div class="kpi-val" style="color: #b45309;">${spareList.length}</div>
+          <div class="kpi-lbl">Total Spare Drivers</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #15803d;">${spareList.filter(d => !(d.assigned_bus_numbers || d.assigned_route_code)).length}</div>
+          <div class="kpi-lbl">Standby Ready</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #0284c7;">${spareList.filter(d => !!(d.assigned_bus_numbers || d.assigned_route_code)).length}</div>
+          <div class="kpi-lbl">On Temporary Route</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #2563eb;">
+            ${spareList.filter(d => !getLicenseStatus(d.license_expiry).isExpired).length}
+          </div>
+          <div class="kpi-lbl">Valid Licences</div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 35px; text-align: center;">#</th>
+            <th style="width: 155px;">Driver Details</th>
+            <th style="width: 110px;">Role</th>
+            <th style="width: 140px;">Current Duty</th>
+            <th style="width: 140px;">Campus</th>
+            <th style="width: 110px;">Licence No</th>
+            <th style="width: 100px;">Licence Expiry</th>
+            <th style="width: 110px;">Mobile Phone</th>
+            <th style="width: 55px; text-align: center;">Exp</th>
+            <th style="width: 50px; text-align: center;">Blood</th>
+            <th style="width: 65px; text-align: center;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <div class="signature-section">
+        <div class="sig-box">
+          <div>Prepared By</div>
+          <div class="sig-title">Transport Operations Assistant</div>
+        </div>
+        <div class="sig-box">
+          <div>Verified By</div>
+          <div class="sig-title">Transport Manager / Incharge</div>
+        </div>
+        <div class="sig-box">
+          <div>Approved By</div>
+          <div class="sig-title">Principal / Fleet Director</div>
+        </div>
+      </div>
+    `;
+
+    printReportWindow(`Spare Drivers Report - ${institutionTitle}`, htmlBody, true);
+  };
+
+  // 2. Generate Single Driver Bio-Data Profile HTML
+  const generateSingleDriverDossierHtml = (driver, timestamp) => {
+    const licStatus = getLicenseStatus(driver.license_expiry);
+    const isAssigned = !!(driver.assigned_bus_numbers || driver.assigned_route_code);
+    const isActive = (driver.status || '').toLowerCase() === 'active';
+
+    return `
+      <div class="report-header">
+        <div class="inst-name">${driver.institution_name && driver.institution_name !== '—' ? driver.institution_name.toUpperCase() : institutionTitle}</div>
+        <div class="report-title">DRIVER SERVICE & CREDENTIALS BIO-DATA SHEET</div>
+        <div class="report-subtitle">Official Transport Staff Profile, Statutory Licence & Fleet Deployment Record</div>
+      </div>
+
+      <div class="meta-row">
+        <div><b>Driver Name:</b> <span class="mono" style="font-size: 13.5px; font-weight: 800; color: #1e293b;">${driver.name || '—'}</span> ${driver.employee_code ? `&bull; <b>Emp Code:</b> #${driver.employee_code}` : ''}</div>
+        <div><b>Campus:</b> <b>${driver.institution_name || 'Central Transport Department'}</b></div>
+        <div><b>Status:</b> <span class="tag-pill ${isActive ? 'tag-active' : 'tag-inactive'}">${(driver.status || 'ACTIVE').toUpperCase()}</span></div>
+        <div><b>Generated:</b> ${timestamp}</div>
+      </div>
+
+      ${isAssigned ? `
+        <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; color: #1e40af;">
+          <b>🚌 ASSIGNED ROUTE PILOT:</b> Regular operational duty allocated for <b>Bus ${driver.assigned_bus_numbers || '—'}</b> on <b>Route ${driver.assigned_route_code || '—'}</b> (${driver.institution_name || 'Central Roster'}).
+        </div>
+      ` : `
+        <div style="background: #fffbeb; border: 1.5px solid #fde68a; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; color: #92400e;">
+          <b>⚠️ STANDBY / RELIEVER PILOT:</b> Transport department reserve roster. Available for immediate route assignment, relief substitution, and contingency backup.
+        </div>
+      `}
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
         <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: #ffffff;">
-          <div style="font-weight: 700; font-size: 12px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
-            👤 PERSONAL INFORMATION
+          <div style="font-weight: 700; font-size: 11px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+            👤 PERSONAL & IDENTITY INFORMATION
           </div>
           <table style="margin: 0;">
             <tr><td style="width: 120px; font-weight: 600; background: #f8fafc;">Full Name</td><td><b>${driver.name || '—'}</b></td></tr>
             <tr><td style="font-weight: 600; background: #f8fafc;">Father's Name</td><td>${driver.father_name || '—'}</td></tr>
-            <tr><td style="font-weight: 600; background: #f8fafc;">Date of Birth</td><td>${fmtDate(driver.date_of_birth)}</td></tr>
+            <tr><td style="font-weight: 600; background: #f8fafc;">Date of Birth</td><td class="mono">${fmtDate(driver.date_of_birth)}</td></tr>
             <tr><td style="font-weight: 600; background: #f8fafc;">Gender</td><td style="text-transform: capitalize;">${driver.gender || '—'}</td></tr>
             <tr><td style="font-weight: 600; background: #f8fafc;">Blood Group</td><td><b>${driver.blood_group || '—'}</b></td></tr>
             <tr><td style="font-weight: 600; background: #f8fafc;">Aadhaar Number</td><td class="mono">${driver.aadhaar_no || '—'}</td></tr>
@@ -1210,14 +1598,14 @@ export default function Drivers() {
         </div>
 
         <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: #ffffff;">
-          <div style="font-weight: 700; font-size: 12px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+          <div style="font-weight: 700; font-size: 11px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
             🪪 LICENCE & CREDENTIALS
           </div>
           <table style="margin: 0;">
             <tr><td style="width: 120px; font-weight: 600; background: #f8fafc;">Licence Number</td><td class="mono"><b>${driver.license_number || '—'}</b></td></tr>
             <tr><td style="font-weight: 600; background: #f8fafc;">Licence Expiry</td><td>
               <span class="mono" style="font-weight: 700;">${fmtDate(driver.license_expiry)}</span>
-              <span class="tag-pill" style="background: ${licStatus.bg}; color: ${licStatus.color}; margin-left: 6px;">${licStatus.label}</span>
+              <span class="tag-pill" style="background: ${licStatus.bg} !important; color: ${licStatus.color} !important; border: 1px solid ${licStatus.border}; margin-left: 6px;">${licStatus.label}</span>
             </td></tr>
             <tr><td style="font-weight: 600; background: #f8fafc;">Licence Issue Date</td><td class="mono">${fmtDate(driver.license_issue_date)}</td></tr>
             <tr><td style="font-weight: 600; background: #f8fafc;">Badge Number</td><td class="mono">${driver.badge_no || '—'}</td></tr>
@@ -1229,7 +1617,7 @@ export default function Drivers() {
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
         <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: #ffffff;">
-          <div style="font-weight: 700; font-size: 12px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+          <div style="font-weight: 700; font-size: 11px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
             📞 CONTACT & ADDRESS
           </div>
           <table style="margin: 0;">
@@ -1242,7 +1630,7 @@ export default function Drivers() {
         </div>
 
         <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background: #ffffff;">
-          <div style="font-weight: 700; font-size: 12px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+          <div style="font-weight: 700; font-size: 11px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
             🛣️ FLEET ASSIGNMENT & EMERGENCY
           </div>
           <table style="margin: 0;">
@@ -1271,8 +1659,57 @@ export default function Drivers() {
         </div>
       </div>
     `;
+  };
 
-    printReportWindow(`Driver Profile - ${driver.name}`, htmlBody, false);
+  // 2b. Download / Print Single Driver Dossier
+  const handlePrintSingleDriver = (driver) => {
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    const htmlBody = generateSingleDriverDossierHtml(driver, timestamp);
+    printReportWindow(`Driver Dossier - ${driver.name}`, htmlBody, false);
+  };
+
+  // 2c. Download / Print Detailed Dossiers by Selection or All (Multi-page Book)
+  const handlePrintDetailedDrivers = (driverId) => {
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    if (driverId && driverId !== 'all') {
+      const drv = items.find(d => String(d.id) === String(driverId));
+      if (drv) {
+        handlePrintSingleDriver(drv);
+        return;
+      }
+    }
+    // All filtered drivers dossier book
+    const list = filteredItems;
+    if (!list.length) {
+      alert('No drivers found in current filter to generate dossiers.');
+      return;
+    }
+    const htmlBody = list.map((drv, idx) => `
+      <div style="${idx > 0 ? 'page-break-before: always; padding-top: 14px;' : ''}">
+        ${generateSingleDriverDossierHtml(drv, timestamp)}
+      </div>
+    `).join('');
+
+    printReportWindow(`Fleet Drivers Detailed Dossiers - ${institutionTitle}`, htmlBody, false);
+  };
+
+  // Helper: Dispatch roster print by scope
+  const handlePrintDriversRoster = (scope = rosterScope) => {
+    if (scope === 'assigned') {
+      handlePrintAssignedDrivers();
+    } else if (scope === 'spare') {
+      handlePrintSpareDrivers();
+    } else if (scope === 'unassigned') {
+      handlePrintUnassignedDrivers();
+    } else {
+      handlePrintAllDrivers();
+    }
   };
 
   // 3. Export CSV Helper
@@ -1336,80 +1773,53 @@ export default function Drivers() {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
+            type="button"
             className="btn btn-sm"
-            onClick={handlePrintAssignedDrivers}
+            onClick={() => setShowReportModal(true)}
+            title="Download / Print Official Driver Reports & Staff Dossiers"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-              color: '#ffffff',
-              border: 'none',
               fontWeight: 700,
-              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+              background: '#f5f3ff',
+              color: '#7c6cfc',
+              border: '1.5px solid #ddd6fe',
+              padding: '6px 12px',
+              borderRadius: 6,
               cursor: 'pointer'
             }}
-            title="Download / Print Assigned Drivers Report (Bus, Route & Duty Mapped)"
           >
-            <DrvIcon name="file" size={14} color="#fff" /> Assigned Report (PDF)
+            <DrvIcon name="file" size={15} color="#7c6cfc" />
+            <span>📄 Driver Report (PDF) ▾</span>
           </button>
 
           <button
+            type="button"
             className="btn btn-sm"
-            onClick={handlePrintUnassignedDrivers}
+            onClick={handleExportCSV}
+            title="Download Full Driver Register to Excel / CSV"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              color: '#ffffff',
-              border: 'none',
               fontWeight: 700,
-              boxShadow: '0 2px 6px rgba(245, 158, 11, 0.25)',
+              background: '#ecfdf5',
+              color: '#059669',
+              border: '1.5px solid #a7f3d0',
+              padding: '6px 12px',
+              borderRadius: 6,
               cursor: 'pointer'
             }}
-            title="Download / Print Unassigned & Standby Drivers Report"
           >
-            <DrvIcon name="alert" size={14} color="#fff" /> Unassigned (PDF)
-          </button>
-
-          <button
-            className="btn btn-sm btn-outline"
-            onClick={handlePrintAllDrivers}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontWeight: 600
-            }}
-            title="Direct print / Save all driver details as PDF"
-          >
-            <DrvIcon name="print" size={14} color="currentColor" /> All Drivers (PDF)
-          </button>
-
-          <button
-            className="btn btn-sm"
-            onClick={handlePrintDriverShiftBackup}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
-              color: '#ffffff',
-              border: 'none',
-              fontWeight: 700,
-              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.25)',
-              cursor: 'pointer'
-            }}
-            title="Download / Print Complete Driver Backup (Driver, Bus, Campus, Route & Morning/Evening Shifts)"
-          >
-            <DrvIcon name="download" size={14} color="#fff" /> Shift Backup (PDF)
+            <DrvIcon name="download" size={15} color="#059669" />
+            <span>📥 Export CSV</span>
           </button>
 
           {canEdit && (
             <button 
               className="btn btn-sm btn-primary" 
-              onClick={() => setEditing({ status: 'active', gender: 'male' })}
+              onClick={() => setEditing({ status: 'active', gender: 'male', driver_type: 'regular' })}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
             >
               <DrvIcon name="plus" size={15} color="#fff" /> Add Driver
@@ -1454,16 +1864,29 @@ export default function Drivers() {
             </div>
           </div>
 
-          <div className={`att-kpi-card ${unassignedCount > 0 ? 'att-kpi-card--warn' : ''}`}>
+          <div className="att-kpi-card">
             <div className="att-kpi-icon att-kpi-icon--amber">
-              <DrvIcon name="badge" size={22} color="#f59e0b" />
+              <DrvIcon name="refresh" size={22} color="#f59e0b" />
             </div>
             <div className="att-kpi-body">
-              <div className="att-kpi-val" style={{ color: unassignedCount > 0 ? '#d97706' : '#64748b' }}>
+              <div className="att-kpi-val" style={{ color: '#d97706' }}>
+                {totalSpareCount}
+              </div>
+              <div className="att-kpi-label">Spare Relievers</div>
+              <div className="att-kpi-sub">{spareStandbyCount > 0 ? `${spareStandbyCount} standby ready` : 'Designated spare staff'}</div>
+            </div>
+          </div>
+
+          <div className={`att-kpi-card ${unassignedCount > 0 ? 'att-kpi-card--warn' : ''}`}>
+            <div className="att-kpi-icon att-kpi-icon--red">
+              <DrvIcon name="alert" size={22} color="#ef4444" />
+            </div>
+            <div className="att-kpi-body">
+              <div className="att-kpi-val" style={{ color: unassignedCount > 0 ? '#dc2626' : '#64748b' }}>
                 {unassignedCount}
               </div>
-              <div className="att-kpi-label">Standby / Unassigned</div>
-              <div className="att-kpi-sub">{unassignedCount > 0 ? 'Available for reliever duty' : 'All drivers mapped'}</div>
+              <div className="att-kpi-label">Unassigned Route Drivers</div>
+              <div className="att-kpi-sub">{unassignedCount > 0 ? 'Awaiting route allocation' : 'All regular drivers mapped'}</div>
             </div>
           </div>
 
@@ -1479,6 +1902,119 @@ export default function Drivers() {
               <div className="att-kpi-sub">{expiringOrExpiredCount > 0 ? 'Renewal required' : 'All licences valid'}</div>
             </div>
           </div>
+        </div>
+
+        {/* Quick Driver Role & Status Filter Chips */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-dim, #64748b)', marginRight: 4 }}>
+            Driver Filter:
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setStatusFilter('all')}
+            style={{
+              padding: '4px 10px',
+              fontSize: 11.5,
+              fontWeight: 700,
+              borderRadius: 20,
+              background: statusFilter === 'all' ? '#7c6cfc' : '#ffffff',
+              color: statusFilter === 'all' ? '#ffffff' : '#334155',
+              border: statusFilter === 'all' ? '1px solid #7c6cfc' : '1px solid #cbd5e1',
+              cursor: 'pointer'
+            }}
+          >
+            All Staff ({totalCount})
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setStatusFilter('assigned')}
+            style={{
+              padding: '4px 10px',
+              fontSize: 11.5,
+              fontWeight: 700,
+              borderRadius: 20,
+              background: statusFilter === 'assigned' ? '#16a34a' : '#ffffff',
+              color: statusFilter === 'assigned' ? '#ffffff' : '#16a34a',
+              border: statusFilter === 'assigned' ? '1px solid #16a34a' : '1px solid #bbf7d0',
+              cursor: 'pointer'
+            }}
+          >
+            🚌 Assigned to Route ({assignedCount})
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setStatusFilter('spare')}
+            style={{
+              padding: '4px 10px',
+              fontSize: 11.5,
+              fontWeight: 700,
+              borderRadius: 20,
+              background: statusFilter === 'spare' ? '#b45309' : '#ffffff',
+              color: statusFilter === 'spare' ? '#ffffff' : '#b45309',
+              border: statusFilter === 'spare' ? '1px solid #b45309' : '1px solid #fde68a',
+              cursor: 'pointer'
+            }}
+          >
+            🔄 Spare / Relievers ({totalSpareCount})
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => setStatusFilter('unassigned')}
+            style={{
+              padding: '4px 10px',
+              fontSize: 11.5,
+              fontWeight: 700,
+              borderRadius: 20,
+              background: statusFilter === 'unassigned' ? '#dc2626' : '#ffffff',
+              color: statusFilter === 'unassigned' ? '#ffffff' : '#dc2626',
+              border: statusFilter === 'unassigned' ? '1px solid #dc2626' : '1px solid #fca5a5',
+              cursor: 'pointer'
+            }}
+          >
+            ⏳ Unassigned Route Drivers ({unassignedCount})
+          </button>
+          {inactiveCount > 0 && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setStatusFilter('inactive')}
+              style={{
+                padding: '4px 10px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                borderRadius: 20,
+                background: statusFilter === 'inactive' ? '#475569' : '#ffffff',
+                color: statusFilter === 'inactive' ? '#ffffff' : '#475569',
+                border: statusFilter === 'inactive' ? '1px solid #475569' : '1px solid #cbd5e1',
+                cursor: 'pointer'
+              }}
+            >
+              🚫 Inactive Staff ({inactiveCount})
+            </button>
+          )}
+          {othersCount > 0 && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setStatusFilter('others')}
+              style={{
+                padding: '4px 10px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                borderRadius: 20,
+                background: statusFilter === 'others' ? '#6d28d9' : '#ffffff',
+                color: statusFilter === 'others' ? '#ffffff' : '#6d28d9',
+                border: statusFilter === 'others' ? '1px solid #6d28d9' : '1px solid #ddd6fe',
+                cursor: 'pointer'
+              }}
+            >
+              🚙 Other / Utility ({othersCount})
+            </button>
+          )}
         </div>
 
         {/* Toolbar & Filters */}
@@ -1517,11 +2053,14 @@ export default function Drivers() {
             className="fselect"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            style={{ maxWidth: 220, fontWeight: 600, height: 38 }}
+            style={{ maxWidth: 240, fontWeight: 600, height: 38 }}
           >
             <option value="all">All Status ({items.length})</option>
             <option value="assigned">Assigned Only ({assignedCount})</option>
-            <option value="unassigned">Unassigned Standby ({unassignedCount})</option>
+            <option value="spare">Spare / Relievers ({totalSpareCount})</option>
+            <option value="unassigned">Unassigned Route Drivers ({unassignedCount})</option>
+            {inactiveCount > 0 && <option value="inactive">Inactive Staff ({inactiveCount})</option>}
+            {othersCount > 0 && <option value="others">Other Utility Pilots ({othersCount})</option>}
           </select>
 
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1536,7 +2075,31 @@ export default function Drivers() {
           data={filteredItems}
           onEdit={canEdit ? setEditing : undefined}
           onDelete={canEdit ? handleDel : undefined}
-          onPdf={handlePrintSingleDriver}
+          extraAction={(item) => (
+            <button
+              type="button"
+              className="icon-btn"
+              title={`Download / Print Dossier for ${item.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrintSingleDriver(item);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#7c6cfc',
+                background: '#f5f3ff',
+                border: '1px solid #ddd6fe',
+                borderRadius: 5,
+                padding: '3px 6px',
+                cursor: 'pointer',
+                lineHeight: 1
+              }}
+            >
+              <span style={{ fontSize: 13 }}>📥</span>
+            </button>
+          )}
           renderSubRow={renderSubRow}
           emptyIcon="👤"
           emptyText="No drivers found matching your criteria."
@@ -1554,316 +2117,416 @@ export default function Drivers() {
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* DRIVER MASTER REPORT PREVIEW & PDF EXPORT MODAL                            */}
-      {/* ========================================================================= */}
+      {/* DRIVER REPORT SELECTION MODAL */}
       {showReportModal && (
         <div
-          className="modal-bg"
-          onClick={() => setShowReportModal(false)}
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(15, 23, 42, 0.7)',
-            backdropFilter: 'blur(6px)',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 99999,
-            padding: 20
+            padding: 16
           }}
+          onClick={() => setShowReportModal(false)}
         >
           <div
-            className="modal"
             style={{
-              maxWidth: '92vw',
-              width: 1200,
-              maxHeight: '90vh',
-              display: 'flex',
-              flexDirection: 'column',
-              padding: 0,
-              overflow: 'hidden',
-              borderRadius: 14,
-              boxShadow: '0 25px 60px rgba(0,0,0,0.4)',
-              border: '1px solid #cbd5e1',
               background: '#ffffff',
-              animation: 'slideUp 0.25s ease'
+              borderRadius: 16,
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              maxWidth: 640,
+              width: '100%',
+              overflow: 'hidden',
+              border: '1px solid #e2e8f0'
             }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Modal Top Bar */}
+            {/* Modal Header */}
             <div
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '16px 24px',
-                borderBottom: '1px solid var(--paper-2)',
-                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                color: '#ffffff'
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+                borderBottom: '1px solid #f1f5f9',
+                background: 'linear-gradient(135deg, #fbfbfe 0%, #f5f3ff 100%)'
               }}
             >
-              <div>
-                <div style={{ fontSize: 17, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>🖨️</span>
-                  <span>Driver Master Report & PDF Export</span>
-                </div>
-                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-                  {institutionTitle} &bull; {filteredItems.length} Driver(s) Selected
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <button
-                  className="btn btn-sm"
-                  onClick={handleExportCSV}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
                   style={{
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: '#ffffff',
-                    border: '1px solid rgba(255, 255, 255, 0.2)'
-                  }}
-                  title="Export raw data to Excel / CSV"
-                >
-                  📥 Export CSV
-                </button>
-                <button
-                  className="btn btn-sm"
-                  onClick={handlePrintAllDrivers}
-                  style={{
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: 700,
-                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)'
-                  }}
-                  title="Open Print Dialog to Save as PDF"
-                >
-                  🖨️ Print / Save as PDF
-                </button>
-                <button
-                  onClick={() => setShowReportModal(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#94a3b8',
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: '#7c6cfc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
                     fontSize: 18,
-                    cursor: 'pointer',
-                    padding: '4px 8px'
+                    boxShadow: '0 4px 10px rgba(124, 108, 252, 0.3)'
                   }}
                 >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body / Report Preview */}
-            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, background: '#f8fafc' }}>
-              {/* Document Banner */}
-              <div
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 10,
-                  padding: '16px 20px',
-                  marginBottom: 16,
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                }}
-              >
-                <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0' }}>{institutionTitle}</h2>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#d97706', letterSpacing: '0.6px' }}>
-                    FLEET DRIVERS MASTER DIRECTORY & COMPLIANCE REPORT
-                  </div>
+                  📄
                 </div>
-
-                {/* KPI Statistics */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
-                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#2563eb' }}>{totalCount}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Drivers</div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>
+                    Select Driver Report Format
                   </div>
-                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#15803d' }}>{activeCount}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Active On Duty</div>
-                  </div>
-                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#d97706' }}>{assignedCount}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Assigned Routes</div>
-                  </div>
-                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#475569' }}>{unassignedCount}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Standby / Reserve</div>
-                  </div>
-                  <div style={{ background: expiringOrExpiredCount > 0 ? '#fff5f5' : '#f8fafc', border: `1px solid ${expiringOrExpiredCount > 0 ? '#fca5a5' : '#e2e8f0'}`, padding: '10px 12px', borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: expiringOrExpiredCount > 0 ? '#b91c1c' : '#15803d' }}>{expiringOrExpiredCount}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Licence Alert</div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>
+                    Choose between overall driver roster report, detailed staff bio-data dossier, or shift backup sheet
                   </div>
                 </div>
               </div>
-
-              {/* Data Table */}
-              <div
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
                 style={{
-                  background: '#ffffff',
-                  borderRadius: 10,
-                  border: '1px solid #e2e8f0',
-                  overflow: 'hidden',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: 18,
+                  color: '#94a3b8',
+                  padding: 4
                 }}
               >
-                <table className="tbl tbl-spacious" style={{ margin: 0, width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc' }}>
-                      <th style={{ width: 45, textAlign: 'center' }}>#</th>
-                      <th>Driver Name</th>
-                      <th>Bus No</th>
-                      <th>Assigned Route</th>
-                      <th>Licence Number</th>
-                      <th>Licence Expiry</th>
-                      <th>Phone</th>
-                      <th>Campus</th>
-                      <th style={{ textAlign: 'center' }}>Blood</th>
-                      <th style={{ textAlign: 'center' }}>Status</th>
-                      <th style={{ textAlign: 'center', width: 80 }}>Profile</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredItems.map((d, idx) => {
-                      const licStatus = getLicenseStatus(d.license_expiry);
-                      const isAssigned = !!d.assigned_route_code;
-                      const isActive = (d.status || '').toLowerCase() === 'active';
+                ✕
+              </button>
+            </div>
 
-                      return (
-                        <tr key={d.id || idx}>
-                          <td style={{ textAlign: 'center', color: '#64748b' }} className="mono">{idx + 1}</td>
-                          <td>
-                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{d.name}</div>
-                            {d.employee_code && <div style={{ fontSize: 11, color: '#2563eb' }} className="mono">{d.employee_code}</div>}
-                          </td>
-                          <td>
-                            {d.assigned_bus_numbers ? (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                                {d.assigned_bus_numbers.split(', ').map(b => (
-                                  <span
-                                    key={b}
-                                    className="mono"
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 3,
-                                      background: '#eff6ff',
-                                      color: '#1d4ed8',
-                                      border: '1px solid #bfdbfe',
-                                      padding: '1px 6px',
-                                      borderRadius: 4,
-                                      fontSize: 11,
-                                      fontWeight: 700
-                                    }}
-                                  >
-                                    <span>🚌</span> {b}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>—</span>
-                            )}
-                          </td>
-                          <td>
-                            {isAssigned ? (
-                              <b style={{ color: '#0f172a' }} className="mono">{d.assigned_route_code}</b>
-                            ) : (
-                              <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>— Standby</span>
-                            )}
-                          </td>
-                          <td className="mono" style={{ fontWeight: 600 }}>{d.license_number || '—'}</td>
-                          <td>
-                            <div className="mono" style={{ fontWeight: 600 }}>{fmtDate(d.license_expiry)}</div>
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                padding: '1px 6px',
-                                borderRadius: 4,
-                                fontSize: 10,
-                                fontWeight: 700,
-                                background: licStatus.bg,
-                                color: licStatus.color,
-                                border: `1px solid ${licStatus.border}`,
-                                marginTop: 2
-                              }}
-                            >
-                              {licStatus.label}
-                            </span>
-                          </td>
-                          <td className="mono" style={{ fontWeight: 600 }}>{d.phone || '—'}</td>
-                          <td style={{ fontWeight: 600, color: '#334155' }}>{d.institution_name || '—'}</td>
-                          <td style={{ textAlign: 'center' }} className="mono">{d.blood_group || '—'}</td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                padding: '2px 8px',
-                                borderRadius: 12,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                background: isActive ? '#dcfce7' : '#fee2e2',
-                                color: isActive ? '#15803d' : '#b91c1c'
-                              }}
-                            >
-                              {isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <button
-                              className="btn btn-sm btn-outline"
-                              onClick={() => handlePrintSingleDriver(d)}
-                              style={{ padding: '3px 8px', fontSize: 11 }}
-                              title="Print Single Driver Bio-Data Sheet"
-                            >
-                              🖨️ Sheet
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            {/* Modal Body */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Option 1: Overall Driver Roster Report */}
+              <div
+                onClick={() => setReportType('overall')}
+                style={{
+                  border: reportType === 'overall' ? '2px solid #7c6cfc' : '1.5px solid #e2e8f0',
+                  borderRadius: 12,
+                  padding: '14px 16px',
+                  background: reportType === 'overall' ? '#f5f3ff' : '#ffffff',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      type="radio"
+                      name="driverReportType"
+                      checked={reportType === 'overall'}
+                      onChange={() => setReportType('overall')}
+                      style={{ width: 17, height: 17, accentColor: '#7c6cfc', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 14.5, fontWeight: 800, color: '#1e293b' }}>
+                      📋 Overall Driver Roster Report (Summary Table)
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      background: '#ede9fe',
+                      color: '#7c6cfc'
+                    }}
+                  >
+                    Master Roster Format
+                  </span>
+                </div>
+                <p style={{ margin: '0 0 0 27px', fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+                  Consolidated master personnel register of drivers with employee ID, father's name, assigned bus & route, licence details & validity, contact phone, campus, blood group, experience, and operational status.
+                </p>
+
+                {/* Sub-selector for roster scope */}
+                <div
+                  style={{
+                    marginLeft: 27,
+                    marginTop: 4,
+                    display: 'flex',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    alignItems: 'center'
+                  }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>Scope:</span>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#1e293b' }}>
+                    <input
+                      type="radio"
+                      name="drvRosterScope"
+                      checked={rosterScope === 'all'}
+                      onChange={() => setRosterScope('all')}
+                      style={{ accentColor: '#7c6cfc', cursor: 'pointer' }}
+                    />
+                    All Drivers ({items.length})
+                  </label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#16a34a' }}>
+                    <input
+                      type="radio"
+                      name="drvRosterScope"
+                      checked={rosterScope === 'assigned'}
+                      onChange={() => setRosterScope('assigned')}
+                      style={{ accentColor: '#16a34a', cursor: 'pointer' }}
+                    />
+                    Assigned ({assignedCount})
+                  </label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#b45309' }}>
+                    <input
+                      type="radio"
+                      name="drvRosterScope"
+                      checked={rosterScope === 'spare'}
+                      onChange={() => setRosterScope('spare')}
+                      style={{ accentColor: '#b45309', cursor: 'pointer' }}
+                    />
+                    Spare Relievers ({totalSpareCount})
+                  </label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#dc2626' }}>
+                    <input
+                      type="radio"
+                      name="drvRosterScope"
+                      checked={rosterScope === 'unassigned'}
+                      onChange={() => setRosterScope('unassigned')}
+                      style={{ accentColor: '#dc2626', cursor: 'pointer' }}
+                    />
+                    Unassigned ({unassignedCount})
+                  </label>
+                </div>
+
+                <div style={{ marginLeft: 27, display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 7px', borderRadius: 4, color: '#334155' }}>
+                    • A4 Landscape
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 7px', borderRadius: 4, color: '#334155' }}>
+                    • Management & Compliance Ready
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 7px', borderRadius: 4, color: '#334155' }}>
+                    • Official Sign-offs
+                  </span>
+                </div>
+              </div>
+
+              {/* Option 2: Detailed Driver Bio-Data Profile */}
+              <div
+                onClick={() => setReportType('detailed')}
+                style={{
+                  border: reportType === 'detailed' ? '2px solid #7c6cfc' : '1.5px solid #e2e8f0',
+                  borderRadius: 12,
+                  padding: '14px 16px',
+                  background: reportType === 'detailed' ? '#f5f3ff' : '#ffffff',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      type="radio"
+                      name="driverReportType"
+                      checked={reportType === 'detailed'}
+                      onChange={() => setReportType('detailed')}
+                      style={{ width: 17, height: 17, accentColor: '#7c6cfc', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 14.5, fontWeight: 800, color: '#1e293b' }}>
+                      📑 Detailed Driver Bio-Data Dossier
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      background: '#ede9fe',
+                      color: '#7c6cfc'
+                    }}
+                  >
+                    4-Card Profile Sheet
+                  </span>
+                </div>
+                <p style={{ margin: '0 0 0 27px', fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+                  In-depth staff bio-data dossier featuring the 4 specification cards: Personal & Identity, Licence & Credentials, Contact & Domicile, and Fleet Assignment & Emergency contacts.
+                </p>
+
+                {/* Select Driver Dropdown */}
+                <div style={{ marginLeft: 27, marginTop: 4 }} onClick={e => e.stopPropagation()}>
+                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                    Choose Driver for Dossier:
+                  </label>
+                  <select
+                    value={selectedDriverId}
+                    onChange={e => setSelectedDriverId(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: 38,
+                      borderRadius: 6,
+                      border: '1.5px solid #cbd5e1',
+                      padding: '0 10px',
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">📚 All Drivers in Scope ({filteredItems.length} drivers - Multi-page Dossier)</option>
+                    {filteredItems.map(d => (
+                      <option key={d.id} value={String(d.id)}>
+                        {d.name} {d.employee_code ? `(#${d.employee_code})` : ''} — {d.assigned_bus_numbers ? `🚌 Bus ${d.assigned_bus_numbers}` : 'Standby'} • Lic: {d.license_number || '—'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Option 3: Shift Backup Sheet */}
+              <div
+                onClick={() => setReportType('shift_backup')}
+                style={{
+                  border: reportType === 'shift_backup' ? '2px solid #7c6cfc' : '1.5px solid #e2e8f0',
+                  borderRadius: 12,
+                  padding: '14px 16px',
+                  background: reportType === 'shift_backup' ? '#f5f3ff' : '#ffffff',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      type="radio"
+                      name="driverReportType"
+                      checked={reportType === 'shift_backup'}
+                      onChange={() => setReportType('shift_backup')}
+                      style={{ width: 17, height: 17, accentColor: '#7c6cfc', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 14.5, fontWeight: 800, color: '#1e293b' }}>
+                      🚌 Driver Shift & Route Backup Sheet (PDF)
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      background: '#e0e7ff',
+                      color: '#4338ca'
+                    }}
+                  >
+                    Operational Shifts
+                  </span>
+                </div>
+                <p style={{ margin: '0 0 0 27px', fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+                  Daily operations roster covering morning and evening shift schedules, assigned routes, and standby reliever backup allocations for operational contingency.
+                </p>
+                <div style={{ marginLeft: 27, display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 7px', borderRadius: 4, color: '#334155' }}>
+                    • Morning & Evening Shifts
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 7px', borderRadius: 4, color: '#334155' }}>
+                    • Emergency Relievers
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, background: '#ffffff', border: '1px solid #cbd5e1', padding: '1px 7px', borderRadius: 4, color: '#334155' }}>
+                    • High-Res Vector PDF
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Modal Bottom Bar */}
+            {/* Modal Footer */}
             <div
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '12px 24px',
-                borderTop: '1px solid var(--paper-2)',
-                background: '#ffffff'
+                justifyContent: 'space-between',
+                padding: '14px 20px',
+                borderTop: '1px solid #f1f5f9',
+                background: '#fafafa',
+                flexWrap: 'wrap',
+                gap: 10
               }}
             >
-              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                💡 <b>Tip:</b> Click <b>Print / Save as PDF</b> and select <i>"Save as PDF"</i> in your browser's print destination to export an official high-resolution PDF.
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn btn-sm btn-outline" onClick={() => setShowReportModal(false)}>
-                  Close
-                </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() => setShowReportModal(false)}
+                style={{ padding: '7px 14px', fontWeight: 600 }}
+              >
+                Cancel
+              </button>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {reportType === 'overall' && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => {
+                      handleExportCSV();
+                      setShowReportModal(false);
+                    }}
+                    style={{
+                      background: '#ecfdf5',
+                      color: '#059669',
+                      border: '1px solid #a7f3d0',
+                      padding: '7px 14px',
+                      borderRadius: 6,
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📥 Export CSV
+                  </button>
+                )}
+
                 <button
+                  type="button"
                   className="btn btn-sm btn-primary"
-                  onClick={handlePrintAllDrivers}
+                  onClick={() => {
+                    setShowReportModal(false);
+                    if (reportType === 'overall') {
+                      handlePrintDriversRoster(rosterScope);
+                    } else if (reportType === 'detailed') {
+                      handlePrintDetailedDrivers(selectedDriverId);
+                    } else if (reportType === 'shift_backup') {
+                      handlePrintDriverShiftBackup();
+                    }
+                  }}
                   style={{
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                    border: 'none',
+                    background: '#7c6cfc',
                     color: '#ffffff',
-                    fontWeight: 700
+                    padding: '7px 16px',
+                    borderRadius: 6,
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(124, 108, 252, 0.35)'
                   }}
                 >
-                  🖨️ Print / Save as PDF
+                  <DrvIcon name="file" size={15} color="#fff" />
+                  <span>
+                    {reportType === 'overall'
+                      ? 'Print / Save Roster (PDF)'
+                      : reportType === 'detailed'
+                      ? 'Print / Save Dossier (PDF)'
+                      : 'Export Shift Backup (PDF)'}
+                  </span>
                 </button>
               </div>
             </div>
