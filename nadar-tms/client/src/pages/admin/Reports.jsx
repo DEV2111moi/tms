@@ -1,7 +1,15 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import api from '../../api/api';
 import { useToast } from '../../components/UI/Toast';
 import { fmtDate, money } from '../../components/UI/DataTable';
+import {
+  groupBusesByInstitution,
+  exportSingleInstitutionBusReportPdf,
+  exportAllInstitutionsConsolidatedPdf,
+  downloadAllInstitutionsZip,
+  downloadSingleInstitutionPdf,
+  downloadAllInstitutionsConsolidatedPdf
+} from '../../utils/busWiseReportPdf';
 
 export const fmtTime = (t) => {
   if (!t) return '';
@@ -205,6 +213,85 @@ export default function Reports() {
     window.print();
   };
 
+  const handleDownloadAllInstPdfs = async () => {
+    let repData = result?.data;
+    if (!repData || result?.type !== 'bus_wise') {
+      try {
+        setLoading(true);
+        repData = await api.repBusWise(st.from, st.to, st.institutionId, st.busId);
+        setResult({ type: 'bus_wise', data: repData });
+      } catch (err) {
+        toast(err.message || 'Failed to fetch bus wise data');
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+    }
+
+    const groups = groupBusesByInstitution(
+      repData.buses || [],
+      refs.institutions || [],
+      repData.trips || [],
+      repData.substitutions || []
+    );
+
+    if (groups.length === 0) {
+      toast('No bus data found for the selected period.');
+      return;
+    }
+
+    toast(`Exporting Master Consolidated Fleet Report for ${groups.length} institutions...`);
+    exportAllInstitutionsConsolidatedPdf({
+      institutionsGroups: groups,
+      from: st.from,
+      to: st.to
+    });
+  };
+
+  const handleDownloadAllZip = async () => {
+    let repData = result?.data;
+    if (!repData || result?.type !== 'bus_wise') {
+      try {
+        setLoading(true);
+        repData = await api.repBusWise(st.from, st.to, st.institutionId, st.busId);
+        setResult({ type: 'bus_wise', data: repData });
+      } catch (err) {
+        toast(err.message || 'Failed to fetch bus wise data');
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+    }
+
+    const groups = groupBusesByInstitution(
+      repData.buses || [],
+      refs.institutions || [],
+      repData.trips || [],
+      repData.substitutions || []
+    );
+
+    if (groups.length === 0) {
+      toast('No bus data found for the selected period.');
+      return;
+    }
+
+    toast('Generating ZIP with separate institution PDFs...');
+    try {
+      await downloadAllInstitutionsZip({
+        institutionsGroups: groups,
+        from: st.from,
+        to: st.to,
+        onProgress: (cur, tot, name) => {
+          toast(`Bundling PDF (${cur}/${tot}): ${name}...`);
+        }
+      });
+      toast('ZIP archive downloaded successfully!');
+    } catch (err) {
+      console.error(err);
+      toast('Failed to generate ZIP: ' + (err.message || 'Error'));
+    }
+  };
+
   const isAtt = st.type === 'attendance';
   const isRoutesStops = st.type === 'routes_stops';
   const routes = refs.routes || [];
@@ -316,7 +403,58 @@ export default function Reports() {
               </span>
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>
+            {st.type === 'bus_wise' && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={handleDownloadAllZip}
+                  disabled={loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 14px',
+                    borderRadius: 6,
+                    boxShadow: '0 2px 6px rgba(22,163,74,0.25)',
+                    cursor: 'pointer'
+                  }}
+                  title="Download all institutions' individual PDF files inside a single ZIP archive named with institution short names"
+                >
+                  <span>📦</span>
+                  <span>Download All as ZIP (Separate PDFs)</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={handleDownloadAllInstPdfs}
+                  disabled={loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 14px',
+                    borderRadius: 6,
+                    boxShadow: '0 2px 6px rgba(30,64,175,0.25)',
+                    cursor: 'pointer'
+                  }}
+                  title="Prints or saves a master consolidated PDF containing ALL institutions with each campus starting on its own page"
+                >
+                  <span>⚡</span>
+                  <span>Consolidated Master PDF</span>
+                </button>
+              </>
+            )}
             <button className="btn btn-sm btn-outline" onClick={handleCsv} disabled={!result}>Export CSV</button>
             <button className="btn btn-sm btn-outline" onClick={handlePrint} disabled={!result}>Print</button>
             <button className="btn btn-sm btn-primary" onClick={handleRun} disabled={loading}>{loading ? 'Running...' : 'Run Report'}</button>
@@ -499,6 +637,8 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
   const [search, setSearch] = useState('');
   const [expandedBus, setExpandedBus] = useState(null);
   const [viewMode, setViewMode] = useState('detailed'); // 'detailed' | 'summary'
+  const [zipLoading, setZipLoading] = useState(false);
+  const [zipStatus, setZipStatus] = useState('');
 
   const buses = data?.buses || [];
   const trips = data?.trips || [];
@@ -574,6 +714,57 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
   const collegeName = activeInst ? activeInst.name.toUpperCase() : 'NADAR SARASWATHI COLLEGE OF ENGINEERING AND TECHNOLOGY';
   const selectedInstitutionName = activeInst ? (activeInst.short_name || activeInst.name) : (st?.institutionId ? 'Selected Institution' : 'All Institutions');
 
+  // Group buses by institution for dedicated PDF exports
+  const institutionGroups = useMemo(() => {
+    return groupBusesByInstitution(buses, insts, trips, substitutions);
+  }, [buses, insts, trips, substitutions]);
+
+  const handleDownloadAllInstitutions = () => {
+    if (institutionGroups.length === 0) {
+      alert('No institution fleet data available to export.');
+      return;
+    }
+    exportAllInstitutionsConsolidatedPdf({
+      institutionsGroups: institutionGroups,
+      from: data?.from || st?.from,
+      to: data?.to || st?.to
+    });
+  };
+
+  const handleDownloadZip = async () => {
+    if (institutionGroups.length === 0) {
+      alert('No institution fleet data available to export.');
+      return;
+    }
+    setZipLoading(true);
+    setZipStatus('Preparing ZIP...');
+    try {
+      await downloadAllInstitutionsZip({
+        institutionsGroups: institutionGroups,
+        from: data?.from || st?.from,
+        to: data?.to || st?.to,
+        onProgress: (cur, tot, name) => {
+          setZipStatus(`Bundling (${cur}/${tot}): ${name}...`);
+        }
+      });
+      setZipStatus('Downloaded!');
+      setTimeout(() => setZipStatus(''), 2500);
+    } catch (err) {
+      console.error('ZIP download error:', err);
+      alert('Error creating ZIP: ' + (err.message || 'Unknown error'));
+    } finally {
+      setZipLoading(false);
+    }
+  };
+
+  const handleDownloadSingleInstitution = (instGroup) => {
+    exportSingleInstitutionBusReportPdf({
+      instGroup,
+      from: data?.from || st?.from,
+      to: data?.to || st?.to
+    });
+  };
+
   const handlePrintDetailed = () => {
     setViewMode('detailed');
     setTimeout(() => {
@@ -583,6 +774,199 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
 
   return (
     <div>
+      {/* Institution-Wise Direct PDF Download Panel */}
+      <div
+        className="hide-on-print"
+        style={{
+          background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
+          border: '1.5px solid #bfdbfe',
+          borderRadius: '10px',
+          padding: '14px 18px',
+          marginBottom: '20px',
+          boxShadow: '0 2px 8px rgba(37,99,235,0.06)'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '20px' }}>🏛️</span>
+              <span style={{ fontWeight: 800, fontSize: '14.5px', color: '#1e3a8a', letterSpacing: '-0.2px' }}>
+                Institution-Wise Bus Reports (Direct PDF & ZIP Download)
+              </span>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                background: '#dbeafe',
+                color: '#1d4ed8',
+                border: '1px solid #bfdbfe',
+                padding: '2px 8px',
+                borderRadius: '12px'
+              }}>
+                {institutionGroups.length} Campuses Ready
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px' }}>
+              Download a single ZIP archive containing individual PDFs named by institution, or print/preview the master consolidated PDF.
+            </div>
+          </div>
+
+          {/* Action Buttons: ZIP Download (Separate PDFs in 1-Click) + Master PDF */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={handleDownloadZip}
+              disabled={zipLoading}
+              style={{
+                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '12.5px',
+                padding: '8px 18px',
+                borderRadius: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 10px rgba(22,163,74,0.3)',
+                cursor: zipLoading ? 'wait' : 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Download all institutions' individual PDF files inside a single ZIP archive named with institution short names"
+            >
+              <span>{zipLoading ? '⏳' : '📦'}</span>
+              <span>
+                {zipLoading
+                  ? (zipStatus || 'Generating ZIP Archive...')
+                  : 'Download All Institutions as ZIP (Separate PDFs in 1-Click)'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={handleDownloadAllInstitutions}
+              style={{
+                background: '#ffffff',
+                color: '#1e40af',
+                border: '1.5px solid #2563eb',
+                fontWeight: 700,
+                fontSize: '12px',
+                padding: '7px 14px',
+                borderRadius: '8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 1px 3px rgba(37,99,235,0.12)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#eff6ff'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; }}
+              title="Opens or prints a single consolidated master PDF document with each campus starting on its own fresh page"
+            >
+              <span>⚡</span>
+              <span>Consolidated Master PDF (Print / Preview)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Individual Campus Download Buttons */}
+        {institutionGroups.length > 0 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '8px',
+            marginTop: '12px',
+            paddingTop: '10px',
+            borderTop: '1px solid #e2e8f0'
+          }}>
+            <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#475569', marginRight: '4px' }}>
+              Individual Campuses:
+            </span>
+            {institutionGroups.map(inst => (
+              <div
+                key={inst.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: '#ffffff',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '6px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                  overflow: 'hidden'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => downloadSingleInstitutionPdf({ instGroup: inst, from: data?.from || st?.from, to: data?.to || st?.to })}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '5px 10px',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = '#f0fdf4';
+                    e.currentTarget.style.color = '#15803d';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'none';
+                    e.currentTarget.style.color = '#0f172a';
+                  }}
+                  title={`Directly download standalone ${inst.name} PDF report (${inst.busesCount} buses, ${Number(inst.totalKm || 0).toLocaleString()} km)`}
+                >
+                  <span>📄</span>
+                  <span><b>{inst.short_name || inst.name}</b></span>
+                  <span style={{ fontSize: '10px', background: '#eff6ff', color: '#1e40af', border: '1px solid #dbeafe', padding: '1px 5px', borderRadius: '4px' }}>
+                    {inst.busesCount} {inst.busesCount === 1 ? 'bus' : 'buses'}
+                  </span>
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>
+                    &bull; {Number(inst.totalKm || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })} km
+                  </span>
+                  <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 800, marginLeft: '2px' }}>
+                    ↓ PDF
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadSingleInstitution(inst)}
+                  style={{
+                    background: '#f8fafc',
+                    borderLeft: '1px solid #e2e8f0',
+                    borderTop: 'none',
+                    borderRight: 'none',
+                    borderBottom: 'none',
+                    padding: '5px 7px',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    color: '#64748b'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = '#eff6ff';
+                    e.currentTarget.style.color = '#1d4ed8';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.color = '#64748b';
+                  }}
+                  title={`Print or preview ${inst.name} in browser print dialog`}
+                >
+                  🖨️
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Stat Cards - Screen Only */}
       <div className="cards-grid hide-on-print" style={{ marginBottom: 20 }}>
         <div className="stat-card">

@@ -456,7 +456,9 @@ exports.busWise = async (req, res) => {
     const buses = await query(`
       SELECT b.id AS bus_id,
              b.registration_number,
+             COALESCE(b.institution_id, (SELECT r3.institution_id FROM routes r3 JOIN assignments a4 ON a4.route_id = r3.id WHERE a4.bus_id = b.id LIMIT 1)) AS institution_id,
              COALESCE(GROUP_CONCAT(DISTINCT i.short_name ORDER BY i.short_name SEPARATOR ', '), '—') AS institution,
+             COALESCE(GROUP_CONCAT(DISTINCT i.name ORDER BY i.name SEPARATOR ', '), '—') AS institution_name,
              COUNT(tl.id) AS total_trips,
              SUM(tl.end_km - tl.start_km) AS total_km,
              
@@ -523,7 +525,9 @@ exports.busWise = async (req, res) => {
              tl.end_stop,
              tl.start_time,
              tl.end_time,
+             COALESCE(r.institution_id, b.institution_id) AS institution_id,
              COALESCE(i.short_name, '—') AS institution,
+             COALESCE(i.name, i.short_name, '—') AS institution_name,
              COALESCE(r.route_code, '—') AS route_code,
              COALESCE(r.route_name, '—') AS route_name,
              COALESCE(dr.name, u.name, '—') AS driver_name
