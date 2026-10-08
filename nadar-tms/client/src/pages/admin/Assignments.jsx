@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../../api/api';
 import { useToast } from '../../components/UI/Toast';
 import { useAuth } from '../../context/AuthContext';
@@ -93,16 +93,16 @@ const COLUMNS = [
   { key: 'registration_number', label: 'Bus', mono: true },
   { key: 'driver_name', label: 'Driver' },
   { key: 'incharge_name', label: 'Bus Incharge' },
-];
-
-function SearchableSelect({ label, value, options, onChange, placeholder = "Search...", emptyText = "—", currentDriverName }) {
+];function SearchableSelect({ label, value, options, onChange, placeholder = "Search...", emptyText = "—", currentDriverName }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [focusedIndex, setFocusedIndex] = useState(0); // 0 is emptyText, 1+ are filteredOptions
-  
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const containerRef = useRef(null);
+  const inputRef = useRef(null);
+
   const selectedOption = options.find(o => String(o.value) === String(value));
   const activeDriverName = currentDriverName !== undefined ? currentDriverName : (selectedOption?.driver_name || '');
-  
+
   const filteredOptions = options.filter(o => {
     const q = search.toLowerCase().trim();
     if (!q) return true;
@@ -113,72 +113,134 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
       (o.driver_name || '').toLowerCase().includes(q)
     );
   });
-  
+
+  // Handle outside clicks seamlessly across all dropdowns
   useEffect(() => {
     if (!isOpen) return;
-    const handleOutsideClick = () => setIsOpen(false);
-    document.addEventListener('click', handleOutsideClick);
-    return () => document.removeEventListener('click', handleOutsideClick);
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setSearch('');
+        setFocusedIndex(-1);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isOpen]);
+
+  // Focus input when opened
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    } else {
+      setSearch('');
+      setFocusedIndex(-1);
+    }
   }, [isOpen]);
 
   useEffect(() => {
-    setFocusedIndex(0);
+    setFocusedIndex(-1);
   }, [search]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setFocusedIndex(prev => (prev + 1) % (filteredOptions.length + 1));
+      setFocusedIndex(prev => {
+        if (filteredOptions.length === 0) return -1;
+        return (prev + 1) % filteredOptions.length;
+      });
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setFocusedIndex(prev => (prev - 1 + filteredOptions.length + 1) % (filteredOptions.length + 1));
+      setFocusedIndex(prev => {
+        if (filteredOptions.length === 0) return -1;
+        return (prev - 1 + filteredOptions.length) % filteredOptions.length;
+      });
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (focusedIndex === 0) {
-        onChange('');
-      } else {
-        const option = filteredOptions[focusedIndex - 1];
-        if (option) onChange(option.value, option);
+      if (focusedIndex >= 0 && focusedIndex < filteredOptions.length) {
+        const option = filteredOptions[focusedIndex];
+        onChange(option.value, option);
+        setIsOpen(false);
+        setSearch('');
+      } else if (filteredOptions.length === 1) {
+        const option = filteredOptions[0];
+        onChange(option.value, option);
+        setIsOpen(false);
+        setSearch('');
       }
-      setIsOpen(false);
-      setSearch('');
     } else if (e.key === 'Escape') {
       setIsOpen(false);
+      setSearch('');
     }
   };
 
-  const toggleDropdown = (e) => {
-    e.stopPropagation();
-    setIsOpen(!isOpen);
-  };
-
   return (
-    <label className="flabel" onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: 0 }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{label}</span>
-      <div style={{ position: 'relative' }}>
-        <div 
-          className="fselect" 
-          onClick={toggleDropdown}
-          style={{ 
-            cursor: 'pointer', 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            background: '#ffffff',
-            border: isOpen ? '1.5px solid #2563eb' : '1.5px solid #cbd5e1',
-            borderRadius: '8px',
-            padding: '9px 12px',
-            minHeight: '40px',
-            boxShadow: isOpen ? '0 0 0 3px rgba(37,99,235,0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
-            transition: 'all 0.15s ease'
-          }}
-        >
+    <div
+      ref={containerRef}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        margin: 0,
+        position: 'relative',
+        zIndex: isOpen ? 60 : 1
+      }}
+    >
+      {label && (
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>
+          {label}
+        </div>
+      )}
+
+      {/* Select Trigger */}
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: '#ffffff',
+          border: isOpen ? '1.5px solid #2563eb' : '1.5px solid #cbd5e1',
+          borderRadius: '8px',
+          padding: '8px 12px',
+          minHeight: '42px',
+          boxShadow: isOpen ? '0 0 0 3px rgba(37,99,235,0.14)' : '0 1px 2px rgba(0,0,0,0.03)',
+          transition: 'all 0.15s ease',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0, marginRight: 8, overflow: 'hidden' }}>
           {selectedOption ? (
             selectedOption.driver_name !== undefined ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <AssignIcon name="bus" size={14} color="#1d4ed8" /> {selectedOption.registration_number || selectedOption.label.split(' · ')[0]}
+              /* Bus option rendering */
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    fontWeight: 800,
+                    fontFamily: 'JetBrains Mono, monospace',
+                    color: '#1d4ed8',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 13
+                  }}
+                >
+                  <AssignIcon name="bus" size={14} color="#1d4ed8" />
+                  {selectedOption.registration_number || (selectedOption.label ? selectedOption.label.split(' · ')[0] : '')}
                 </span>
+                {selectedOption.vehicle_type === 'winger' && (
+                  <span style={{ fontSize: 9.5, fontWeight: 700, background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe', padding: '1px 5px', borderRadius: 3 }}>
+                    Winger
+                  </span>
+                )}
+                {selectedOption.vehicle_type === 'tractor' && (
+                  <span style={{ fontSize: 9.5, fontWeight: 700, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '1px 5px', borderRadius: 3 }}>
+                    Tractor
+                  </span>
+                )}
                 {activeDriverName ? (
                   <span
                     style={{
@@ -194,110 +256,299 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                       gap: 4
                     }}
                   >
-                    <AssignIcon name="user" size={11} color="#1d4ed8" /> {activeDriverName}
+                    <AssignIcon name="user" size={11} color="#1d4ed8" />
+                    {activeDriverName}
                   </span>
                 ) : (
-                  <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>
-                    (Standby)
+                  <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 6px', borderRadius: 4 }}>
+                    Standby
                   </span>
                 )}
               </div>
             ) : (
-              <span style={{ fontWeight: 600, color: '#0f172a' }}>{selectedOption.label}</span>
+              /* Driver / Incharge / Route rendering */
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                <span
+                  style={{
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    fontSize: 13,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {selectedOption.label}
+                </span>
+              </div>
             )
           ) : (
-            <span style={{ color: '#94a3b8' }}>{emptyText}</span>
+            <span style={{ color: '#94a3b8', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+              {emptyText}
+            </span>
           )}
-          <span style={{ fontSize: '10px', color: '#64748b', marginLeft: 8 }}>▼</span>
         </div>
-        
-        {isOpen && (
-          <div 
-            style={{ 
-              position: 'absolute', 
-              top: '100%', 
-              left: 0, 
-              right: 0, 
-              background: '#ffffff', 
-              border: '1.5px solid #e2e8f0', 
-              borderRadius: '8px',
-              boxShadow: '0 12px 28px -4px rgba(0,0,0,0.18)',
-              zIndex: 1000,
-              marginTop: '4px',
-              padding: '6px',
-              maxHeight: '280px',
-              display: 'flex',
-              flexDirection: 'column'
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {value && (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange('');
+                setSearch('');
+              }}
+              title="Clear selection"
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#94a3b8',
+                cursor: 'pointer',
+                background: '#f1f5f9',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#fee2e2';
+                e.currentTarget.style.color = '#ef4444';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f1f5f9';
+                e.currentTarget.style.color = '#94a3b8';
+              }}
+            >
+              ✕
+            </span>
+          )}
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={isOpen ? '#2563eb' : '#64748b'}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease'
             }}
           >
-            <input 
-              type="text" 
-              className="fselect"
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Dropdown Menu Popup */}
+      {isOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 5px)',
+            left: 0,
+            right: 0,
+            background: '#ffffff',
+            border: '1.5px solid #cbd5e1',
+            borderRadius: '10px',
+            boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.18), 0 4px 10px -2px rgba(15, 23, 42, 0.08)',
+            zIndex: 1050,
+            padding: '8px',
+            maxHeight: '320px',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          {/* Search Box with Search Icon */}
+          <div style={{ position: 'relative', marginBottom: 6 }}>
+            <span
+              style={{
+                position: 'absolute',
+                left: 10,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#94a3b8',
+                pointerEvents: 'none',
+                display: 'flex'
+              }}
+            >
+              <AssignIcon name="search" size={13} color="#94a3b8" />
+            </span>
+            <input
+              ref={inputRef}
+              type="text"
               placeholder={placeholder}
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={handleKeyDown}
-              autoFocus
-              style={{ 
-                marginBottom: '6px', 
-                width: '100%', 
+              style={{
+                width: '100%',
                 boxSizing: 'border-box',
-                padding: '7px 9px',
-                fontSize: '13px'
+                padding: '8px 28px 8px 30px',
+                fontSize: '13px',
+                borderRadius: '6px',
+                border: '1.5px solid #cbd5e1',
+                outline: 'none',
+                background: '#f8fafc',
+                color: '#0f172a',
+                transition: 'border-color 0.15s, background-color 0.15s'
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = '#2563eb';
+                e.target.style.background = '#ffffff';
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = '#cbd5e1';
+                e.target.style.background = '#f8fafc';
               }}
               onClick={e => e.stopPropagation()}
             />
-            <div style={{ overflowY: 'auto', flex: 1 }}>
-              <div 
-                style={{ 
-                  padding: '6px 8px', 
-                  cursor: 'pointer', 
-                  fontSize: '13px',
-                  borderRadius: '3px',
-                  background: focusedIndex === 0 ? 'var(--paper-2)' : 'transparent',
-                  fontWeight: !value ? '600' : 'normal',
-                  color: 'var(--text-dim)'
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  inputRef.current?.focus();
                 }}
-                onClick={() => { onChange(''); setIsOpen(false); setSearch(''); }}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 2,
+                  color: '#94a3b8',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
               >
-                {emptyText}
+                <AssignIcon name="x" size={12} color="#94a3b8" />
+              </button>
+            )}
+          </div>
+
+          {/* Counts and Quick Actions */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '2px 6px 6px 6px',
+              borderBottom: '1px solid #f1f5f9',
+              marginBottom: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#64748b'
+            }}
+          >
+            <span>{filteredOptions.length} available</span>
+            {value && (
+              <span
+                onClick={() => {
+                  onChange('');
+                  setIsOpen(false);
+                  setSearch('');
+                }}
+                style={{
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700
+                }}
+              >
+                Clear selection
+              </span>
+            )}
+          </div>
+
+          {/* Options List */}
+          <div style={{ overflowY: 'auto', maxHeight: '220px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {!search && (
+              <div
+                onClick={() => {
+                  onChange('');
+                  setIsOpen(false);
+                  setSearch('');
+                }}
+                onMouseEnter={() => setFocusedIndex(-1)}
+                style={{
+                  padding: '7px 10px',
+                  cursor: 'pointer',
+                  fontSize: '12.5px',
+                  borderRadius: '6px',
+                  color: !value ? '#2563eb' : '#64748b',
+                  background: !value ? '#eff6ff' : 'transparent',
+                  border: !value ? '1px solid #bfdbfe' : '1px solid transparent',
+                  fontWeight: !value ? 700 : 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: 'background-color 0.12s'
+                }}
+              >
+                <span>{emptyText}</span>
+                {!value && <span style={{ color: '#2563eb', fontWeight: 800 }}>✓</span>}
               </div>
-              {filteredOptions.map((o, sIndex) => {
-                const isFocused = sIndex === (focusedIndex - 1);
+            )}
+
+            {filteredOptions.length === 0 ? (
+              <div style={{ padding: '16px 12px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                No matching options found
+              </div>
+            ) : (
+              filteredOptions.map((o, idx) => {
+                const isFocused = idx === focusedIndex;
                 const isSelected = String(o.value) === String(value);
-                const bg = isFocused 
-                  ? 'var(--paper-2)' 
-                  : isSelected 
-                    ? 'var(--marigold-soft)' 
-                    : 'transparent';
 
                 return (
-                  <div 
-                    key={o.value} 
-                    style={{ 
-                      padding: '7px 10px', 
-                      cursor: 'pointer', 
+                  <div
+                    key={o.value}
+                    onMouseEnter={() => setFocusedIndex(idx)}
+                    onClick={() => {
+                      onChange(o.value, o);
+                      setIsOpen(false);
+                      setSearch('');
+                    }}
+                    style={{
+                      padding: '7px 10px',
+                      cursor: 'pointer',
                       fontSize: '13px',
-                      borderRadius: '4px',
-                      background: bg,
-                      color: isSelected ? 'var(--navy)' : 'inherit',
-                      fontWeight: isSelected ? '600' : 'normal',
+                      borderRadius: '6px',
+                      background: isSelected
+                        ? '#eff6ff'
+                        : isFocused
+                          ? '#f8fafc'
+                          : 'transparent',
+                      border: isSelected ? '1px solid #bfdbfe' : '1px solid transparent',
+                      color: isSelected ? '#1e40af' : '#1e293b',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: 8,
-                      borderBottom: '1px solid rgba(0,0,0,0.03)'
+                      transition: 'background-color 0.12s'
                     }}
-                    onClick={() => { onChange(o.value, o); setIsOpen(false); setSearch(''); }}
                   >
                     {o.driver_name !== undefined ? (
+                      /* Bus Option */
                       <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flex: 1 }}>
                           <span style={{ fontSize: 13 }}>
                             {o.vehicle_type === 'tractor' ? '🚜' : o.vehicle_type === 'winger' ? '🚐' : '🚌'}
                           </span>
-                          <span style={{ fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: isSelected ? '#1d4ed8' : '#0f172a' }}>
-                            {o.registration_number || o.label.split(' · ')[0]}
+                          <span
+                            style={{
+                              fontWeight: 800,
+                              fontFamily: 'JetBrains Mono, monospace',
+                              color: isSelected ? '#1d4ed8' : '#0f172a',
+                              fontSize: 13
+                            }}
+                          >
+                            {o.registration_number || (o.label ? o.label.split(' · ')[0] : '')}
                           </span>
                           {o.vehicle_type === 'winger' && (
                             <span style={{ fontSize: 9.5, fontWeight: 700, background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe', padding: '1px 5px', borderRadius: 3 }}>
@@ -306,7 +557,7 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                           )}
                           {o.vehicle_type === 'tractor' && (
                             <span style={{ fontSize: 9.5, fontWeight: 700, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '1px 5px', borderRadius: 3 }}>
-                              Tractor (Non-Route)
+                              Tractor
                             </span>
                           )}
                         </div>
@@ -315,9 +566,9 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                             style={{
                               fontSize: 11,
                               fontWeight: 700,
-                              background: '#eff6ff',
-                              color: '#1d4ed8',
-                              border: '1px solid #bfdbfe',
+                              background: isSelected ? '#dbeafe' : '#f1f5f9',
+                              color: isSelected ? '#1e40af' : '#475569',
+                              border: '1px solid #cbd5e1',
                               padding: '2px 8px',
                               borderRadius: 4,
                               display: 'inline-flex',
@@ -326,7 +577,8 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                               whiteSpace: 'nowrap'
                             }}
                           >
-                            <span>👤</span> {o.driver_name}
+                            <AssignIcon name="user" size={11} color={isSelected ? '#1e40af' : '#475569'} />
+                            <span>{o.driver_name}</span>
                           </span>
                         ) : (
                           <span
@@ -346,21 +598,30 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                         )}
                       </>
                     ) : (
-                      <span>{o.label}</span>
+                      /* Driver / Incharge / General Option */
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+                        <span
+                          style={{
+                            fontWeight: isSelected ? 700 : 500,
+                            color: isSelected ? '#1d4ed8' : '#0f172a'
+                          }}
+                        >
+                          {o.label}
+                        </span>
+                      </div>
+                    )}
+
+                    {isSelected && (
+                      <span style={{ color: '#2563eb', fontWeight: 800, fontSize: 13, marginLeft: 4 }}>✓</span>
                     )}
                   </div>
                 );
-              })}
-              {filteredOptions.length === 0 && (
-                <div style={{ padding: '8px', color: 'var(--text-dim)', fontSize: '13px', fontStyle: 'italic', textAlign: 'center' }}>
-                  No matching options found
-                </div>
-              )}
-            </div>
+              })
+            )}
           </div>
-        )}
-      </div>
-    </label>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1731,13 +1992,15 @@ export default function Assignments() {
             border: '1.5px solid #e2e8f0',
             boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04)',
             marginBottom: 28,
-            overflow: 'hidden',
+            overflow: 'visible',
             position: 'relative'
           }}
         >
           {/* Top Decorative Gradient Accent Line */}
           <div style={{
             height: 4,
+            borderTopLeftRadius: 13,
+            borderTopRightRadius: 13,
             background: form.route_id
               ? 'linear-gradient(90deg, #3b82f6, #6366f1, #a855f7)'
               : 'linear-gradient(90deg, #2563eb, #3b82f6, #06b6d4)'
@@ -2289,7 +2552,7 @@ export default function Assignments() {
                       options={inchargeOptions}
                       onChange={val => setForm(prev => ({ ...prev, incharge_id: val }))}
                       placeholder="Search faculty incharge name..."
-                      emptyText="Select incharge (optional)..."
+                      emptyText="Select incharge..."
                     />
                   </div>
                 </div>
@@ -2407,7 +2670,7 @@ export default function Assignments() {
                       options={inchargeOptions}
                       onChange={val => setForm(prev => ({ ...prev, incharge_id: val }))}
                       placeholder="Search faculty incharge name..."
-                      emptyText="Select incharge (optional)..."
+                      emptyText="Select incharge..."
                     />
                   </div>
                 </div>
@@ -2420,6 +2683,8 @@ export default function Assignments() {
             padding: '16px 24px',
             background: '#f8fafc',
             borderTop: '1px solid #e2e8f0',
+            borderBottomLeftRadius: 13,
+            borderBottomRightRadius: 13,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',

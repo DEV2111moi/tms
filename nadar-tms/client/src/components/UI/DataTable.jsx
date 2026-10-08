@@ -93,21 +93,108 @@ export default function DataTable({
                   ))}
                   {showActions && (
                     <td style={{ textAlign: 'center' }}>
-                      <div className="row-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <div className="row-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                         {extraAction && extraAction(item, i)}
                         {onMasterEdit && (
                           <button
-                            className="icon-btn"
+                            type="button"
                             title={t('Edit')}
                             onClick={() => onMasterEdit(item)}
-                            style={{ color: '#d97706', fontSize: 14 }}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: 6,
+                              border: '1px solid #fed7aa',
+                              background: '#fffbeb',
+                              color: '#d97706',
+                              cursor: 'pointer',
+                              fontSize: 13
+                            }}
                           >
                             ⚡
                           </button>
                         )}
-                        {onPdf && <button className="icon-btn" title={t('Print')} onClick={() => onPdf(item)}>🖨</button>}
-                        {onEdit && <button className="icon-btn" title={t('Edit')} onClick={() => onEdit(item)}>✎</button>}
-                        {onDelete && <button className="icon-btn icon-btn--danger" title={t('Delete')} onClick={() => onDelete(item)}>🗑</button>}
+                        {onPdf && (
+                          <button
+                            type="button"
+                            title={t('Print')}
+                            onClick={() => onPdf(item)}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: 6,
+                              border: '1px solid #e2e8f0',
+                              background: '#ffffff',
+                              color: '#475569',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+                            </svg>
+                          </button>
+                        )}
+                        {onEdit && (
+                          <button
+                            type="button"
+                            title={t('Edit')}
+                            onClick={() => onEdit(item)}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: 6,
+                              border: '1px solid #e2e8f0',
+                              background: '#ffffff',
+                              color: '#2563eb',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                          </button>
+                        )}
+                        {onDelete && (
+                          <button
+                            type="button"
+                            title={t('Delete')}
+                            onClick={() => onDelete(item)}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: 6,
+                              border: '1px solid #e2e8f0',
+                              background: '#ffffff',
+                              color: '#dc2626',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#fca5a5'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     </td>
                   )}

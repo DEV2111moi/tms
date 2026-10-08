@@ -845,23 +845,21 @@ export default function Buses() {
         const vtype = (item.vehicle_type || 'bus').toLowerCase();
         const isTractor = vtype === 'tractor';
         const isWinger = vtype === 'winger';
-        const isBus = vtype === 'bus';
 
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <span
                 style={{
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'monospace',
                   fontWeight: 800,
                   fontSize: 13,
-                  letterSpacing: '0.6px',
-                  color: isTractor ? '#92400e' : isWinger ? '#5b21b6' : '#1e293b',
-                  background: isTractor ? '#fef3c7' : isWinger ? '#f5f3ff' : '#f8fafc',
-                  border: isTractor ? '1.5px solid #fde68a' : isWinger ? '1.5px solid #ddd6fe' : '1.5px solid #cbd5e1',
+                  letterSpacing: '0.04em',
+                  color: '#0f172a',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
                   padding: '2px 8px',
-                  borderRadius: 5,
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  borderRadius: 6
                 }}
               >
                 {val}
@@ -869,11 +867,11 @@ export default function Buses() {
               {item.bus_code && (
                 <span
                   style={{
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    background: '#f5f3ff',
-                    color: '#7c6cfc',
-                    border: '1px solid #ddd6fe',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#64748b',
+                    background: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
                     padding: '1px 6px',
                     borderRadius: 4
                   }}
@@ -883,94 +881,43 @@ export default function Buses() {
               )}
             </div>
 
-            {/* Quick Type Changer Dropdown */}
+            {/* Quick Type Changer Dropdown Pill */}
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
-              <select
-                value={vtype}
-                onClick={e => e.stopPropagation()}
-                onChange={e => handleQuickTypeChange(item.id, e.target.value, item.registration_number)}
-                title="Click to mark vehicle as Bus, Winger, Tractor, Mini Bus, or Van"
-                style={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.3px',
-                  padding: '2px 6px',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  height: 25,
-                  border: isTractor
-                    ? '1.5px solid #f59e0b'
-                    : isWinger
-                    ? '1.5px solid #8b5cf6'
-                    : vtype === 'mini_bus'
-                    ? '1.5px solid #06b6d4'
-                    : vtype === 'van'
-                    ? '1.5px solid #64748b'
-                    : '1.5px solid #3b82f6',
-                  background: isTractor
-                    ? '#fffbeb'
-                    : isWinger
-                    ? '#f5f3ff'
-                    : vtype === 'mini_bus'
-                    ? '#ecfeff'
-                    : vtype === 'van'
-                    ? '#f8fafc'
-                    : '#eff6ff',
-                  color: isTractor
-                    ? '#b45309'
-                    : isWinger
-                    ? '#6d28d9'
-                    : vtype === 'mini_bus'
-                    ? '#0e7490'
-                    : vtype === 'van'
-                    ? '#334155'
-                    : '#1d4ed8',
-                  outline: 'none',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                }}
-              >
-                <option value="bus">🚌 BUS (Route Fleet)</option>
-                <option value="winger">🚐 WINGER (Route / Relief)</option>
-                <option value="tractor">🚜 TRACTOR (Non-Route)</option>
-                <option value="mini_bus">🚐 MINI BUS</option>
-                <option value="van">🚙 VAN</option>
-              </select>
+              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                <select
+                  value={vtype}
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => handleQuickTypeChange(item.id, e.target.value, item.registration_number)}
+                  title="Click to change vehicle classification"
+                  style={{
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: '2px 20px 2px 7px',
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                    height: 22,
+                    border: '1px solid #e2e8f0',
+                    background: isTractor ? '#fffbeb' : isWinger ? '#f5f3ff' : vtype === 'mini_bus' ? '#ecfeff' : vtype === 'van' ? '#f8fafc' : '#eff6ff',
+                    color: isTractor ? '#b45309' : isWinger ? '#6d28d9' : vtype === 'mini_bus' ? '#0e7490' : vtype === 'van' ? '#475569' : '#1d4ed8',
+                    outline: 'none',
+                    lineHeight: '18px'
+                  }}
+                >
+                  <option value="bus">🚌 Bus</option>
+                  <option value="winger">🚐 Winger</option>
+                  <option value="tractor">🚜 Tractor</option>
+                  <option value="mini_bus">🚐 Mini Bus</option>
+                  <option value="van">🚙 Van</option>
+                </select>
+                <span style={{ position: 'absolute', right: 7, pointerEvents: 'none', fontSize: 8, opacity: 0.6, color: 'currentColor' }}>
+                  ▼
+                </span>
+              </div>
 
-              {isTractor && (
-                <span 
-                  style={{ 
-                    fontSize: 9.5, 
-                    fontWeight: 700, 
-                    background: '#fee2e2', 
-                    color: '#b91c1c', 
-                    border: '1px solid #fca5a5', 
-                    padding: '1px 5px', 
-                    borderRadius: 4 
-                  }}
-                  title="Tractors cannot be assigned to student routes"
-                >
-                  Non-Route
-                </span>
-              )}
-              {isWinger && (
-                <span 
-                  style={{ 
-                    fontSize: 9.5, 
-                    fontWeight: 700, 
-                    background: '#ede9fe', 
-                    color: '#6d28d9', 
-                    border: '1px solid #ddd6fe', 
-                    padding: '1px 5px', 
-                    borderRadius: 4 
-                  }}
-                  title="Winger can be used for routes or relief duty"
-                >
-                  Relief / Route
-                </span>
-              )}
               {item.ownership_type && (
-                <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'capitalize' }}>
+                <span style={{ fontSize: 11, color: '#94a3b8', textTransform: 'capitalize' }}>
                   • {item.ownership_type}
                 </span>
               )}
@@ -982,18 +929,29 @@ export default function Buses() {
     {
       key: 'manufacturer',
       label: 'Make',
-      render: (_, item) => (
-        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-          {item.manufacturer || item.bus_model || '—'}
-        </span>
-      )
+      render: (_, item) => {
+        const raw = item.manufacturer || item.bus_model || '—';
+        const formatted = raw === '—' ? '—' : raw
+          .toLowerCase()
+          .split(' ')
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ')
+          .replace(/\bLtd\b/gi, 'Ltd')
+          .replace(/\bTata\b/gi, 'Tata');
+
+        return (
+          <span style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>
+            {formatted}
+          </span>
+        );
+      }
     },
     {
       key: 'capacity',
       label: 'Capacity',
       render: (val, item) => (
-        <span style={{ fontWeight: 700, color: '#1e293b', fontSize: 12.5, fontFamily: 'JetBrains Mono, monospace' }}>
-          {item.vehicle_type === 'tractor' ? 'Utility Unit' : val ? `${val} Seats` : '—'}
+        <span style={{ fontWeight: 500, color: '#475569', fontSize: 13 }}>
+          {item.vehicle_type === 'tractor' ? 'Utility' : val ? `${val} Seats` : '—'}
         </span>
       )
     },
@@ -1002,25 +960,28 @@ export default function Buses() {
       label: 'Fitness (FC)',
       render: (val) => {
         const fc = checkComplianceStatus(val);
-        if (!val) return <span style={{ color: '#94a3b8' }}>—</span>;
+        if (!val || fc.status === 'none') return <span style={{ color: '#94a3b8', fontSize: 13 }}>—</span>;
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1e293b' }}>
               {formatDate(val)}
             </span>
             <div>
               <span
                 style={{
-                  display: 'inline-block',
-                  fontSize: 10,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 10.5,
                   fontWeight: 700,
-                  padding: '1px 6px',
-                  borderRadius: 4,
+                  padding: '1px 7px',
+                  borderRadius: 12,
                   background: fc.bg,
                   color: fc.color,
                   border: `1px solid ${fc.border}`
                 }}
               >
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor' }} />
                 {fc.label}
               </span>
             </div>
@@ -1033,25 +994,28 @@ export default function Buses() {
       label: 'Insurance',
       render: (val) => {
         const ins = checkComplianceStatus(val);
-        if (!val) return <span style={{ color: '#94a3b8' }}>—</span>;
+        if (!val || ins.status === 'none') return <span style={{ color: '#94a3b8', fontSize: 13 }}>—</span>;
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1e293b' }}>
               {formatDate(val)}
             </span>
             <div>
               <span
                 style={{
-                  display: 'inline-block',
-                  fontSize: 10,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 10.5,
                   fontWeight: 700,
-                  padding: '1px 6px',
-                  borderRadius: 4,
+                  padding: '1px 7px',
+                  borderRadius: 12,
                   background: ins.bg,
                   color: ins.color,
                   border: `1px solid ${ins.border}`
                 }}
               >
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor' }} />
                 {ins.label}
               </span>
             </div>
@@ -1066,24 +1030,24 @@ export default function Buses() {
         const st = (val || 'active').toLowerCase();
         const isOk = st === 'active';
         const isRepair = st === 'repair';
+        const label = isOk ? 'Active' : isRepair ? 'In Repair' : 'Inactive';
         return (
           <span
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
-              padding: '2px 8px',
+              gap: 5,
+              padding: '2px 9px',
               borderRadius: 12,
-              fontSize: 11,
+              fontSize: 11.5,
               fontWeight: 700,
-              textTransform: 'uppercase',
-              background: isOk ? '#dcfce7' : isRepair ? '#fef3c7' : '#fee2e2',
-              color: isOk ? '#15803d' : isRepair ? '#b45309' : '#b91c1c',
-              border: `1px solid ${isOk ? '#86efac' : isRepair ? '#fde68a' : '#fca5a5'}`
+              background: isOk ? '#ecfdf5' : isRepair ? '#fef3c7' : '#fee2e2',
+              color: isOk ? '#059669' : isRepair ? '#b45309' : '#dc2626',
+              border: `1px solid ${isOk ? '#a7f3d0' : isRepair ? '#fde68a' : '#fca5a5'}`
             }}
           >
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
-            {val || 'active'}
+            {label}
           </span>
         );
       }
@@ -1102,22 +1066,23 @@ export default function Buses() {
               setExpandedId(prev => (prev === item.id ? null : item.id));
             }}
             style={{
-              padding: '3px 8px',
-              fontSize: 11,
-              fontWeight: 700,
-              background: isExp ? '#7c6cfc' : '#f5f3ff',
-              color: isExp ? '#ffffff' : '#7c6cfc',
-              border: '1px solid #ddd6fe',
-              borderRadius: 5,
+              padding: '3px 9px',
+              fontSize: 11.5,
+              fontWeight: 600,
+              borderRadius: 6,
+              background: isExp ? '#2563eb' : '#ffffff',
+              color: isExp ? '#ffffff' : '#475569',
+              border: isExp ? '1px solid #2563eb' : '1px solid #cbd5e1',
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
-            title="Toggle full vehicle database details"
+            title="Toggle full vehicle specifications"
           >
-            <BusIcon name="info" size={13} color={isExp ? '#fff' : '#7c6cfc'} />
-            {isExp ? 'Close' : 'Specs ▾'}
+            <span style={{ fontSize: 11 }}>📋</span>
+            <span>{isExp ? 'Close' : 'Specs ▾'}</span>
           </button>
         );
       }
@@ -1294,17 +1259,21 @@ export default function Buses() {
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              fontWeight: 700,
-              background: '#f5f3ff',
-              color: '#7c6cfc',
-              border: '1.5px solid #ddd6fe',
-              padding: '6px 12px',
-              borderRadius: 6,
-              cursor: 'pointer'
+              fontWeight: 600,
+              background: '#ffffff',
+              color: '#334155',
+              border: '1px solid #cbd5e1',
+              padding: '6px 13px',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontSize: 12.5,
+              transition: 'all 0.15s ease'
             }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#94a3b8'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
           >
-            <BusIcon name="file" size={15} color="#7c6cfc" />
-            <span>📄 Fleet Report (PDF) ▾</span>
+            <BusIcon name="file" size={14} color="#64748b" />
+            <span>Fleet Report (PDF) ▾</span>
           </button>
 
           <button 
@@ -1316,17 +1285,21 @@ export default function Buses() {
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              fontWeight: 700,
-              background: '#ecfdf5',
-              color: '#059669',
-              border: '1.5px solid #a7f3d0',
-              padding: '6px 12px',
-              borderRadius: 6,
-              cursor: 'pointer'
+              fontWeight: 600,
+              background: '#ffffff',
+              color: '#334155',
+              border: '1px solid #cbd5e1',
+              padding: '6px 13px',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontSize: 12.5,
+              transition: 'all 0.15s ease'
             }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#94a3b8'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
           >
-            <BusIcon name="download" size={15} color="#059669" />
-            <span>📥 Export CSV</span>
+            <BusIcon name="download" size={14} color="#64748b" />
+            <span>Export CSV</span>
           </button>
 
           {canEdit && (
@@ -1405,116 +1378,55 @@ export default function Buses() {
         </div>
 
         {/* Quick Vehicle Type Filter Chips */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-dim, #64748b)', marginRight: 4 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginRight: 4 }}>
             Vehicle Filter:
           </span>
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => setTypeFilter('all')}
-            style={{
-              padding: '4px 10px',
-              fontSize: 11.5,
-              fontWeight: 700,
-              borderRadius: 20,
-              background: typeFilter === 'all' ? '#7c6cfc' : '#ffffff',
-              color: typeFilter === 'all' ? '#ffffff' : '#334155',
-              border: typeFilter === 'all' ? '1px solid #7c6cfc' : '1px solid #cbd5e1',
-              cursor: 'pointer'
-            }}
-          >
-            All Fleet ({items.length})
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => setTypeFilter('bus')}
-            style={{
-              padding: '4px 10px',
-              fontSize: 11.5,
-              fontWeight: 700,
-              borderRadius: 20,
-              background: typeFilter === 'bus' ? '#1d4ed8' : '#ffffff',
-              color: typeFilter === 'bus' ? '#ffffff' : '#1d4ed8',
-              border: typeFilter === 'bus' ? '1px solid #1d4ed8' : '1px solid #bfdbfe',
-              cursor: 'pointer'
-            }}
-          >
-            🚌 Buses ({stats.busesCount})
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => setTypeFilter('winger')}
-            style={{
-              padding: '4px 10px',
-              fontSize: 11.5,
-              fontWeight: 700,
-              borderRadius: 20,
-              background: typeFilter === 'winger' ? '#7c3aed' : '#ffffff',
-              color: typeFilter === 'winger' ? '#ffffff' : '#7c3aed',
-              border: typeFilter === 'winger' ? '1px solid #7c3aed' : '1px solid #ddd6fe',
-              cursor: 'pointer'
-            }}
-          >
-            🚐 Wingers ({stats.wingersCount})
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => setTypeFilter('tractor')}
-            style={{
-              padding: '4px 10px',
-              fontSize: 11.5,
-              fontWeight: 700,
-              borderRadius: 20,
-              background: typeFilter === 'tractor' ? '#b45309' : '#ffffff',
-              color: typeFilter === 'tractor' ? '#ffffff' : '#b45309',
-              border: typeFilter === 'tractor' ? '1px solid #b45309' : '1px solid #fde68a',
-              cursor: 'pointer'
-            }}
-          >
-            🚜 Tractors ({stats.tractorsCount})
-          </button>
-          {stats.miniBusesCount > 0 && (
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => setTypeFilter('mini_bus')}
-              style={{
-                padding: '4px 10px',
-                fontSize: 11.5,
-                fontWeight: 700,
-                borderRadius: 20,
-                background: typeFilter === 'mini_bus' ? '#0f766e' : '#ffffff',
-                color: typeFilter === 'mini_bus' ? '#ffffff' : '#0f766e',
-                border: typeFilter === 'mini_bus' ? '1px solid #0f766e' : '1px solid #99f6e4',
-                cursor: 'pointer'
-              }}
-            >
-              🚐 Mini Buses ({stats.miniBusesCount})
-            </button>
-          )}
-          {stats.vansCount > 0 && (
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => setTypeFilter('van')}
-              style={{
-                padding: '4px 10px',
-                fontSize: 11.5,
-                fontWeight: 700,
-                borderRadius: 20,
-                background: typeFilter === 'van' ? '#475569' : '#ffffff',
-                color: typeFilter === 'van' ? '#ffffff' : '#475569',
-                border: typeFilter === 'van' ? '1px solid #475569' : '1px solid #cbd5e1',
-                cursor: 'pointer'
-              }}
-            >
-              🚙 Vans ({stats.vansCount})
-            </button>
-          )}
+          {[
+            { id: 'all', label: `All Fleet (${items.length})` },
+            { id: 'bus', label: `🚌 Buses (${stats.busesCount})`, count: stats.busesCount },
+            { id: 'mini_bus', label: `🚐 Mini Buses (${stats.miniBusesCount})`, count: stats.miniBusesCount },
+            { id: 'van', label: `🚙 Vans (${stats.vansCount})`, count: stats.vansCount },
+            { id: 'winger', label: `🚐 Wingers (${stats.wingersCount})`, count: stats.wingersCount },
+            { id: 'tractor', label: `🚜 Tractors (${stats.tractorsCount})`, count: stats.tractorsCount },
+          ].map(tab => {
+            const active = typeFilter === tab.id;
+            const isZero = tab.count === 0;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setTypeFilter(tab.id)}
+                style={{
+                  padding: '4px 12px',
+                  fontSize: 12,
+                  fontWeight: active ? 700 : 500,
+                  borderRadius: 20,
+                  background: active ? '#0f172a' : '#ffffff',
+                  color: active ? '#ffffff' : isZero ? '#94a3b8' : '#334155',
+                  border: active ? '1px solid #0f172a' : '1px solid #e2e8f0',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: active ? '0 1px 3px rgba(15,23,42,0.18)' : '0 1px 2px rgba(0,0,0,0.02)',
+                  opacity: isZero && !active ? 0.65 : 1
+                }}
+                onMouseEnter={e => {
+                  if (!active) {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!active) {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Toolbar & Filters */}
@@ -1577,26 +1489,30 @@ export default function Buses() {
           extraAction={(item) => (
             <button
               type="button"
-              className="icon-btn"
-              title={`Download / Print Dossier for ${item.registration_number}`}
+              title={`Download Technical Dossier for ${item.registration_number}`}
               onClick={(e) => {
                 e.stopPropagation();
                 handlePrintSingleBus(item);
               }}
               style={{
+                width: 28,
+                height: 28,
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#7c6cfc',
-                background: '#f5f3ff',
-                border: '1px solid #ddd6fe',
-                borderRadius: 5,
-                padding: '3px 6px',
+                borderRadius: 6,
+                border: '1px solid #e2e8f0',
+                background: '#ffffff',
+                color: '#475569',
                 cursor: 'pointer',
-                lineHeight: 1
+                transition: 'all 0.15s ease'
               }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#0f172a'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#475569'; }}
             >
-              <span style={{ fontSize: 13 }}>📥</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
             </button>
           )}
           renderSubRow={renderSubRow}
