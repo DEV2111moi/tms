@@ -27,8 +27,12 @@ const TABLES = {
     order: 'route_id, sequence',
   },
   maintenance_logs: {
-    cols: ['bus_id', 'service_date', 'service_type', 'cost', 'odometer', 'next_due_date', 'notes'],
+    cols: ['bus_id', 'service_date', 'service_type', 'cost', 'odometer', 'next_due_date', 'notes', 'bill_no', 'workshop_name', 'mechanic_name', 'labor_charges', 'parts_cost', 'parts_data'],
     order: 'service_date DESC',
+  },
+  inventory_items: {
+    cols: ['part_name', 'part_number', 'category', 'unit', 'unit_cost', 'quantity', 'min_stock_alert', 'supplier_name', 'invoice_no', 'purchase_date', 'notes'],
+    order: 'part_name ASC',
   },
   tyres: {
     cols: ['bus_id', 'tyre_position', 'tyre_brand', 'tyre_size', 'year_of_make', 'tyre_quality', 'serial_no', 'purchase_date', 'purchase_price', 'fitted_date', 'fitted_odometer_km', 'current_km_run', 'expected_life_km', 'condition_status', 'tyre_status', 'remarks'],

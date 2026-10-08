@@ -2957,5 +2957,442 @@ a.nav-item.active {
   text-overflow: ellipsis;
 }
 
+/* ==========================================================================
+   FLEET MAINTENANCE & SPARE PARTS INVENTORY - MODERN UI STYLES
+   ========================================================================== */
 
+.maint-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: maintFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes maintFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes maintSlideUp {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.maint-modal-card {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 
+    0 25px 50px -12px rgba(15, 23, 42, 0.25),
+    0 0 0 1px rgba(0, 0, 0, 0.07);
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: maintSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.maint-modal-header {
+  padding: 18px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.maint-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.maint-avatar-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.maint-avatar--blue {
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #2563eb;
+}
+
+.maint-avatar--green {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #059669;
+}
+
+.maint-avatar--indigo {
+  background: #eef2ff;
+  border: 1px solid #e0e7ff;
+  color: #4f46e5;
+}
+
+.maint-header-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.015em;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.maint-header-sub {
+  font-size: 12.5px;
+  color: #64748b;
+  margin-top: 3px;
+  font-weight: 400;
+}
+
+.maint-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 14px;
+}
+
+.maint-close-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+/* Modal Body & Forms */
+.maint-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  max-height: calc(88vh - 140px);
+}
+
+.maint-form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.maint-req {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.maint-input-field {
+  width: 100%;
+  height: 40px;
+  padding: 0 13px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: #0f172a;
+  background: #ffffff;
+  transition: all 0.15s ease;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.maint-input-field:hover {
+  border-color: #cbd5e1;
+}
+
+.maint-input-field:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.12);
+}
+
+/* Currency input adornment */
+.maint-currency-group {
+  display: flex;
+  align-items: stretch;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+  height: 40px;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.maint-currency-group:hover {
+  border-color: #cbd5e1;
+}
+
+.maint-currency-group:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.12);
+}
+
+.maint-currency-prefix {
+  padding: 0 12px;
+  background: #f8fafc;
+  border-right: 1.5px solid #e2e8f0;
+  font-weight: 700;
+  color: #64748b;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  user-select: none;
+}
+
+.maint-currency-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Quantity input group with unit suffix */
+.maint-qty-group {
+  display: flex;
+  align-items: stretch;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+  height: 40px;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.maint-qty-group:hover {
+  border-color: #cbd5e1;
+}
+
+.maint-qty-group:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.12);
+}
+
+.maint-qty-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.maint-qty-suffix {
+  padding: 0 12px;
+  background: #f8fafc;
+  border-left: 1.5px solid #e2e8f0;
+  font-weight: 600;
+  color: #64748b;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  user-select: none;
+}
+
+/* Modal Footer */
+.maint-modal-footer {
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.maint-btn-cancel {
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.maint-btn-cancel:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.maint-btn-primary {
+  padding: 9px 22px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.maint-btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.38);
+  transform: translateY(-1px);
+}
+
+.maint-btn-primary:active {
+  transform: translateY(0);
+}
+
+.maint-btn-emerald {
+  padding: 9px 22px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.28);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.maint-btn-emerald:hover {
+  background: linear-gradient(135deg, #047857, #065f46);
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.38);
+  transform: translateY(-1px);
+}
+
+.maint-btn-emerald:active {
+  transform: translateY(0);
+}
+
+/* TMHNU Job Card Slip Styling */
+.maint-btn-pink {
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid #fbcfe8;
+  background: #fdf2f8;
+  color: #be185d;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.maint-btn-pink:hover {
+  background: #fce7f3;
+  border-color: #f472b6;
+  color: #9d174d;
+  transform: translateY(-1px);
+}
+
+.tmhNU-jobcard-preview {
+  width: 100%;
+  max-width: 520px;
+  background: #ffccd5;
+  border: 2.5px solid #000;
+  padding: 8px 10px;
+  color: #000;
+  font-family: 'Times New Roman', Times, serif;
+  box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+  margin: 0 auto;
+}
+
+/* ========================================================================= */
+/* MULTILINGUAL TOPBAR & LANGUAGE SWITCHER STYLES                            */
+/* ========================================================================= */
+.top-head-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 54px;
+  background: #ffffff;
+  border-bottom: 1.5px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+}
+
+.lang-switcher-wrap {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 24px;
+  padding: 3px 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.lang-switcher-wrap:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Tamil font enhancements */
+body.lang-ta {
+  font-family: 'Mukta Malar', 'Noto Sans Tamil', 'Latha', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: 0.15px;
+}
+
+body.lang-ta .tbl th,
+body.lang-ta .page-title,
+body.lang-ta .nav-label,
+body.lang-ta .btn {
+  letter-spacing: normal;
+}
+
+@media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+  .top-head-bar {
+    padding: 0 16px;
+    height: 50px;
+  }
+}
 

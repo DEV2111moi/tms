@@ -2,11 +2,15 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import api from '../../api/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/UI/Toast';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSwitcher from '../../components/UI/LanguageSwitcher';
 import { useNavigate } from 'react-router-dom';
 
 export default function Attendance() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
+
   const toast = useToast();
 
   const [shift, setShift] = useState('morning1');
@@ -239,29 +243,31 @@ export default function Attendance() {
             </svg>
           </div>
           <div className="topbar-title-wrap">
-            <span className="topbar-kicker">TMHNU FLEET</span>
-            <span className="topbar-title">Live Attendance & Boarding</span>
+            <span className="topbar-kicker">{t('TMHNU FLEET') || 'TMHNU FLEET'}</span>
+            <span className="topbar-title">{t('Live Attendance & Boarding')}</span>
           </div>
         </div>
 
-        <div className="topbar-user-wrap">
+        <div className="topbar-user-wrap" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <LanguageSwitcher compact={true} />
           <div className="topbar-user-chip">
             <div className="topbar-avatar">{getInitials(user?.name)}</div>
             <div>
-              <div className="topbar-who">{user?.name || 'Incharge'}</div>
-              <div className="topbar-role-tag">Shift Supervisor</div>
+              <div className="topbar-who">{user?.name || t('Incharge')}</div>
+              <div className="topbar-role-tag">{t('Shift Supervisor')}</div>
             </div>
           </div>
-          <button className="signout-btn" onClick={handleLogout} title="Exit session">
+          <button className="signout-btn" onClick={handleLogout} title={t('Exit session')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
               <polyline points="16 17 21 12 16 7"/>
               <line x1="21" y1="12" x2="9" y2="12"/>
             </svg>
-            Exit
+            {t('Exit')}
           </button>
         </div>
       </header>
+
 
       {/* Session Header & Telemetry Banner */}
       <section className="attendance-session-banner">

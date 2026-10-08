@@ -1,4 +1,5 @@
 import React, { Fragment } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 export const money = (n) => '₹' + Math.round(n || 0).toLocaleString('en-IN');
@@ -18,11 +19,13 @@ export default function DataTable({
   emptyText,
   showSerial = true
 }) {
+  const { t } = useLanguage();
+
   if (!data?.length) {
     return (
       <div className="empty">
         <div className="empty-icon">{emptyIcon || '📋'}</div>
-        <p>{emptyText || 'No records found.'}</p>
+        <p>{t(emptyText || 'No records found.')}</p>
       </div>
     );
   }
@@ -42,7 +45,7 @@ export default function DataTable({
     if (col.mono) return <span className="mono">{val ?? '—'}</span>;
     if (col.tag) {
       const cls = val === 'active' ? 'tag--ok' : val === 'repair' ? 'tag--warn' : val === 'breakdown' ? 'tag--off' : 'tag--off';
-      return <span className={`tag ${cls}`}>{val || '—'}</span>;
+      return <span className={`tag ${cls}`}>{t(val || '—')}</span>;
     }
     return val ?? '—';
   };
@@ -58,15 +61,15 @@ export default function DataTable({
           <tr>
             {displaySerial && (
               <th style={{ width: 55, textAlign: 'center', fontWeight: 700, fontSize: 11, letterSpacing: '0.5px' }}>
-                S.NO
+                {t('S.No')}
               </th>
             )}
             {columns.map((c, i) => (
               <th key={i} style={c.key === 'sno' || c.key === 'serial' ? { width: c.width || 55, textAlign: 'center' } : undefined}>
-                {c.label}
+                {t(c.label)}
               </th>
             ))}
-            {showActions && <th style={{ textAlign: 'center' }}>Action</th>}
+            {showActions && <th style={{ textAlign: 'center' }}>{t('Action')}</th>}
           </tr>
         </thead>
         <tbody>
@@ -95,16 +98,16 @@ export default function DataTable({
                         {onMasterEdit && (
                           <button
                             className="icon-btn"
-                            title="⚡ Master Edit (Driver, Bus, Route, Institution)"
+                            title={t('Edit')}
                             onClick={() => onMasterEdit(item)}
                             style={{ color: '#d97706', fontSize: 14 }}
                           >
                             ⚡
                           </button>
                         )}
-                        {onPdf && <button className="icon-btn" title="Profile PDF" onClick={() => onPdf(item)}>🖨</button>}
-                        {onEdit && <button className="icon-btn" title="Edit Full Profile" onClick={() => onEdit(item)}>✎</button>}
-                        {onDelete && <button className="icon-btn icon-btn--danger" title="Delete Driver" onClick={() => onDelete(item)}>🗑</button>}
+                        {onPdf && <button className="icon-btn" title={t('Print')} onClick={() => onPdf(item)}>🖨</button>}
+                        {onEdit && <button className="icon-btn" title={t('Edit')} onClick={() => onEdit(item)}>✎</button>}
+                        {onDelete && <button className="icon-btn icon-btn--danger" title={t('Delete')} onClick={() => onDelete(item)}>🗑</button>}
                       </div>
                     </td>
                   )}

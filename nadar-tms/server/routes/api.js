@@ -14,6 +14,7 @@ const notifs = require('../controllers/notificationController');
 const upload = require('../controllers/uploadController');
 const salary = require('../controllers/salaryController');
 const substitution = require('../controllers/substitutionController');
+const maintenance = require('../controllers/maintenanceController');
 
 // ---- Auth (public) ----
 router.post('/auth/login', auth.login);
@@ -30,13 +31,20 @@ router.post('/attendance/submit', authenticate, requireRole('incharge', 'admin')
 router.post('/trips/:tripId/location', authenticate, requireRole('incharge', 'driver', 'admin'), fleet.pushLocation);
 
 // ---- Entry modules (admin only): buses, drivers, students, routes, stops, etc. ----
-['institutions', 'buses', 'drivers', 'students', 'routes', 'stops', 'maintenance_logs', 'tyres'].forEach((t) => {
+['institutions', 'buses', 'drivers', 'students', 'routes', 'stops', 'maintenance_logs', 'tyres', 'inventory_items'].forEach((t) => {
   const writers = (t === 'students' || t === 'routes' || t === 'stops') ? ['admin', 'institution'] : ['admin'];
   router.get(`/${t}`, authenticate, crud.list(t));
   router.post(`/${t}`, authenticate, requireRole(...writers), crud.create(t));
   router.put(`/${t}/:id`, authenticate, requireRole(...writers), crud.update(t));
   router.delete(`/${t}/:id`, authenticate, requireRole(...writers), crud.remove(t));
 });
+
+// ---- Maintenance & Spare Parts Inventory Specialized Endpoints ----
+router.post('/maintenance/record', authenticate, requireRole('admin', 'institution'), maintenance.saveMaintenanceWithParts);
+router.put('/maintenance/record/:id', authenticate, requireRole('admin', 'institution'), maintenance.updateMaintenanceWithParts);
+router.delete('/maintenance/record/:id', authenticate, requireRole('admin', 'institution'), maintenance.deleteMaintenanceWithParts);
+router.get('/inventory/stats', authenticate, requireRole('admin', 'executive', 'institution'), maintenance.getInventoryStats);
+router.post('/inventory/restock', authenticate, requireRole('admin', 'institution'), maintenance.restockItem);
 
 // Driver Master Edit & Add (Driver Name, Bus No, Route, Institution)
 router.put('/drivers/:id/master-edit', authenticate, requireRole('admin'), fleet.driverMasterEdit);

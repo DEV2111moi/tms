@@ -1,7 +1,9 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useState, useEffect } from 'react';
 import api from '../../api/api';
+
 
 function NavIcon({ name, className = "nav-icon-svg" }) {
   switch (name) {
@@ -107,6 +109,14 @@ function NavIcon({ name, className = "nav-icon-svg" }) {
           <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
         </svg>
       );
+    case 'box':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+          <line x1="12" y1="22.08" x2="12" y2="12" />
+        </svg>
+      );
     case 'tyre':
       return (
         <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -164,6 +174,16 @@ function NavIcon({ name, className = "nav-icon-svg" }) {
           <line x1="21" y1="12" x2="9" y2="12" />
         </svg>
       );
+    case 'card':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+          <rect x="8" y="2" width="8" height="4" rx="1" />
+          <path d="M9 14h6" />
+          <path d="M9 18h6" />
+          <path d="M9 10h6" />
+        </svg>
+      );
     case 'external':
       return (
         <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -213,7 +233,9 @@ const GROUPS_ADMIN = [
     title: 'Fleet & Maintenance',
     items: [
       { to: '/admin/diesel', icon: 'fuel', label: 'Diesel Usage' },
-      { to: '/admin/maintenance', icon: 'wrench', label: 'Maintenance' },
+      { to: '/admin/maintenance', icon: 'wrench', label: 'Maintenance & Billing' },
+      { to: '/admin/job-cards', icon: 'card', label: 'Job Cards (Bus-Wise)' },
+      { to: '/admin/inventory', icon: 'box', label: 'Spare Parts Inventory' },
       { to: '/admin/tyres', icon: 'tyre', label: 'Tyres' },
       { to: '/admin/alerts', icon: 'alert', label: 'FC Alerts', badge: true },
     ],
@@ -272,7 +294,9 @@ const GROUPS_EXEC = [
     title: 'Fleet & Maintenance',
     items: [
       { to: '/admin/diesel', icon: 'fuel', label: 'Diesel Usage' },
-      { to: '/admin/maintenance', icon: 'wrench', label: 'Maintenance' },
+      { to: '/admin/maintenance', icon: 'wrench', label: 'Maintenance & Billing' },
+      { to: '/admin/job-cards', icon: 'card', label: 'Job Cards (Bus-Wise)' },
+      { to: '/admin/inventory', icon: 'box', label: 'Spare Parts Inventory' },
       { to: '/admin/tyres', icon: 'tyre', label: 'Tyres' },
       { to: '/admin/alerts', icon: 'alert', label: 'FC Alerts', badge: true },
     ],
@@ -281,6 +305,7 @@ const GROUPS_EXEC = [
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [alertCount, setAlertCount] = useState(0);
 
@@ -322,14 +347,14 @@ export default function Sidebar() {
             </svg>
           </div>
           <div className="brand-titles">
-            <span className="brand-kicker">THENI CENTRAL</span>
+            <span className="brand-kicker">{t('THENI CENTRAL')}</span>
             <span className="brand-name">TMHNU</span>
           </div>
         </div>
 
         <div className="sidebar-status-pill">
           <span className="status-dot"></span>
-          <span>{portalName}</span>
+          <span>{t(portalName)}</span>
         </div>
       </div>
 
@@ -337,7 +362,7 @@ export default function Sidebar() {
       <nav className="sidebar-nav">
         {groups.map((group) => (
           <div key={group.title} className="nav-group">
-            <div className="nav-group-label">{group.title}</div>
+            <div className="nav-group-label">{t(group.title)}</div>
             {group.items.map((item) => (
               <NavLink
                 key={item.to}
@@ -348,7 +373,7 @@ export default function Sidebar() {
                 <div className="nav-icon-wrap">
                   <NavIcon name={item.icon} />
                 </div>
-                <span className="nav-label">{item.label}</span>
+                <span className="nav-label">{t(item.label)}</span>
                 {item.badge && alertCount > 0 && (
                   <span className="nav-badge">{alertCount}</span>
                 )}
@@ -365,18 +390,18 @@ export default function Sidebar() {
             {getInitials(user?.name)}
           </div>
           <div className="sidebar-user-meta">
-            <span className="sidebar-user-name" title={user?.name || 'Administrator'}>
-              {user?.name || 'Administrator'}
+            <span className="sidebar-user-name" title={user?.name || t('Administrator')}>
+              {user?.name || t('Administrator')}
             </span>
             <span className="sidebar-user-role">
-              {role === 'institution' ? 'Campus Incharge' : role === 'executive' ? 'Executive' : 'Super Admin'}
+              {t(role === 'institution' ? 'Campus Incharge' : role === 'executive' ? 'Executive' : 'Super Admin')}
             </span>
           </div>
           <button
             type="button"
             className="btn-signout-icon"
             onClick={handleLogout}
-            title="Sign out of TMS"
+            title={t('Sign out of TMS')}
           >
             <NavIcon name="logout" />
           </button>
@@ -385,3 +410,4 @@ export default function Sidebar() {
     </aside>
   );
 }
+

@@ -42,6 +42,12 @@ const api = {
   saveRes: (t, data, id) => call(`/${t}${id ? '/' + id : ''}`, { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) }),
   delRes: (t, id) => call(`/${t}/${id}`, { method: 'DELETE' }),
 
+  // Maintenance & Inventory
+  maintenanceSaveWithParts: (data, id) => call(`/maintenance/record${id ? '/' + id : ''}`, { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) }),
+  maintenanceDelete: (id) => call(`/maintenance/record/${id}`, { method: 'DELETE' }),
+  inventoryStats: () => call('/inventory/stats'),
+  inventoryRestock: (data) => call('/inventory/restock', { method: 'POST', body: JSON.stringify(data) }),
+
   // Fleet
   refs: () => call('/fleet/refs'),
   alerts: (days = 30) => call(`/fleet/alerts?days=${days}`),

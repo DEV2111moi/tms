@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import api from '../../api/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/UI/Toast';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSwitcher from '../../components/UI/LanguageSwitcher';
 import { useNavigate } from 'react-router-dom';
 import { fmtDate, money } from '../../components/UI/DataTable';
 
 export default function DriverPanel() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
+
   const toast = useToast();
 
   const [data, setData] = useState(null);
@@ -85,13 +89,15 @@ export default function DriverPanel() {
       <header className="topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 20 }}>🪪</span>
-          <span style={{ fontFamily: 'Oswald', fontWeight: 600, fontSize: 16 }}>TMS Driver Portal</span>
+          <span style={{ fontFamily: 'Oswald', fontWeight: 600, fontSize: 16 }}>{t('TMS Driver Portal')}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LanguageSwitcher compact={true} />
           <span className="topbar-who">{user?.name}</span>
-          <button className="signout-btn" onClick={handleLogout}>Exit</button>
+          <button className="signout-btn" onClick={handleLogout}>{t('Exit')}</button>
         </div>
       </header>
+
 
       <main className="page-body" style={{ flex: 1, padding: 16, maxWidth: 800, margin: '0 auto', width: '100%' }}>
         {/* Info card */}

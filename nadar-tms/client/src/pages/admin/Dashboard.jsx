@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/api';
+
 
 // Clean SVG Icon Component (No Emojis)
 function DashIcon({ name, size = 18, color = 'currentColor' }) {
@@ -118,7 +120,9 @@ function VisitorsDonut({ morning = 50, evening = 50, size = 125 }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [data, setData] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [shiftTab, setShiftTab] = useState('morning'); // 'morning' | 'evening'
@@ -246,7 +250,7 @@ export default function Dashboard() {
       <div className="page-head" style={{ marginBottom: 16 }}>
         <div>
           <div className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>Welcome {userName.split(' ')[0]}</span>
+            <span>{t('Welcome')} {userName.split(' ')[0]}</span>
           </div>
           <div className="page-sub">
             {selectedInstSummary
@@ -277,7 +281,7 @@ export default function Dashboard() {
                   appearance: 'none'
                 }}
               >
-                <option value="ALL">All Campuses ({activeCampusesCount})</option>
+                <option value="ALL">{t('All Campuses')} ({activeCampusesCount})</option>
                 {(data.institutionSummary || []).map(inst => (
                   <option key={inst.id} value={inst.id}>
                     {inst.short_name} ({inst.totalRoutes} routes)
@@ -290,7 +294,7 @@ export default function Dashboard() {
 
           <div className="live-badge">
             <span className="dot" />
-            <span>{selectedInstSummary ? `${selectedInstSummary.short_name.toUpperCase()} ACTIVE` : (isInstitution ? 'CAMPUS ACTIVE' : 'FLEET ACTIVE')}</span>
+            <span>{selectedInstSummary ? `${selectedInstSummary.short_name.toUpperCase()} ACTIVE` : (isInstitution ? t('CAMPUS ACTIVE') : t('FLEET ACTIVE'))}</span>
           </div>
 
           <button
@@ -323,7 +327,7 @@ export default function Dashboard() {
               <path d="M1 20v-6h6" />
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
             </svg>
-            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+            <span>{refreshing ? t('Refreshing...') : t('Refresh')}</span>
           </button>
         </div>
       </div>
@@ -342,7 +346,7 @@ export default function Dashboard() {
             <div className="socialeco-kpi-card__header">
               <div className="socialeco-kpi-card__brand">
                 <span className="socialeco-kpi-card__icon" style={{ color: '#ff9f43' }}><DashIcon name="bus" size={18} color="#ff9f43" /></span>
-                <span>Fleet Buses</span>
+                <span>{t('Fleet Buses')}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <RadialRing value={activeBusesPct} color="#ff9f43" size={48} />
@@ -355,7 +359,7 @@ export default function Dashboard() {
                 <div className="socialeco-kpi-card__value">{dynamicKPIs.activeBuses || dynamicKPIs.busesRunning || 0}</div>
                 <div className="socialeco-kpi-card__delta">+{activeBusesPct}%</div>
               </div>
-              <div className="socialeco-kpi-card__label">Active Buses in Service</div>
+              <div className="socialeco-kpi-card__label">{t('Active Buses in Service')}</div>
             </div>
           </div>
 
@@ -368,8 +372,9 @@ export default function Dashboard() {
             <div className="socialeco-kpi-card__header">
               <div className="socialeco-kpi-card__brand">
                 <span className="socialeco-kpi-card__icon" style={{ color: '#7c6cfc' }}><DashIcon name="driver" size={18} color="#7c6cfc" /></span>
-                <span>Duty Drivers</span>
+                <span>{t('Duty Drivers')}</span>
               </div>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <RadialRing value={activeDriversPct || 92} color="#7c6cfc" size={48} />
                 <span className="socialeco-card-arrow">↗</span>

@@ -21,6 +21,11 @@ function AssignIcon({ name, size = 16, color = 'currentColor', style = {} }) {
     zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
     arrowRight: <><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></>,
     building: <><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="22" x2="9" y2="22.01"/><line x1="15" y1="22" x2="15" y2="22.01"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><line x1="9" y1="18" x2="9" y2="18.01"/><line x1="15" y1="18" x2="15" y2="18.01"/></>,
+    printer: <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
+    download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+    file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
+    x: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    refresh: <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />,
   };
   return (
     <svg
@@ -148,8 +153,8 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
   };
 
   return (
-    <label className="flabel" onClick={e => e.stopPropagation()}>
-      <span>{label}</span>
+    <label className="flabel" onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: 0 }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{label}</span>
       <div style={{ position: 'relative' }}>
         <div 
           className="fselect" 
@@ -159,18 +164,20 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center',
-            background: 'var(--paper)',
-            border: '1px solid var(--paper-2)',
-            borderRadius: '4px',
-            padding: '8px 12px',
-            minHeight: '38px'
+            background: '#ffffff',
+            border: isOpen ? '1.5px solid #2563eb' : '1.5px solid #cbd5e1',
+            borderRadius: '8px',
+            padding: '9px 12px',
+            minHeight: '40px',
+            boxShadow: isOpen ? '0 0 0 3px rgba(37,99,235,0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
+            transition: 'all 0.15s ease'
           }}
         >
           {selectedOption ? (
             selectedOption.driver_name !== undefined ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: 'var(--navy)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <AssignIcon name="bus" size={13} color="var(--navy)" /> {selectedOption.registration_number || selectedOption.label.split(' · ')[0]}
+                <span style={{ fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <AssignIcon name="bus" size={14} color="#1d4ed8" /> {selectedOption.registration_number || selectedOption.label.split(' · ')[0]}
                 </span>
                 {activeDriverName ? (
                   <span
@@ -180,7 +187,7 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                       background: '#eff6ff',
                       color: '#1d4ed8',
                       border: '1px solid #bfdbfe',
-                      padding: '1px 7px',
+                      padding: '2px 7px',
                       borderRadius: 4,
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -190,18 +197,18 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
                     <AssignIcon name="user" size={11} color="#1d4ed8" /> {activeDriverName}
                   </span>
                 ) : (
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                  <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>
                     (Standby)
                   </span>
                 )}
               </div>
             ) : (
-              <span>{selectedOption.label}</span>
+              <span style={{ fontWeight: 600, color: '#0f172a' }}>{selectedOption.label}</span>
             )
           ) : (
-            <span style={{ color: 'var(--text-dim)' }}>{emptyText}</span>
+            <span style={{ color: '#94a3b8' }}>{emptyText}</span>
           )}
-          <span style={{ fontSize: '10px', color: 'var(--text-dim)', marginLeft: 8 }}>▼</span>
+          <span style={{ fontSize: '10px', color: '#64748b', marginLeft: 8 }}>▼</span>
         </div>
         
         {isOpen && (
@@ -211,10 +218,10 @@ function SearchableSelect({ label, value, options, onChange, placeholder = "Sear
               top: '100%', 
               left: 0, 
               right: 0, 
-              background: 'var(--paper)', 
-              border: '1px solid var(--paper-2)', 
-              borderRadius: '4px',
-              boxShadow: '0 6px 18px rgba(0,0,0,0.18)',
+              background: '#ffffff', 
+              border: '1.5px solid #e2e8f0', 
+              borderRadius: '8px',
+              boxShadow: '0 12px 28px -4px rgba(0,0,0,0.18)',
               zIndex: 1000,
               marginTop: '4px',
               padding: '6px',
@@ -378,6 +385,10 @@ export default function Assignments() {
   const [viewMode, setViewMode] = useState('assigned'); // 'assigned' | 'unassigned'
   const [selectedInstChip, setSelectedInstChip] = useState('');
   const [shiftFilter, setShiftFilter] = useState('');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportType, setReportType] = useState('assigned'); // 'assigned' | 'unassigned'
+  const [reportInst, setReportInst] = useState('all');
+  const [reportShift, setReportShift] = useState('all');
   const toast = useToast();
   const { user } = useAuth();
   const isInst = user?.role === 'institution';
@@ -916,6 +927,10 @@ export default function Assignments() {
   const hasMultipleSessions = selectedShifts.length > 1;
   const isSplitSessions = hasMultipleSessions && !sameForBoth && morningShifts.length > 0 && eveningShifts.length > 0;
 
+  const selectedRoute = routes.find(r => String(r.id) === String(form.route_id));
+  const existingRouteAssignments = selectedRoute ? items.filter(a => String(a.route_id) === String(selectedRoute.id)) : [];
+  const isRouteAlreadyAssigned = existingRouteAssignments.length > 0;
+
   // KPI Calculations
   const stats = useMemo(() => {
     const total = items.length;
@@ -926,6 +941,656 @@ export default function Assignments() {
     return { total, uniqueBuses, uniqueDrivers, uniqueIncharges, unassigned };
   }, [items, allUnassignedRoutes]);
 
+  // Helper: Open Print Window and Trigger Native Browser PDF Printing
+  const printReportWindow = (title, htmlBody, landscape = true) => {
+    const printWin = window.open('', '_blank', 'width=1180,height=820');
+    if (!printWin) {
+      alert('Please allow popups in your browser to print / save the PDF report.');
+      return;
+    }
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <meta charset="utf-8" />
+        <style>
+          @page {
+            size: ${landscape ? 'A4 landscape' : 'A4 portrait'};
+            margin: 8mm 8mm;
+          }
+          * { box-sizing: border-box; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #0f172a;
+            padding: 14px;
+            margin: 0;
+            background: #ffffff;
+            font-size: 11px;
+            line-height: 1.45;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .report-header {
+            text-align: center;
+            border-bottom: 2.5px solid #0f172a;
+            padding-bottom: 12px;
+            margin-bottom: 14px;
+          }
+          .inst-name {
+            font-size: 16px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.5px;
+            margin: 0 0 4px 0;
+          }
+          .report-title {
+            font-size: 13px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin: 0 0 3px 0;
+          }
+          .report-subtitle {
+            font-size: 11px;
+            color: #475569;
+            font-weight: 500;
+          }
+          .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 14px;
+            font-size: 10.5px;
+          }
+          .kpi-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 14px;
+          }
+          .kpi-card {
+            flex: 1;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            padding: 8px 10px;
+            border-radius: 6px;
+            text-align: center;
+          }
+          .kpi-val {
+            font-size: 16px;
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .kpi-lbl {
+            font-size: 9.5px;
+            color: #64748b;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 2px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            margin-bottom: 18px;
+            table-layout: auto;
+          }
+          thead {
+            display: table-header-group;
+          }
+          th {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 9.5px;
+            letter-spacing: 0.4px;
+            border: 1px solid #94a3b8;
+            padding: 8px 6px;
+            text-align: left;
+            vertical-align: middle;
+          }
+          td {
+            border: 1px solid #cbd5e1;
+            padding: 7px 6px;
+            vertical-align: middle;
+            color: #1e293b;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          tr:nth-child(even) td {
+            background-color: #f8fafc !important;
+          }
+          .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 10px;
+          }
+          .tag-pill {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+          }
+          .signature-section {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 32px;
+            padding-top: 14px;
+            page-break-inside: avoid;
+          }
+          .sig-box {
+            text-align: center;
+            width: 190px;
+            border-top: 1.5px solid #0f172a;
+            padding-top: 5px;
+            font-size: 10.5px;
+            font-weight: 600;
+            color: #1e293b;
+          }
+          .sig-title {
+            font-size: 9.5px;
+            color: #64748b;
+            font-weight: 500;
+          }
+          @media print {
+            body { padding: 0; }
+            .no-print { display: none !important; }
+          }
+        </style>
+      </head>
+      <body>
+        ${htmlBody}
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => {
+      printWin.print();
+    }, 450);
+  };
+
+  // 1. Generate Assigned Routes PDF Report
+  const handlePrintAssignedReport = (customScope = null) => {
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    let assignedList = items;
+    if (customScope?.inst && customScope.inst !== 'all') {
+      assignedList = assignedList.filter(a => String(a.institution_id) === String(customScope.inst));
+    } else if (curInst) {
+      assignedList = assignedList.filter(a => String(a.institution_id) === String(curInst));
+    }
+
+    if (customScope?.shift && customScope.shift !== 'all') {
+      assignedList = assignedList.filter(a => a.shift === customScope.shift);
+    } else if (shiftFilter) {
+      assignedList = assignedList.filter(a => a.shift === shiftFilter);
+    }
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase().trim();
+      assignedList = assignedList.filter(item =>
+        (item.route_code || '').toLowerCase().includes(q) ||
+        (item.route_name || '').toLowerCase().includes(q) ||
+        (item.driver_name || '').toLowerCase().includes(q) ||
+        (item.registration_number || '').toLowerCase().includes(q) ||
+        (item.institution_name || '').toLowerCase().includes(q) ||
+        (item.incharge_name || '').toLowerCase().includes(q)
+      );
+    }
+
+    if (assignedList.length === 0) {
+      toast('No route assignments found for the selected scope.');
+      return;
+    }
+
+    const targetInstId = customScope?.inst && customScope.inst !== 'all' ? customScope.inst : curInst;
+    const activeInst = (refs.institutions || []).find(i => String(i.id) === String(targetInstId));
+    const instTitle = activeInst 
+      ? (activeInst.name || activeInst.short_name).toUpperCase() 
+      : 'THENI MELAPETTAI HINDU NADARGAL URAVINMURAI (TMHNU) — CENTRAL FLEET MANAGEMENT';
+
+    const uniqueBuses = new Set(assignedList.map(a => a.bus_id).filter(Boolean)).size;
+    const uniqueDrivers = new Set(assignedList.map(a => a.driver_id).filter(Boolean)).size;
+    const uniqueIncharges = new Set(assignedList.map(a => a.incharge_id).filter(Boolean)).size;
+    const totalKm = assignedList.reduce((acc, a) => acc + (Number(a.total_distance) || 0), 0);
+
+    const rowsHtml = assignedList.map((a, idx) => {
+      const drv = (refs.drivers || []).find(d => Number(d.id) === Number(a.driver_id));
+      const busObj = (refs.buses || []).find(b => Number(b.id) === Number(a.bus_id));
+      const shiftName = SHIFT_MAP[a.shift] || a.shift || '—';
+      const isMorning = a.shift && a.shift.toLowerCase().includes('morning');
+
+      return `
+        <tr>
+          <td style="text-align: center; font-weight: 700; color: #64748b;" class="mono">${idx + 1}</td>
+          <td>
+            <div style="font-weight: 800; color: #0f172a; font-size: 11px;" class="mono">${a.route_code || '—'}</div>
+            <div style="font-size: 9.5px; color: #334155; font-weight: 600;">${a.route_name || ''}</div>
+          </td>
+          <td>
+            <span class="tag-pill" style="background: ${isMorning ? '#e0f2fe' : '#fef3c7'}; color: ${isMorning ? '#0369a1' : '#b45309'}; border: 1px solid ${isMorning ? '#bae6fd' : '#fde68a'};">
+              ${isMorning ? '☀️' : '🌙'} ${shiftName}
+            </span>
+          </td>
+          <td>
+            ${a.registration_number ? `
+              <span class="mono" style="font-weight: 800; color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; padding: 2px 7px; border-radius: 4px; display: inline-block;">
+                🚌 ${a.registration_number}
+              </span>
+              ${busObj?.vehicle_type ? `<div style="font-size: 9px; color: #64748b; margin-top: 2px;">${busObj.vehicle_type} (${busObj.seating_capacity || 40} Seats)</div>` : ''}
+            ` : `<span style="color: #dc2626; font-style: italic; font-weight: 600;">❌ No Bus</span>`}
+          </td>
+          <td>
+            ${a.driver_name ? `
+              <div style="font-weight: 700; color: #0f172a; font-size: 11px;">${a.driver_name}</div>
+              ${drv?.phone ? `<div class="mono" style="font-size: 9.5px; color: #2563eb; margin-top: 1px;">📞 ${drv.phone}</div>` : ''}
+              ${drv?.driver_type === 'spare' ? `<span class="tag-pill" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; margin-top: 2px;">🔄 Spare Pilot</span>` : ''}
+            ` : `<span style="color: #dc2626; font-style: italic; font-weight: 600;">⚠️ No Driver</span>`}
+          </td>
+          <td>
+            ${a.incharge_name ? `
+              <div style="font-weight: 600; color: #1e293b;">${a.incharge_name}</div>
+              <div style="font-size: 8.5px; color: #64748b;">Faculty Escort</div>
+            ` : `<span style="color: #94a3b8; font-style: italic;">— None —</span>`}
+          </td>
+          <td style="font-weight: 600; color: #334155;">
+            ${a.institution_name || 'Central Roster'}
+          </td>
+          <td>
+            <div style="font-size: 10px; color: #1e293b;">
+              <span>${a.origin || '—'}</span>
+              <span style="color: #d97706; font-weight: bold; margin: 0 4px;">➔</span>
+              <span>${a.destination || '—'}</span>
+            </div>
+            ${a.boarding_time || a.end_time ? `
+              <div class="mono" style="font-size: 9px; color: #64748b; margin-top: 2px;">
+                ⏱️ ${a.boarding_time ? a.boarding_time.slice(0, 5) : '—'} - ${a.end_time ? a.end_time.slice(0, 5) : '—'}
+              </div>
+            ` : ''}
+          </td>
+          <td style="text-align: center;" class="mono">
+            <b>${a.total_distance ? `${a.total_distance} km` : '—'}</b>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const htmlBody = `
+      <div class="report-header">
+        <div class="inst-name">${instTitle}</div>
+        <div class="report-title" style="color: #1e3a8a;">ROUTE ASSIGNMENTS & FLEET DEPLOYMENT REPORT</div>
+        <div class="report-subtitle">Standing Master Register of Buses, Drivers & Faculty Incharges Mapped to Daily Operational Routes</div>
+      </div>
+
+      <div class="meta-row">
+        <div><b>Scope:</b> ${activeInst ? (activeInst.name || activeInst.short_name) : 'All Campuses / Central Network'} &bull; <b>Active Mappings:</b> ${assignedList.length} Total</div>
+        <div><b>Generated:</b> ${timestamp} &bull; <b>Generated By:</b> ${user?.name || 'Transport Admin'}</div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card" style="border-left: 4px solid #3b82f6;">
+          <div class="kpi-val" style="color: #1d4ed8;">${assignedList.length}</div>
+          <div class="kpi-lbl">Active Mappings</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #0284c7;">${uniqueBuses}</div>
+          <div class="kpi-lbl">Buses in Service</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #16a34a;">${uniqueDrivers}</div>
+          <div class="kpi-lbl">Drivers on Duty</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #7c6cfc;">${uniqueIncharges}</div>
+          <div class="kpi-lbl">Faculty Incharges</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #d97706;">${totalKm.toFixed(1)} km</div>
+          <div class="kpi-lbl">Total Route Mileage</div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 30px; text-align: center;">#</th>
+            <th style="width: 170px;">Route Details</th>
+            <th style="width: 95px;">Shift / Session</th>
+            <th style="width: 125px;">Assigned Bus</th>
+            <th style="width: 145px;">Assigned Driver</th>
+            <th style="width: 120px;">Bus Incharge</th>
+            <th style="width: 110px;">Institution</th>
+            <th style="width: 175px;">Stoppages & Timings</th>
+            <th style="width: 55px; text-align: center;">Distance</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <div class="signature-section">
+        <div class="sig-box">
+          <div>Prepared By</div>
+          <div class="sig-title">Transport Operations Assistant</div>
+        </div>
+        <div class="sig-box">
+          <div>Verified By</div>
+          <div class="sig-title">Transport Manager / Fleet Incharge</div>
+        </div>
+        <div class="sig-box">
+          <div>Approved By</div>
+          <div class="sig-title">Principal / Fleet Director</div>
+        </div>
+      </div>
+    `;
+
+    printReportWindow(`Route Assignments Report - ${instTitle}`, htmlBody, true);
+  };
+
+  // 2. Generate Unassigned Routes Deficit PDF Report
+  const handlePrintUnassignedReport = (customScope = null) => {
+    const timestamp = new Date().toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    let unassignedList = allUnassignedRoutes;
+    if (customScope?.inst && customScope.inst !== 'all') {
+      unassignedList = unassignedList.filter(r => String(r.institution_id) === String(customScope.inst));
+    } else if (activeUnassignedInst) {
+      unassignedList = unassignedList.filter(r => String(r.institution_id) === String(activeUnassignedInst));
+    }
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase().trim();
+      unassignedList = unassignedList.filter(r =>
+        (r.route_code || '').toLowerCase().includes(q) ||
+        (r.route_name || '').toLowerCase().includes(q) ||
+        (r.institution_name || '').toLowerCase().includes(q) ||
+        (r.origin || '').toLowerCase().includes(q) ||
+        (r.destination || '').toLowerCase().includes(q)
+      );
+    }
+
+    if (unassignedList.length === 0) {
+      toast('All routes in the selected scope are fully assigned!');
+      return;
+    }
+
+    const targetInstId = customScope?.inst && customScope.inst !== 'all' ? customScope.inst : activeUnassignedInst;
+    const activeInst = (refs.institutions || []).find(i => String(i.id) === String(targetInstId));
+    const instTitle = activeInst 
+      ? (activeInst.name || activeInst.short_name).toUpperCase() 
+      : 'THENI MELAPETTAI HINDU NADARGAL URAVINMURAI (TMHNU) — CENTRAL FLEET MANAGEMENT';
+
+    const noAssignmentCount = unassignedList.filter(r => r.status === 'no_assignment').length;
+    const noDriverCount = unassignedList.filter(r => r.status === 'no_driver').length;
+    const noBusCount = unassignedList.filter(r => r.status === 'no_bus' || r.status.includes('missing')).length;
+    const totalKm = unassignedList.reduce((acc, r) => acc + (Number(r.total_distance) || 0), 0);
+
+    const rowsHtml = unassignedList.map((r, idx) => {
+      const statusColor = r.status === 'no_assignment' ? '#b91c1c' : '#c2410c';
+      const statusBg = r.status === 'no_assignment' ? '#fee2e2' : '#ffedd5';
+      const statusBorder = r.status === 'no_assignment' ? '#fca5a5' : '#fed7aa';
+
+      return `
+        <tr>
+          <td style="text-align: center; font-weight: 700; color: #64748b;" class="mono">${idx + 1}</td>
+          <td>
+            <div style="font-weight: 800; color: #0f172a; font-size: 11px;" class="mono">${r.route_code || '—'}</div>
+            <div style="font-size: 9.5px; color: #334155; font-weight: 600;">${r.route_name || ''}</div>
+          </td>
+          <td>
+            <span class="tag-pill" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a;">
+              ${r.institution_name || 'Central Roster'}
+            </span>
+          </td>
+          <td>
+            <div style="font-size: 10px; color: #1e293b;">
+              <span>${r.origin || '—'}</span>
+              <span style="color: #d97706; font-weight: bold; margin: 0 4px;">➔</span>
+              <span>${r.destination || '—'}</span>
+            </div>
+            ${r.stops_list ? `<div style="font-size: 9px; color: #64748b; margin-top: 2px;">Stops: ${r.stops_list.split(',').slice(0, 3).join(', ')}...</div>` : ''}
+          </td>
+          <td>
+            ${r.initial_point ? `
+              <div style="font-size: 10px; font-weight: 600; color: #0f172a;">${r.initial_point}</div>
+              ${r.initial_time ? `<div class="mono" style="font-size: 9.5px; color: #2563eb;">⏰ ${r.initial_time.slice(0, 5)}</div>` : ''}
+            ` : `<span style="color: #94a3b8; font-style: italic;">—</span>`}
+          </td>
+          <td style="text-align: center;" class="mono">
+            <b>${r.total_distance ? `${r.total_distance} km` : '—'}</b>
+          </td>
+          <td>
+            <span class="tag-pill" style="background: ${statusBg}; color: ${statusColor}; border: 1px solid ${statusBorder}; font-weight: 800;">
+              ${r.statusLabel || 'Unassigned'}
+            </span>
+          </td>
+          <td>
+            <span style="font-size: 9.5px; color: #475569; font-weight: 600;">
+              ${r.assignedCount ? `⚠️ ${r.assignedCount} session(s) mapped` : '❌ 0 sessions mapped'}
+            </span>
+          </td>
+          <td>
+            <span style="font-size: 9.5px; color: #b91c1c; font-weight: 700; display: inline-flex; align-items: center; gap: 3px;">
+              ⚡ Urgent Fleet Allocation
+            </span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const htmlBody = `
+      <div class="report-header">
+        <div class="inst-name">${instTitle}</div>
+        <div class="report-title" style="color: #c2410c;">UNASSIGNED ROUTES & FLEET DEFICIT REPORT</div>
+        <div class="report-subtitle">Priority Action Register of Operational Routes Lacking Bus, Driver, or Shift Allocation</div>
+      </div>
+
+      <div class="meta-row">
+        <div><b>Scope:</b> ${activeInst ? (activeInst.name || activeInst.short_name) : 'All Campuses / Central Network'} &bull; <b>Deficit Slots:</b> ${unassignedList.length} Routes Requiring Action</div>
+        <div><b>Generated:</b> ${timestamp} &bull; <b>Generated By:</b> ${user?.name || 'Transport Admin'}</div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card" style="border-left: 4px solid #ea580c;">
+          <div class="kpi-val" style="color: #c2410c;">${unassignedList.length}</div>
+          <div class="kpi-lbl">Unassigned Routes</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #dc2626;">${noAssignmentCount}</div>
+          <div class="kpi-lbl">Missing Bus & Driver</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #d97706;">${noDriverCount}</div>
+          <div class="kpi-lbl">Driver Missing</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #7c6cfc;">${noBusCount}</div>
+          <div class="kpi-lbl">Bus Missing / Shift Gap</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val" style="color: #2563eb;">${totalKm.toFixed(1)} km</div>
+          <div class="kpi-lbl">Uncovered Distance</div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 30px; text-align: center;">#</th>
+            <th style="width: 175px;">Route Code & Name</th>
+            <th style="width: 110px;">Institution</th>
+            <th style="width: 180px;">Stoppages (From ➔ To)</th>
+            <th style="width: 110px;">Initial Point</th>
+            <th style="width: 55px; text-align: center;">Distance</th>
+            <th style="width: 130px;">Deficit Status</th>
+            <th style="width: 105px;">Coverage</th>
+            <th style="width: 135px;">Action Required</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <div class="signature-section">
+        <div class="sig-box">
+          <div>Prepared By</div>
+          <div class="sig-title">Transport Operations Assistant</div>
+        </div>
+        <div class="sig-box">
+          <div>Verified By</div>
+          <div class="sig-title">Transport Manager / Fleet Incharge</div>
+        </div>
+        <div class="sig-box">
+          <div>Approved By</div>
+          <div class="sig-title">Principal / Fleet Director</div>
+        </div>
+      </div>
+    `;
+
+    printReportWindow(`Unassigned Routes Report - ${instTitle}`, htmlBody, true);
+  };
+
+  // 3. Export Assigned Routes to CSV
+  // 3. Export Assigned Routes to CSV
+  const handleExportAssignedCSV = (customScope = null) => {
+    let baseList = items;
+    if (customScope?.inst && customScope.inst !== 'all') {
+      baseList = baseList.filter(a => String(a.institution_id) === String(customScope.inst));
+    } else if (curInst) {
+      baseList = baseList.filter(a => String(a.institution_id) === String(curInst));
+    }
+
+    if (customScope?.shift && customScope.shift !== 'all') {
+      baseList = baseList.filter(a => a.shift === customScope.shift);
+    } else if (shiftFilter) {
+      baseList = baseList.filter(a => a.shift === shiftFilter);
+    }
+
+    if (searchQuery && !customScope) {
+      const q = searchQuery.toLowerCase().trim();
+      baseList = baseList.filter(item =>
+        (item.route_code || '').toLowerCase().includes(q) ||
+        (item.route_name || '').toLowerCase().includes(q) ||
+        (item.driver_name || '').toLowerCase().includes(q) ||
+        (item.registration_number || '').toLowerCase().includes(q) ||
+        (item.institution_name || '').toLowerCase().includes(q) ||
+        (item.incharge_name || '').toLowerCase().includes(q)
+      );
+    }
+
+    if (baseList.length === 0) {
+      toast('No route assignments found to export.');
+      return;
+    }
+    const headers = [
+      '#', 'Route Code', 'Route Name', 'Shift', 'Bus Number', 'Vehicle Type',
+      'Driver Name', 'Driver Phone', 'Bus Incharge', 'Institution',
+      'Origin', 'Destination', 'Distance (KM)'
+    ];
+    const rows = baseList.map((a, i) => {
+      const drv = (refs.drivers || []).find(d => Number(d.id) === Number(a.driver_id));
+      const busObj = (refs.buses || []).find(b => Number(b.id) === Number(a.bus_id));
+      return [
+        i + 1,
+        a.route_code || '',
+        a.route_name || '',
+        SHIFT_MAP[a.shift] || a.shift || '',
+        a.registration_number || '—',
+        busObj?.vehicle_type || 'Bus',
+        a.driver_name || '—',
+        drv?.phone || '',
+        a.incharge_name || '—',
+        a.institution_name || '',
+        a.origin || '',
+        a.destination || '',
+        a.total_distance || ''
+      ];
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' +
+      [headers.join(','), ...rows.map(e => e.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `route_assignments_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast('Assigned routes exported as CSV');
+  };
+
+  // 4. Export Unassigned Routes to CSV
+  const handleExportUnassignedCSV = (customScope = null) => {
+    let baseList = allUnassignedRoutes;
+    if (customScope?.inst && customScope.inst !== 'all') {
+      baseList = baseList.filter(r => String(r.institution_id) === String(customScope.inst));
+    } else if (activeUnassignedInst) {
+      baseList = baseList.filter(r => String(r.institution_id) === String(activeUnassignedInst));
+    }
+
+    if (searchQuery && !customScope) {
+      const q = searchQuery.toLowerCase().trim();
+      baseList = baseList.filter(r =>
+        (r.route_code || '').toLowerCase().includes(q) ||
+        (r.route_name || '').toLowerCase().includes(q) ||
+        (r.institution_name || '').toLowerCase().includes(q) ||
+        (r.origin || '').toLowerCase().includes(q) ||
+        (r.destination || '').toLowerCase().includes(q)
+      );
+    }
+
+    if (baseList.length === 0) {
+      toast('No unassigned routes to export for selected criteria.');
+      return;
+    }
+    const headers = [
+      '#', 'Route Code', 'Route Name', 'Institution', 'Origin', 'Destination',
+      'Distance (KM)', 'Deficit Status', 'Covered Mappings Count', 'Initial Point', 'Initial Time'
+    ];
+    const rows = baseList.map((r, i) => [
+      i + 1,
+      r.route_code || '',
+      r.route_name || '',
+      r.institution_name || '',
+      r.origin || '',
+      r.destination || '',
+      r.total_distance || '',
+      r.statusLabel || 'Unassigned',
+      r.assignedCount || 0,
+      r.initial_point || '',
+      r.initial_time || ''
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' +
+      [headers.join(','), ...rows.map(e => e.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `unassigned_routes_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast('Unassigned routes exported as CSV');
+  };
+
   if (loading) return <div className="loading-center"><div className="spinner" /> Loading...</div>;
 
   return (
@@ -935,19 +1600,47 @@ export default function Assignments() {
           <div className="page-title">Route Assignments</div>
           <div className="page-sub">Standing mapping of buses, drivers, and faculty incharges to daily routes</div>
         </div>
-        {allUnassignedRoutes.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {allUnassignedRoutes.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => {
+                setViewMode('unassigned');
+                const el = document.getElementById('assignment-list-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              style={{
+                background: '#fef3c7',
+                border: '1.5px solid #f59e0b',
+                color: '#b45309',
+                fontWeight: 700,
+                fontSize: '13px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 14px',
+                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.12)'
+              }}
+            >
+              <AssignIcon name="alert" size={15} color="#b45309" />
+              <span>{allUnassignedRoutes.length} Routes Need Assignment</span>
+              <span style={{ fontSize: '11px', background: '#f59e0b', color: '#fff', padding: '2px 7px', borderRadius: '10px' }}>
+                View List ➔
+              </span>
+            </button>
+          )}
+
           <button
             type="button"
-            className="btn btn-sm"
+            className="btn btn-primary btn-sm"
             onClick={() => {
-              setViewMode('unassigned');
-              const el = document.getElementById('assignment-list-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
+              setReportType(viewMode === 'unassigned' ? 'unassigned' : 'assigned');
+              setShowReportModal(true);
             }}
             style={{
-              background: '#fef3c7',
-              border: '1.5px solid #f59e0b',
-              color: '#b45309',
               fontWeight: 700,
               fontSize: '13px',
               borderRadius: '6px',
@@ -955,17 +1648,14 @@ export default function Assignments() {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '8px 14px',
-              boxShadow: '0 2px 6px rgba(245, 158, 11, 0.12)'
+              padding: '8px 16px',
+              boxShadow: '0 2px 8px rgba(30, 58, 138, 0.18)'
             }}
           >
-            <AssignIcon name="alert" size={15} color="#b45309" />
-            <span>{allUnassignedRoutes.length} Routes Need Assignment</span>
-            <span style={{ fontSize: '11px', background: '#f59e0b', color: '#fff', padding: '2px 7px', borderRadius: '10px' }}>
-              View List ➔
-            </span>
+            <AssignIcon name="printer" size={15} color="#fff" />
+            <span>Reports & PDF</span>
           </button>
-        )}
+        </div>
       </div>
 
       <div className="page-body">
@@ -1029,236 +1719,785 @@ export default function Assignments() {
           </div>
         </div>
 
-        <form className="card" onSubmit={handleSave} style={{ marginBottom: 24 }}>
-          <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 14 }}>
-            {form.route_id ? 'Edit Assignment' : 'New / Update Assignment'}
-          </div>
-          <div className="form-grid">
-            {(!isInst && insts.length > 0) && (
-              <label className="flabel full">
-                <span>Institution (filters routes & incharges)</span>
-                <select className="fselect" value={instFilter} onChange={e => { setInstFilter(e.target.value); setForm(prev => ({ ...prev, route_id: '', incharge_id: '' })); }}>
-                  <option value="">All institutions</option>
-                  {insts.map(i => <option key={i.id} value={i.id}>{i.short_name || i.name}</option>)}
-                </select>
-              </label>
-            )}
+        {/* ========================================================================= */}
+        {/* MASTER ASSIGNMENT CONSOLE (REDESIGNED PREMIUM CARD)                     */}
+        {/* ========================================================================= */}
+        <form
+          className="assignment-console-card"
+          onSubmit={handleSave}
+          style={{
+            background: '#ffffff',
+            borderRadius: 14,
+            border: '1.5px solid #e2e8f0',
+            boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04)',
+            marginBottom: 28,
+            overflow: 'hidden',
+            position: 'relative'
+          }}
+        >
+          {/* Top Decorative Gradient Accent Line */}
+          <div style={{
+            height: 4,
+            background: form.route_id
+              ? 'linear-gradient(90deg, #3b82f6, #6366f1, #a855f7)'
+              : 'linear-gradient(90deg, #2563eb, #3b82f6, #06b6d4)'
+          }} />
 
-            <SearchableSelect
-              label="Route *"
-              value={form.route_id}
-              options={routeOptions}
-              onChange={handleRouteChange}
-              placeholder="Search route code, name, or driver..."
-              emptyText="Choose route"
-            />
-
-            <div className="flabel" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-main)' }}>Apply to Sessions *</span>
-                <span style={{ fontSize: 11, color: '#1d4ed8', fontWeight: 600 }}>
-                  {selectedShifts.length} session{selectedShifts.length === 1 ? '' : 's'} selected
-                </span>
+          {/* Console Header Bar */}
+          <div style={{
+            padding: '18px 24px',
+            background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
+            borderBottom: '1px solid #edf2f7',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: form.route_id ? 'rgba(99, 102, 241, 0.1)' : 'rgba(37, 99, 235, 0.1)',
+                border: `1.5px solid ${form.route_id ? 'rgba(99, 102, 241, 0.25)' : 'rgba(37, 99, 235, 0.25)'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: form.route_id ? '#4f46e5' : '#2563eb'
+              }}>
+                <AssignIcon name={form.route_id ? 'zap' : 'route'} size={20} color="currentColor" />
               </div>
-              <select
-                className="fselect"
-                value={getSelectValue(selectedShifts)}
-                required
-                onChange={e => handleShiftSelectChange(e.target.value)}
-                style={{ fontWeight: 500 }}
-              >
-                {PRESET_COMBINATIONS.map(p => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
-                <option value="custom" disabled={getSelectValue(selectedShifts) !== 'custom'}>
-                  Custom Selection ({selectedShifts.map(s => SHIFT_MAP[s] || s).join(', ')})
-                </option>
-              </select>
-
-              {/* Selectable toggle chips for sessions */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                {[
-                  { key: 'morning1', label: 'Morning 1', isMorning: true },
-                  { key: 'morning2', label: 'Morning 2', isMorning: true },
-                  { key: 'evening1', label: 'Evening 1', isMorning: false },
-                  { key: 'evening2', label: 'Evening 2', isMorning: false }
-                ].map(({ key, label, isMorning }) => {
-                  const isSelected = selectedShifts.includes(key);
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => handleToggleShift(key)}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 20,
-                        fontSize: 12,
-                        fontWeight: isSelected ? 700 : 500,
-                        cursor: 'pointer',
-                        border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
-                        background: isSelected ? '#eff6ff' : '#f8fafc',
-                        color: isSelected ? '#1d4ed8' : '#64748b',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 5,
-                        boxShadow: isSelected ? '0 1px 3px rgba(37,99,235,0.2)' : 'none',
-                        transition: 'all 0.15s ease'
-                      }}
-                      title={`Toggle ${label}`}
-                    >
-                      <AssignIcon name={isMorning ? 'sun' : 'moon'} size={12} color={isSelected ? '#1d4ed8' : '#94a3b8'} />
-                      <span>{label}</span>
-                      <span style={{ 
-                        fontSize: 11, 
-                        fontWeight: 800, 
-                        color: isSelected ? '#2563eb' : '#94a3b8' 
-                      }}>
-                        {isSelected ? '✓' : '+'}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.2px' }}>
+                    {form.assignment_id
+                      ? 'Edit Route Assignment'
+                      : (form.route_id ? 'Update Route Assignment' : 'New / Update Route Assignment')}
+                  </h3>
+                  {form.route_id && (
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe'
+                    }}>
+                      Active Route
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                  Standing allocation of vehicle fleet, pilots, and faculty escorts across operating shifts
+                </div>
               </div>
             </div>
 
-            {hasMultipleSessions && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, gridColumn: 'span 2', cursor: 'pointer', marginTop: 4, marginBottom: 4 }}>
-                <input
-                  type="checkbox"
-                  checked={sameForBoth}
-                  onChange={e => setSameForBoth(e.target.checked)}
-                  style={{ width: 18, height: 18, cursor: 'pointer' }}
-                />
-                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-main)' }}>
-                  Same bus and driver for {selectedShifts.length === 2 ? 'both sessions' : 'all selected sessions'} ({selectedShifts.map(s => SHIFT_MAP[s] || s).join(', ')})
-                </span>
-              </label>
-            )}
-
-            {!isInst && (
-              <>
-                {isSplitSessions ? (
-                  <>
-                    <SearchableSelect
-                      label={`${morningLabel} Bus`}
-                      value={form.bus_id}
-                      options={busOptions}
-                      currentDriverName={drivers.find(d => String(d.id) === String(form.driver_id))?.name}
-                      onChange={val => {
-                        const chosenBus = busOptions.find(o => String(o.value) === String(val));
-                        const autoDriver = chosenBus?.driver_id ? String(chosenBus.driver_id) : '';
-                        setForm(prev => ({
-                          ...prev,
-                          bus_id: val,
-                          driver_id: autoDriver || (val ? prev.driver_id : '')
-                        }));
-                      }}
-                      placeholder={`Search ${morningLabel.toLowerCase()} bus number or driver...`}
-                    />
-
-                    <SearchableSelect
-                      label={`${morningLabel} Driver`}
-                      value={form.driver_id}
-                      options={driverOptions}
-                      onChange={val => setForm(prev => ({ ...prev, driver_id: val }))}
-                      placeholder={`Search ${morningLabel.toLowerCase()} driver name...`}
-                    />
-
-                    <SearchableSelect
-                      label={`${eveningLabel} Bus`}
-                      value={form.evening_bus_id}
-                      options={busOptions}
-                      currentDriverName={drivers.find(d => String(d.id) === String(form.evening_driver_id))?.name}
-                      onChange={val => {
-                        const chosenBus = busOptions.find(o => String(o.value) === String(val));
-                        const autoDriver = chosenBus?.driver_id ? String(chosenBus.driver_id) : '';
-                        setForm(prev => ({
-                          ...prev,
-                          evening_bus_id: val,
-                          evening_driver_id: autoDriver || (val ? prev.evening_driver_id : '')
-                        }));
-                      }}
-                      placeholder={`Search ${eveningLabel.toLowerCase()} bus number or driver...`}
-                    />
-
-                    <SearchableSelect
-                      label={`${eveningLabel} Driver`}
-                      value={form.evening_driver_id}
-                      options={driverOptions}
-                      onChange={val => setForm(prev => ({ ...prev, evening_driver_id: val }))}
-                      placeholder={`Search ${eveningLabel.toLowerCase()} driver name...`}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <SearchableSelect
-                      label={hasMultipleSessions ? `Bus (${selectedShifts.map(s => SHIFT_MAP[s] || s).join(', ')})` : 'Bus'}
-                      value={form.bus_id}
-                      options={busOptions}
-                      currentDriverName={drivers.find(d => String(d.id) === String(form.driver_id))?.name}
-                      onChange={val => {
-                        const chosenBus = busOptions.find(o => String(o.value) === String(val));
-                        const autoDriver = chosenBus?.driver_id ? String(chosenBus.driver_id) : '';
-                        setForm(prev => ({
-                          ...prev,
-                          bus_id: val,
-                          driver_id: autoDriver || (val ? prev.driver_id : '')
-                        }));
-                      }}
-                      placeholder="Search bus number or driver..."
-                    />
-
-                    <SearchableSelect
-                      label={hasMultipleSessions ? `Driver (${selectedShifts.map(s => SHIFT_MAP[s] || s).join(', ')})` : 'Driver'}
-                      value={form.driver_id}
-                      options={driverOptions}
-                      onChange={val => setForm(prev => ({ ...prev, driver_id: val }))}
-                      placeholder="Search driver name..."
-                    />
-                  </>
-                )}
-              </>
-            )}
-
-            <div className="full">
-              <SearchableSelect
-                label="Bus Incharge"
-                value={form.incharge_id}
-                options={inchargeOptions}
-                onChange={val => setForm(prev => ({ ...prev, incharge_id: val }))}
-                placeholder="Search incharge name..."
-              />
-            </div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-            {form.route_id && (
-              <>
-                <button type="button" className="btn btn-sm btn-outline"
+            {/* Header Right Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {form.route_id && (
+                <button
+                  type="button"
                   onClick={() => {
                     setForm({ assignment_id: null, route_id: '', shift: 'm1_e1', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '', incharge_id: '' });
                     setSelectedShifts(['morning1', 'evening1']);
                     setSameForBoth(true);
-                  }}>
-                  Cancel edit
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline"
-                  onClick={handleDeleteForm}
+                  }}
                   style={{
-                    borderColor: '#ef4444',
-                    color: '#dc2626',
+                    padding: '6px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    background: '#fff',
+                    color: '#475569',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 6
+                    gap: 5
                   }}
-                  title="Delete this assignment and make route unassigned"
                 >
-                  <AssignIcon name="trash" size={14} color="#dc2626" /> Delete assignment
+                  <AssignIcon name="refresh" size={13} color="#475569" />
+                  <span>Clear Selection</span>
                 </button>
-              </>
-            )}
-            <button className="btn btn-sm btn-primary" type="submit">Save assignment</button>
+              )}
+            </div>
+          </div>
+
+          <div style={{ padding: '24px' }}>
+            {/* ------------------------------------------------------------- */}
+            {/* SECTION 1: ROUTE & TIMETABLE SPECIFICATION                   */}
+            {/* ------------------------------------------------------------- */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 11.5,
+                fontWeight: 800,
+                color: '#6366f1',
+                textTransform: 'uppercase',
+                letterSpacing: '0.8px',
+                marginBottom: 14
+              }}>
+                <span style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  background: 'rgba(99, 102, 241, 0.12)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: 800
+                }}>
+                  1
+                </span>
+                <span>Operating Route & Sessions Scope</span>
+              </div>
+
+              {/* Grid: Institution Filter + Route Selector */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: (!isInst && insts.length > 0) ? 'minmax(220px, 320px) 1fr' : '1fr',
+                gap: 16,
+                alignItems: 'flex-start'
+              }}>
+                {(!isInst && insts.length > 0) && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: 13, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+                      <AssignIcon name="building" size={14} color="#6366f1" />
+                      <span>Campus / Institution</span>
+                    </label>
+                    <select
+                      className="fselect"
+                      value={instFilter}
+                      onChange={e => {
+                        setInstFilter(e.target.value);
+                        setForm(prev => ({ ...prev, route_id: '', incharge_id: '' }));
+                      }}
+                      style={{
+                        height: 40,
+                        borderRadius: 8,
+                        border: '1.5px solid #cbd5e1',
+                        background: '#ffffff',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        padding: '0 12px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">🏫 All Institutions (Entire Network)</option>
+                      {insts.map(i => (
+                        <option key={i.id} value={i.id}>
+                          {i.short_name || i.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>
+                      Filters available routes and campus incharge faculty
+                    </span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <SearchableSelect
+                    label={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <AssignIcon name="route" size={14} color="#2563eb" />
+                        <span>Target Route *</span>
+                        {filteredRoutes.length > 0 && (
+                          <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>
+                            ({filteredRoutes.length} available)
+                          </span>
+                        )}
+                      </div>
+                    }
+                    value={form.route_id}
+                    options={routeOptions}
+                    onChange={handleRouteChange}
+                    placeholder="Search by route code, route name, stoppages, or driver..."
+                    emptyText="Click to select a route..."
+                  />
+                </div>
+              </div>
+
+              {/* Selected Route Live Information Strip */}
+              {selectedRoute && (
+                <div style={{
+                  marginTop: 14,
+                  padding: '12px 16px',
+                  background: isRouteAlreadyAssigned ? '#f0fdf4' : '#fffbeb',
+                  border: `1.5px solid ${isRouteAlreadyAssigned ? '#bbf7d0' : '#fde68a'}`,
+                  borderRadius: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 12
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{
+                      padding: '3px 9px',
+                      borderRadius: 14,
+                      background: isRouteAlreadyAssigned ? '#dcfce7' : '#fef3c7',
+                      color: isRouteAlreadyAssigned ? '#15803d' : '#b45309',
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}>
+                      {isRouteAlreadyAssigned ? '✓ Active Roster' : '⚠️ Deficit / Unassigned'}
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                      {selectedRoute.route_code}: {selectedRoute.origin || 'Origin'}
+                      <span style={{ color: '#d97706', margin: '0 6px', fontWeight: 800 }}>➔</span>
+                      {selectedRoute.destination || 'Destination'}
+                    </span>
+                    {selectedRoute.total_distance && (
+                      <span style={{
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        color: '#475569',
+                        background: 'rgba(0,0,0,0.05)',
+                        padding: '2px 8px',
+                        borderRadius: 6
+                      }}>
+                        📏 {selectedRoute.total_distance} km
+                      </span>
+                    )}
+                    {selectedRoute.initial_point && (
+                      <span style={{ fontSize: 11.5, color: '#2563eb', fontWeight: 600 }}>
+                        ⏰ Starts {selectedRoute.initial_time ? selectedRoute.initial_time.slice(0, 5) : '07:00'} at {selectedRoute.initial_point}
+                      </span>
+                    )}
+                  </div>
+                  {isRouteAlreadyAssigned && (
+                    <div style={{ fontSize: 11.5, color: '#166534', fontWeight: 600 }}>
+                      Currently mapped: {existingRouteAssignments.map(a => `${SHIFT_MAP[a.shift] || a.shift}: ${a.registration_number || 'No Bus'} (${a.driver_name || 'No Driver'})`).join(' · ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sessions Selector Container */}
+              <div style={{
+                marginTop: 18,
+                padding: '16px',
+                background: '#f8fafc',
+                borderRadius: 10,
+                border: '1px solid #e2e8f0'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 10,
+                  marginBottom: 12
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                      Operating Sessions Coverage *
+                    </span>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      border: '1px solid #bfdbfe'
+                    }}>
+                      {selectedShifts.length} session{selectedShifts.length === 1 ? '' : 's'} selected
+                    </span>
+                  </div>
+
+                  {/* Preset Shortcuts */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11.5, color: '#64748b', fontWeight: 600 }}>Quick Presets:</span>
+                    {[
+                      { label: 'Morning 1 + Evening 1 (Standard)', val: 'm1_e1', shifts: ['morning1', 'evening1'] },
+                      { label: 'Morning 1 only', val: 'morning1', shifts: ['morning1'] },
+                      { label: 'Evening 1 only', val: 'evening1', shifts: ['evening1'] },
+                      { label: 'All 4 Sessions', val: 'all_4', shifts: ['morning1', 'morning2', 'evening1', 'evening2'] }
+                    ].map(preset => {
+                      const isActive = preset.shifts.length === selectedShifts.length &&
+                        preset.shifts.every(s => selectedShifts.includes(s));
+                      return (
+                        <button
+                          key={preset.val}
+                          type="button"
+                          onClick={() => {
+                            setSelectedShifts(preset.shifts);
+                            setForm(f => ({ ...f, shift: getSelectValue(preset.shifts) }));
+                          }}
+                          style={{
+                            padding: '3px 10px',
+                            borderRadius: 14,
+                            border: `1px solid ${isActive ? '#2563eb' : '#cbd5e1'}`,
+                            background: isActive ? '#2563eb' : '#fff',
+                            color: isActive ? '#fff' : '#475569',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 4 Interactive Session Cards */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                  gap: 10
+                }}>
+                  {[
+                    { key: 'morning1', label: 'Morning 1', tag: 'Standard Inbound', isMorning: true },
+                    { key: 'morning2', label: 'Morning 2', tag: 'Late Inbound', isMorning: true },
+                    { key: 'evening1', label: 'Evening 1', tag: 'Standard Return', isMorning: false },
+                    { key: 'evening2', label: 'Evening 2', tag: 'Late Return', isMorning: false }
+                  ].map(({ key, label, tag, isMorning }) => {
+                    const isSelected = selectedShifts.includes(key);
+                    return (
+                      <div
+                        key={key}
+                        onClick={() => handleToggleShift(key)}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: 8,
+                          border: `1.5px solid ${isSelected ? (isMorning ? '#3b82f6' : '#6366f1') : '#e2e8f0'}`,
+                          background: isSelected ? (isMorning ? '#eff6ff' : '#f5f3ff') : '#ffffff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          boxShadow: isSelected ? '0 2px 8px rgba(59, 130, 246, 0.15)' : 'none',
+                          transition: 'all 0.18s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 6,
+                            background: isSelected
+                              ? (isMorning ? '#dbeafe' : '#ede9fe')
+                              : '#f1f5f9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: isMorning ? '#d97706' : '#6366f1'
+                          }}>
+                            <AssignIcon name={isMorning ? 'sun' : 'moon'} size={15} color="currentColor" />
+                          </span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? '#0f172a' : '#475569' }}>
+                              {label}
+                            </div>
+                            <div style={{ fontSize: 10.5, color: '#64748b' }}>
+                              {tag}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 6,
+                          border: `1.5px solid ${isSelected ? (isMorning ? '#2563eb' : '#6366f1') : '#cbd5e1'}`,
+                          background: isSelected ? (isMorning ? '#2563eb' : '#6366f1') : '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          fontSize: 11,
+                          fontWeight: 800
+                        }}>
+                          {isSelected ? '✓' : ''}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* ------------------------------------------------------------- */}
+            {/* SECTION 2: FLEET & CREW ALLOCATION                            */}
+            {/* ------------------------------------------------------------- */}
+            <div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 11.5,
+                fontWeight: 800,
+                color: '#6366f1',
+                textTransform: 'uppercase',
+                letterSpacing: '0.8px',
+                marginBottom: 14
+              }}>
+                <span style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  background: 'rgba(99, 102, 241, 0.12)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: 800
+                }}>
+                  2
+                </span>
+                <span>Fleet & Crew Assignment</span>
+              </div>
+
+              {/* Same Bus and Driver Toggle Switch */}
+              {hasMultipleSessions && (
+                <div
+                  onClick={() => setSameForBoth(!sameForBoth)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 18px',
+                    background: sameForBoth ? '#f8fafc' : '#fffbeb',
+                    border: `1.5px solid ${sameForBoth ? '#e2e8f0' : '#fde68a'}`,
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    transition: 'all 0.18s ease',
+                    marginBottom: 18
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 44,
+                      height: 24,
+                      borderRadius: 14,
+                      background: sameForBoth ? '#2563eb' : '#cbd5e1',
+                      position: 'relative',
+                      transition: 'background 0.2s ease',
+                      flexShrink: 0
+                    }}>
+                      <div style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: '50%',
+                        background: '#fff',
+                        position: 'absolute',
+                        top: 3,
+                        left: sameForBoth ? 23 : 3,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                        transition: 'left 0.2s ease'
+                      }} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
+                        Same Bus & Driver for all selected sessions
+                      </div>
+                      <div style={{ fontSize: 11.5, color: '#64748b' }}>
+                        {sameForBoth
+                          ? `Deploy identical bus and pilot for both Morning & Evening trips`
+                          : `Split shift mode: Assign distinct buses or drivers for morning vs evening`}
+                      </div>
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '3px 10px',
+                    borderRadius: 12,
+                    background: sameForBoth ? '#eff6ff' : '#fef3c7',
+                    color: sameForBoth ? '#1d4ed8' : '#b45309'
+                  }}>
+                    {sameForBoth ? 'Unified Crew' : 'Split Shift Crew'}
+                  </span>
+                </div>
+              )}
+
+              {/* Resource Selectors Layout */}
+              {!isSplitSessions ? (
+                /* Mode A: Unified Crew (Bus + Driver + Incharge in balanced 3-column row) */
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                  gap: 16,
+                  alignItems: 'flex-start'
+                }}>
+                  <div>
+                    <SearchableSelect
+                      label={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <AssignIcon name="bus" size={14} color="#3b82f6" />
+                          <span>Bus ({selectedShifts.length > 1 ? 'Both Sessions' : 'Session'})</span>
+                        </div>
+                      }
+                      value={form.bus_id}
+                      options={busOptions}
+                      currentDriverName={drivers.find(d => String(d.id) === String(form.driver_id))?.name}
+                      onChange={val => {
+                        const chosenBus = busOptions.find(o => String(o.value) === String(val));
+                        const autoDriver = chosenBus?.driver_id ? String(chosenBus.driver_id) : '';
+                        setForm(prev => ({
+                          ...prev,
+                          bus_id: val,
+                          driver_id: autoDriver || (val ? prev.driver_id : '')
+                        }));
+                      }}
+                      placeholder="Search bus registration number..."
+                      emptyText="Select bus..."
+                    />
+                  </div>
+
+                  <div>
+                    <SearchableSelect
+                      label={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <AssignIcon name="user" size={14} color="#10b981" />
+                          <span>Driver ({selectedShifts.length > 1 ? 'Both Sessions' : 'Session'})</span>
+                        </div>
+                      }
+                      value={form.driver_id}
+                      options={driverOptions}
+                      onChange={val => setForm(prev => ({ ...prev, driver_id: val }))}
+                      placeholder="Search driver name..."
+                      emptyText="Select driver..."
+                    />
+                  </div>
+
+                  <div>
+                    <SearchableSelect
+                      label={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <AssignIcon name="badge" size={14} color="#7c6cfc" />
+                          <span>Bus Incharge (Faculty Escort)</span>
+                        </div>
+                      }
+                      value={form.incharge_id}
+                      options={inchargeOptions}
+                      onChange={val => setForm(prev => ({ ...prev, incharge_id: val }))}
+                      placeholder="Search faculty incharge name..."
+                      emptyText="Select incharge (optional)..."
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Mode B: Split Sessions (Morning Panel + Evening Panel + Incharge) */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                    gap: 16
+                  }}>
+                    {/* Morning Panel */}
+                    <div style={{
+                      padding: '16px',
+                      background: '#f0f9ff',
+                      borderRadius: 10,
+                      border: '1.5px solid #bae6fd'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: '#0369a1',
+                        marginBottom: 12
+                      }}>
+                        <AssignIcon name="sun" size={15} color="#0284c7" />
+                        <span>Morning Shift Crew ({morningLabel})</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <SearchableSelect
+                          label="Morning Bus"
+                          value={form.bus_id}
+                          options={busOptions}
+                          currentDriverName={drivers.find(d => String(d.id) === String(form.driver_id))?.name}
+                          onChange={val => {
+                            const chosenBus = busOptions.find(o => String(o.value) === String(val));
+                            const autoDriver = chosenBus?.driver_id ? String(chosenBus.driver_id) : '';
+                            setForm(prev => ({
+                              ...prev,
+                              bus_id: val,
+                              driver_id: autoDriver || (val ? prev.driver_id : '')
+                            }));
+                          }}
+                          placeholder="Select morning bus..."
+                        />
+                        <SearchableSelect
+                          label="Morning Driver"
+                          value={form.driver_id}
+                          options={driverOptions}
+                          onChange={val => setForm(prev => ({ ...prev, driver_id: val }))}
+                          placeholder="Select morning driver..."
+                        />
+                      </div>
+                    </div>
+
+                    {/* Evening Panel */}
+                    <div style={{
+                      padding: '16px',
+                      background: '#fdf4ff',
+                      borderRadius: 10,
+                      border: '1.5px solid #f0abfc'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: '#a21caf',
+                        marginBottom: 12
+                      }}>
+                        <AssignIcon name="moon" size={15} color="#c026d3" />
+                        <span>Evening Shift Crew ({eveningLabel})</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <SearchableSelect
+                          label="Evening Bus"
+                          value={form.evening_bus_id}
+                          options={busOptions}
+                          currentDriverName={drivers.find(d => String(d.id) === String(form.evening_driver_id))?.name}
+                          onChange={val => {
+                            const chosenBus = busOptions.find(o => String(o.value) === String(val));
+                            const autoDriver = chosenBus?.driver_id ? String(chosenBus.driver_id) : '';
+                            setForm(prev => ({
+                              ...prev,
+                              evening_bus_id: val,
+                              evening_driver_id: autoDriver || (val ? prev.evening_driver_id : '')
+                            }));
+                          }}
+                          placeholder="Select evening bus..."
+                        />
+                        <SearchableSelect
+                          label="Evening Driver"
+                          value={form.evening_driver_id}
+                          options={driverOptions}
+                          onChange={val => setForm(prev => ({ ...prev, evening_driver_id: val }))}
+                          placeholder="Select evening driver..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Faculty Incharge */}
+                  <div style={{ maxWidth: 400 }}>
+                    <SearchableSelect
+                      label={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <AssignIcon name="badge" size={14} color="#7c6cfc" />
+                          <span>Bus Incharge (Faculty Escort)</span>
+                        </div>
+                      }
+                      value={form.incharge_id}
+                      options={inchargeOptions}
+                      onChange={val => setForm(prev => ({ ...prev, incharge_id: val }))}
+                      placeholder="Search faculty incharge name..."
+                      emptyText="Select incharge (optional)..."
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Console Action Bar / Footer */}
+          <div style={{
+            padding: '16px 24px',
+            background: '#f8fafc',
+            borderTop: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12
+          }}>
+            <div>
+              {form.route_id && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={handleDeleteForm}
+                  style={{
+                    background: '#fff',
+                    border: '1.5px solid #fca5a5',
+                    color: '#dc2626',
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    padding: '8px 14px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer'
+                  }}
+                  title="Remove assignment and make route unassigned"
+                >
+                  <AssignIcon name="trash" size={14} color="#dc2626" />
+                  <span>Delete Assignment</span>
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {form.route_id && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm({ assignment_id: null, route_id: '', shift: 'm1_e1', bus_id: '', driver_id: '', evening_bus_id: '', evening_driver_id: '', incharge_id: '' });
+                    setSelectedShifts(['morning1', 'evening1']);
+                    setSameForBoth(true);
+                  }}
+                  style={{
+                    background: '#fff',
+                    border: '1.5px solid #cbd5e1',
+                    color: '#475569',
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    padding: '8px 16px',
+                    cursor: 'pointer',
+                    fontSize: 13
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+
+              <button
+                type="submit"
+                style={{
+                  background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '9px 24px',
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.28)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <AssignIcon name="check" size={15} color="#fff" />
+                <span>{form.assignment_id ? 'Update Assignment' : 'Save Assignment'}</span>
+              </button>
+            </div>
           </div>
         </form>
 
@@ -1333,38 +2572,136 @@ export default function Assignments() {
             </button>
           </div>
 
-          <div style={{ position: 'relative', width: '100%', maxWidth: 360 }}>
-            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
-              <AssignIcon name="search" size={15} color="#94a3b8" />
-            </span>
-            <input
-              type="text"
-              className="fselect"
-              placeholder={viewMode === 'unassigned' ? "Search unassigned route, institution..." : "Search route, driver, bus..."}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{ width: '100%', paddingLeft: 34, paddingRight: searchQuery ? 30 : 12, borderRadius: 6, background: '#fff', height: 38 }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                style={{
-                  position: 'absolute',
-                  right: 8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-dim)',
-                  fontSize: 14,
-                  padding: 2
-                }}
-                title="Clear search"
-              >
-                ✕
-              </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '100%', minWidth: 220, maxWidth: 280 }}>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                <AssignIcon name="search" size={15} color="#94a3b8" />
+              </span>
+              <input
+                type="text"
+                className="fselect"
+                placeholder={viewMode === 'unassigned' ? "Search unassigned route, institution..." : "Search route, driver, bus..."}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{ width: '100%', paddingLeft: 34, paddingRight: searchQuery ? 30 : 12, borderRadius: 6, background: '#fff', height: 38 }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-dim)',
+                    fontSize: 14,
+                    padding: 2
+                  }}
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {viewMode === 'assigned' ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => handlePrintAssignedReport()}
+                  className="btn btn-sm"
+                  style={{
+                    background: '#eff6ff',
+                    border: '1.5px solid #bfdbfe',
+                    color: '#1d4ed8',
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    padding: '8px 13px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                    fontSize: 12.5
+                  }}
+                  title="Print official assigned routes deployment register (A4 PDF)"
+                >
+                  <AssignIcon name="printer" size={14} color="#1d4ed8" />
+                  <span>Print Assigned Report</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportAssignedCSV()}
+                  className="btn btn-sm"
+                  style={{
+                    background: '#f8fafc',
+                    border: '1.5px solid #cbd5e1',
+                    color: '#334155',
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    padding: '8px 12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                    fontSize: 12.5
+                  }}
+                  title="Download assigned routes as CSV spreadsheet"
+                >
+                  <AssignIcon name="download" size={14} color="#334155" />
+                  <span>Export CSV</span>
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => handlePrintUnassignedReport()}
+                  className="btn btn-sm"
+                  style={{
+                    background: '#fff7ed',
+                    border: '1.5px solid #fed7aa',
+                    color: '#c2410c',
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    padding: '8px 13px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                    fontSize: 12.5
+                  }}
+                  title="Print unassigned routes & fleet deficit report (A4 PDF)"
+                >
+                  <AssignIcon name="printer" size={14} color="#c2410c" />
+                  <span>Print Unassigned Report</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportUnassignedCSV()}
+                  className="btn btn-sm"
+                  style={{
+                    background: '#f8fafc',
+                    border: '1.5px solid #cbd5e1',
+                    color: '#334155',
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    padding: '8px 12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                    fontSize: 12.5
+                  }}
+                  title="Download unassigned deficit list as CSV spreadsheet"
+                >
+                  <AssignIcon name="download" size={14} color="#334155" />
+                  <span>Export CSV</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -1620,6 +2957,362 @@ export default function Assignments() {
             emptyText={searchQuery ? 'No matching unassigned routes found.' : 'All routes have buses assigned! Great job!'}
           />
         )}
+
+        {/* Reports & PDF Scope Modal */}
+        {showReportModal && (() => {
+          // Compute modal preview stats
+          let modalAssignedList = items;
+          if (reportInst !== 'all') {
+            modalAssignedList = modalAssignedList.filter(a => String(a.institution_id) === String(reportInst));
+          }
+          if (reportShift !== 'all') {
+            modalAssignedList = modalAssignedList.filter(a => a.shift === reportShift);
+          }
+          const modalBuses = new Set(modalAssignedList.map(a => a.bus_id).filter(Boolean)).size;
+          const modalDrivers = new Set(modalAssignedList.map(a => a.driver_id).filter(Boolean)).size;
+          const modalIncharges = new Set(modalAssignedList.map(a => a.incharge_id).filter(Boolean)).size;
+          const modalTotalKm = modalAssignedList.reduce((acc, a) => acc + (Number(a.total_distance) || 0), 0);
+
+          let modalUnassignedList = allUnassignedRoutes;
+          if (reportInst !== 'all') {
+            modalUnassignedList = modalUnassignedList.filter(r => String(r.institution_id) === String(reportInst));
+          }
+          const modalNoAssign = modalUnassignedList.filter(r => r.status === 'no_assignment').length;
+          const modalNoDriver = modalUnassignedList.filter(r => r.status === 'no_driver').length;
+          const modalNoBus = modalUnassignedList.filter(r => r.status === 'no_bus' || r.status.includes('missing')).length;
+          const modalUnassignedKm = modalUnassignedList.reduce((acc, r) => acc + (Number(r.total_distance) || 0), 0);
+
+          return (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(15, 23, 42, 0.65)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999,
+                padding: 20
+              }}
+              onClick={() => setShowReportModal(false)}
+            >
+              <div
+                style={{
+                  background: '#fff',
+                  borderRadius: 12,
+                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+                  width: '100%',
+                  maxWidth: 640,
+                  overflow: 'hidden',
+                  animation: 'fadeIn 0.18s ease-out'
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div style={{
+                  padding: '18px 24px',
+                  background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+                  color: '#fff',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <AssignIcon name="file" size={20} color="#fff" />
+                      <span>Route & Fleet Reports</span>
+                    </div>
+                    <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
+                      Generate print-ready A4 reports or export CSV data registers
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(false)}
+                    style={{
+                      background: 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#fff',
+                      borderRadius: '50%',
+                      width: 32,
+                      height: 32,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <AssignIcon name="x" size={16} color="#fff" />
+                  </button>
+                </div>
+
+                <div style={{ padding: '20px 24px' }}>
+                  {/* Report Type Selector Tabs */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 10,
+                    marginBottom: 20,
+                    background: 'var(--paper)',
+                    padding: 4,
+                    borderRadius: 8
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setReportType('assigned')}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: reportType === 'assigned' ? '#fff' : 'transparent',
+                        color: reportType === 'assigned' ? 'var(--navy)' : 'var(--text-dim)',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        boxShadow: reportType === 'assigned' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <AssignIcon name="clipboard" size={16} color={reportType === 'assigned' ? 'var(--navy)' : 'currentColor'} />
+                      <span>Assigned Register</span>
+                      <span style={{
+                        fontSize: 11,
+                        background: reportType === 'assigned' ? 'var(--navy)' : 'var(--paper-2)',
+                        color: reportType === 'assigned' ? '#fff' : 'inherit',
+                        padding: '2px 7px',
+                        borderRadius: 10
+                      }}>
+                        {items.length}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReportType('unassigned')}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: reportType === 'unassigned' ? '#fff' : 'transparent',
+                        color: reportType === 'unassigned' ? '#c2410c' : 'var(--text-dim)',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        boxShadow: reportType === 'unassigned' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <AssignIcon name="alert" size={16} color={reportType === 'unassigned' ? '#c2410c' : 'currentColor'} />
+                      <span>Unassigned Deficit</span>
+                      <span style={{
+                        fontSize: 11,
+                        background: reportType === 'unassigned' ? '#ea580c' : '#f59e0b',
+                        color: '#fff',
+                        padding: '2px 7px',
+                        borderRadius: 10
+                      }}>
+                        {allUnassignedRoutes.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Filter Controls Grid */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: reportType === 'assigned' ? '1.2fr 1fr' : '1fr',
+                    gap: 14,
+                    marginBottom: 20
+                  }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6, color: '#334155' }}>
+                        Scope by Institution:
+                      </label>
+                      <select
+                        className="fselect"
+                        value={reportInst}
+                        onChange={e => setReportInst(e.target.value)}
+                        style={{ width: '100%', height: 38, borderRadius: 6 }}
+                      >
+                        <option value="all">🏢 All Institutions (Entire Network)</option>
+                        {(refs.institutions || []).map(inst => (
+                          <option key={inst.id} value={inst.id}>
+                            {inst.name || inst.short_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {reportType === 'assigned' && (
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginBottom: 6, color: '#334155' }}>
+                          Session / Shift:
+                        </label>
+                        <select
+                          className="fselect"
+                          value={reportShift}
+                          onChange={e => setReportShift(e.target.value)}
+                          style={{ width: '100%', height: 38, borderRadius: 6 }}
+                        >
+                          <option value="all">🕒 All Daily Sessions (M1-M4, E1-E4)</option>
+                          {SHIFT_OPTIONS.map(s => (
+                            <option key={s.key} value={s.key}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Scope Preview Card */}
+                  {reportType === 'assigned' ? (
+                    <div style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: 8,
+                      padding: '14px 16px',
+                      marginBottom: 24
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#166534', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <AssignIcon name="check" size={14} color="#166534" />
+                        <span>REPORT SUMMARY PREVIEW</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, textAlign: 'center' }}>
+                        <div style={{ background: '#fff', padding: '8px 4px', borderRadius: 6, border: '1px solid #dcfce7' }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#15803d' }}>{modalAssignedList.length}</div>
+                          <div style={{ fontSize: 10.5, color: '#4b5563', fontWeight: 600 }}>Active Mappings</div>
+                        </div>
+                        <div style={{ background: '#fff', padding: '8px 4px', borderRadius: 6, border: '1px solid #dcfce7' }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#2563eb' }}>{modalBuses}</div>
+                          <div style={{ fontSize: 10.5, color: '#4b5563', fontWeight: 600 }}>Buses Mapped</div>
+                        </div>
+                        <div style={{ background: '#fff', padding: '8px 4px', borderRadius: 6, border: '1px solid #dcfce7' }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#0d9488' }}>{modalDrivers}</div>
+                          <div style={{ fontSize: 10.5, color: '#4b5563', fontWeight: 600 }}>Drivers Rostered</div>
+                        </div>
+                        <div style={{ background: '#fff', padding: '8px 4px', borderRadius: 6, border: '1px solid #dcfce7' }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#7c3aed' }}>{modalTotalKm.toFixed(0)} km</div>
+                          <div style={{ fontSize: 10.5, color: '#4b5563', fontWeight: 600 }}>Total Route KM</div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      background: '#fff7ed',
+                      border: '1px solid #fed7aa',
+                      borderRadius: 8,
+                      padding: '14px 16px',
+                      marginBottom: 24
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#9a3412', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <AssignIcon name="alert" size={14} color="#ea580c" />
+                        <span>DEFICIT REPORT PREVIEW</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, textAlign: 'center' }}>
+                        <div style={{ background: '#fff', padding: '8px 4px', borderRadius: 6, border: '1px solid #ffedd5' }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#c2410c' }}>{modalUnassignedList.length}</div>
+                          <div style={{ fontSize: 10.5, color: '#4b5563', fontWeight: 600 }}>Deficit Routes</div>
+                        </div>
+                        <div style={{ background: '#fff', padding: '8px 4px', borderRadius: 6, border: '1px solid #ffedd5' }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#dc2626' }}>{modalNoAssign}</div>
+                          <div style={{ fontSize: 10.5, color: '#4b5563', fontWeight: 600 }}>No Bus & Driver</div>
+                        </div>
+                        <div style={{ background: '#fff', padding: '8px 4px', borderRadius: 6, border: '1px solid #ffedd5' }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>{modalNoDriver}</div>
+                          <div style={{ fontSize: 10.5, color: '#4b5563', fontWeight: 600 }}>Missing Driver</div>
+                        </div>
+                        <div style={{ background: '#fff', padding: '8px 4px', borderRadius: 6, border: '1px solid #ffedd5' }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#b91c1c' }}>{modalUnassignedKm.toFixed(0)} km</div>
+                          <div style={{ fontSize: 10.5, color: '#4b5563', fontWeight: 600 }}>Uncovered KM</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Modal Action Buttons */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    alignItems: 'center',
+                    gap: 10
+                  }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => setShowReportModal(false)}
+                      style={{ padding: '9px 18px', borderRadius: 6, fontWeight: 600 }}
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => {
+                        if (reportType === 'assigned') {
+                          handleExportAssignedCSV({ inst: reportInst, shift: reportShift });
+                        } else {
+                          handleExportUnassignedCSV({ inst: reportInst });
+                        }
+                      }}
+                      style={{
+                        background: '#f1f5f9',
+                        border: '1.5px solid #cbd5e1',
+                        color: '#1e293b',
+                        padding: '9px 18px',
+                        borderRadius: 6,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      <AssignIcon name="download" size={15} color="#1e293b" />
+                      <span>Download CSV</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => {
+                        if (reportType === 'assigned') {
+                          handlePrintAssignedReport({ inst: reportInst, shift: reportShift });
+                        } else {
+                          handlePrintUnassignedReport({ inst: reportInst });
+                        }
+                      }}
+                      style={{
+                        padding: '9px 20px',
+                        borderRadius: 6,
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)'
+                      }}
+                    >
+                      <AssignIcon name="printer" size={15} color="#fff" />
+                      <span>Print PDF Report</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </>
   );

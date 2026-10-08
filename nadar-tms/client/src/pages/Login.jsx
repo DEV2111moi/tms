@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import LanguageSwitcher from '../components/UI/LanguageSwitcher';
 
 export default function Login() {
   const [email, setEmail] = useState('admin@tms.in');
@@ -9,6 +11,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const ROLE_ROUTES = {
@@ -34,7 +37,12 @@ export default function Login() {
   };
 
   return (
-    <div className="login-screen">
+    <div className="login-screen" style={{ position: 'relative' }}>
+      {/* Multilingual Switcher Button at Head of Login Page */}
+      <div style={{ position: 'absolute', top: 20, right: 24, zIndex: 10 }}>
+        <LanguageSwitcher />
+      </div>
+
       <div className="login-card">
         {/* Brand Header */}
         <div className="login-brand">
@@ -49,16 +57,17 @@ export default function Login() {
             </svg>
           </div>
           <h1>TMHNU</h1>
-          <p>Transport Management System · Theni</p>
+          <p>{t('Transport Management System · Theni') || 'Transport Management System · Theni'}</p>
           <div className="login-security-tag">
-            <span>🔒 Central Control Room Portal</span>
+            <span>🔒 {t('Control Room')} Portal</span>
           </div>
         </div>
 
         {/* Login Form */}
         <form onSubmit={handleSubmit}>
+
           <div className="login-input-group">
-            <label htmlFor="login-email">Email Address</label>
+            <label htmlFor="login-email">{t('Email Address') || 'Email Address'}</label>
             <div className="login-input-wrap">
               <span className="login-input-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -80,7 +89,7 @@ export default function Login() {
           </div>
 
           <div className="login-input-group">
-            <label htmlFor="login-password">Password</label>
+            <label htmlFor="login-password">{t('Password')}</label>
             <div className="login-input-wrap">
               <span className="login-input-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -133,11 +142,11 @@ export default function Login() {
             {loading ? (
               <>
                 <span className="login-btn-spinner"></span>
-                <span>Signing In...</span>
+                <span>{t('Please wait...')}</span>
               </>
             ) : (
               <>
-                <span>Sign In to TMHNU</span>
+                <span>{t('Sign in')} TMHNU</span>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12" />
                   <polyline points="12 5 19 12 12 19" />
@@ -145,6 +154,7 @@ export default function Login() {
               </>
             )}
           </button>
+
         </form>
 
         <div className="login-foot-note">
