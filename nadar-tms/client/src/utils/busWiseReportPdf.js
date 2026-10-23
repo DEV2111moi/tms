@@ -181,6 +181,84 @@ export function groupBusesByInstitution(buses = [], institutions = [], trips = [
 }
 
 /**
+ * Helper to format trip and boarding point details for HTML verification reports
+ */
+function formatTripCellHtml(trips = [], fallbackRoutes = '', shiftType = 'morning') {
+  const isMorning = shiftType === 'morning';
+  const matchingTrips = (trips || []).filter(t => {
+    const s = String(t.shift || '').toLowerCase();
+    return isMorning ? s.includes('morning') : s.includes('evening');
+  });
+
+  const shiftOrder = {
+    morning1: 1, morning2: 2, morning3: 3, morning4: 4, morning: 1,
+    evening1: 1, evening2: 2, evening3: 3, evening4: 4, evening: 1
+  };
+
+  matchingTrips.sort((a, b) => {
+    const orderA = shiftOrder[String(a.shift).toLowerCase()] || 99;
+    const orderB = shiftOrder[String(b.shift).toLowerCase()] || 99;
+    if (orderA !== orderB) return orderA - orderB;
+    return String(a.start_time || '').localeCompare(String(b.start_time || ''));
+  });
+
+  if (matchingTrips.length > 0) {
+    return matchingTrips.map((t, idx) => {
+      const shiftNumMatch = String(t.shift || '').match(/\d+/);
+      const tripNum = shiftNumMatch ? shiftNumMatch[0] : (idx + 1);
+      const tripLabel = isMorning ? `Morning ${tripNum}` : `Evening ${tripNum}`;
+      
+      const codeTag = t.route_code && t.route_code !== '—' 
+        ? `<span style="font-size: 8.5px; color: #64748b; font-weight: normal; margin-left: 4px;">(${t.route_code})</span>` 
+        : '';
+      const name = t.route_name && t.route_name !== '—' ? t.route_name : 'Assigned Route';
+      
+      const startTime = t.start_time ? formatTime12(t.start_time) : '';
+      const endTime = t.end_time ? formatTime12(t.end_time) : '';
+      let timeHtml = '';
+      if (startTime && endTime) {
+        timeHtml = `<div style="font-size: 9px; color: #64748b; margin-top: 2px;">⏰ <b>Time:</b> ${startTime} &ndash; ${endTime}</div>`;
+      } else if (startTime) {
+        timeHtml = `<div style="font-size: 9px; color: #64748b; margin-top: 2px;">⏰ <b>Time:</b> ${startTime}</div>`;
+      } else if (endTime) {
+        timeHtml = `<div style="font-size: 9px; color: #64748b; margin-top: 2px;">⏰ <b>Time:</b> ${endTime}</div>`;
+      }
+
+      return `
+        <div style="margin-bottom: 7px; padding-bottom: 5px; border-bottom: 1px dashed #e2e8f0;">
+          <div style="font-size: 10px; color: #0f172a;">
+            <b style="color: ${isMorning ? '#1e40af' : '#7e22ce'};">${tripLabel}:</b> ${name}${codeTag}
+          </div>
+          ${timeHtml}
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (fallbackRoutes && fallbackRoutes !== '—') {
+    const parts = fallbackRoutes.split(/[,;/]+/).map(p => p.trim()).filter(Boolean);
+    if (parts.length > 0) {
+      return parts.map((r, idx) => {
+        const label = isMorning ? `Morning ${idx + 1}` : `Evening ${idx + 1}`;
+        return `
+          <div style="margin-bottom: 5px;">
+            <div style="font-size: 10px; color: #0f172a;">
+              <b style="color: ${isMorning ? '#1e40af' : '#7e22ce'};">${label}:</b> ${r}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  return `
+    <div style="color: #94a3b8; font-style: italic; font-size: 9.5px;">
+      — Unassigned
+    </div>
+  `;
+}
+
+/**
  * Builds the HTML content for an individual institution section
  */
 function buildInstitutionSectionHtml(instGroup, from, to, isStandalone = true) {
@@ -189,35 +267,42 @@ function buildInstitutionSectionHtml(instGroup, from, to, isStandalone = true) {
   const buses = instGroup.buses || [];
 
   const busesRowsHtml = buses.map((b, idx) => {
+    const bTrips = b.allTrips || [];
     const bdCount = (b.breakdownsList || []).length;
     const cdCount = (b.coversList || []).length;
-    let incidentBadge = '<span style="color: #15803d; font-weight: 700;">✓ Normal</span>';
+    let incidentBadge = '<div style="color: #15803d; font-weight: 700; font-size: 9.5px;">[ &nbsp; ] Verified</div>';
     if (bdCount > 0) {
-      incidentBadge = `<span style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 9.5px;">⚠️ ${bdCount} Breakdown(s)</span>`;
+      incidentBadge = `<span style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 2px 5px; border-radius: 4px; font-weight: 800; font-size: 8.5px;">⚠️ ${bdCount} Breakdown</span>`;
     } else if (cdCount > 0) {
-      incidentBadge = `<span style="background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 9.5px;">🔄 ${cdCount} Cover Duty</span>`;
+      incidentBadge = `<span style="background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; padding: 2px 5px; border-radius: 4px; font-weight: 800; font-size: 8.5px;">🔄 ${cdCount} Cover Duty</span>`;
     }
+
+    const morningHtml = formatTripCellHtml(bTrips, b.routes, 'morning');
+    const eveningHtml = formatTripCellHtml(bTrips, b.routes, 'evening');
 
     return `
       <tr>
-        <td style="text-align: center; font-weight: 700; color: #475569;">${idx + 1}</td>
-        <td>
-          <span style="font-family: 'JetBrains Mono', Consolas, monospace; font-weight: 800; color: #1d4ed8; font-size: 11.5px;">
+        <td style="text-align: center; font-weight: 700; color: #475569; vertical-align: middle; padding: 10px 6px;">${idx + 1}</td>
+        <td style="vertical-align: middle; padding: 10px 8px;">
+          <div style="font-family: 'JetBrains Mono', Consolas, monospace; font-weight: 800; color: #1d4ed8; font-size: 12px;">
             ${b.registration_number}
-          </span>
+          </div>
         </td>
-        <td style="color: #1e293b; font-size: 10px;">${b.routes || '—'}</td>
-        <td style="color: #0f172a; font-weight: 600; font-size: 10.5px;">${b.drivers || '—'}</td>
-        <td style="text-align: center;" class="mono">${Number(b.morning1_km || 0) > 0 ? `${Number(b.morning1_km).toFixed(1)} km <span class="trips-tag">(${b.morning1_trips})</span>` : '—'}</td>
-        <td style="text-align: center;" class="mono">${Number(b.morning2_km || 0) > 0 ? `${Number(b.morning2_km).toFixed(1)} km <span class="trips-tag">(${b.morning2_trips})</span>` : '—'}</td>
-        <td style="text-align: center;" class="mono">${Number(b.evening1_km || 0) > 0 ? `${Number(b.evening1_km).toFixed(1)} km <span class="trips-tag">(${b.evening1_trips})</span>` : '—'}</td>
-        <td style="text-align: center;" class="mono">${Number(b.evening2_km || 0) > 0 ? `${Number(b.evening2_km).toFixed(1)} km <span class="trips-tag">(${b.evening2_trips})</span>` : '—'}</td>
-        <td style="text-align: center; font-weight: 800; color: #0284c7;" class="mono">${b.total_trips || 0}</td>
-        <td style="text-align: right; font-weight: 800; color: #0f172a; font-size: 11.5px;" class="mono">${Number(b.total_km || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km</td>
-        <td style="text-align: center;">${incidentBadge}</td>
+        <td style="vertical-align: middle; padding: 10px 8px;">
+          <div style="color: #0f172a; font-weight: 700; font-size: 11px;">
+            ${b.drivers || '—'}
+          </div>
+        </td>
+        <td style="vertical-align: top; padding: 10px 8px;">
+          ${morningHtml}
+        </td>
+        <td style="vertical-align: top; padding: 10px 8px;">
+          ${eveningHtml}
+        </td>
       </tr>
     `;
   }).join('');
+
 
   // Detailed Bus Cards with full breakdown of logged trips
   const detailedBusCardsHtml = buses.map((b) => {
@@ -373,22 +458,16 @@ function buildInstitutionSectionHtml(instGroup, from, to, isStandalone = true) {
         </div>
       </div>
 
-      <!-- SECTION 1: CONSOLIDATED FLEET SUMMARY TABLE -->
-      <div class="section-heading">1. Consolidated Vehicle Fleet Summary — ${shortName}</div>
+      <!-- SECTION 1: CONSOLIDATED SCHEDULE REGISTER -->
+      <div class="section-heading">1. Vehicle, Driver, Route & Shift Schedule Register — ${shortName}</div>
       <table class="report-table" style="margin-bottom: 18px;">
         <thead>
           <tr>
-            <th style="width: 3%; text-align: center;">#</th>
-            <th style="width: 11%;">Bus Number</th>
-            <th style="width: 14%;">Routes Operated</th>
-            <th style="width: 14%;">Primary Driver</th>
-            <th style="width: 9%; text-align: center;">Morning 1</th>
-            <th style="width: 9%; text-align: center;">Morning 2</th>
-            <th style="width: 9%; text-align: center;">Evening 1</th>
-            <th style="width: 9%; text-align: center;">Evening 2</th>
-            <th style="width: 6%; text-align: center;">Trips</th>
-            <th style="width: 8%; text-align: right;">Total KM</th>
-            <th style="width: 8%; text-align: center;">Status</th>
+            <th style="width: 4%; text-align: center;">#</th>
+            <th style="width: 14%;">Bus Number</th>
+            <th style="width: 16%;">Assigned Driver</th>
+            <th style="width: 33%;">Morning Route & Timings</th>
+            <th style="width: 33%;">Evening Route & Timings</th>
           </tr>
         </thead>
         <tbody>
@@ -396,11 +475,8 @@ function buildInstitutionSectionHtml(instGroup, from, to, isStandalone = true) {
         </tbody>
         <tfoot>
           <tr style="background: #e2e8f0; font-weight: 800;">
-            <td colspan="4" style="text-align: right;">FLEET TOTAL (${shortName}):</td>
-            <td colspan="4" style="text-align: center; color: #334155;" class="mono">${instGroup.busesCount} Active Vehicles</td>
-            <td style="text-align: center; color: #0284c7;" class="mono">${instGroup.totalTrips || 0}</td>
-            <td style="text-align: right; color: #0f172a; font-size: 11.5px;" class="mono">${Number(instGroup.totalKm || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km</td>
-            <td style="text-align: center; color: #166534;">Verified</td>
+            <td colspan="3" style="text-align: right;">FLEET TOTAL (${shortName}):</td>
+            <td colspan="2" style="text-align: center; color: #334155;" class="mono">${instGroup.busesCount} Active Vehicles</td>
           </tr>
         </tfoot>
       </table>
@@ -905,10 +981,11 @@ export function downloadAllSeparateInstitutionFiles({
   });
 }
 
-// Re-export vector PDF generators and ZIP bundle utilities
+// Re-export vector PDF generators
 export {
   generateInstitutionPdfDoc,
   generateAllInstitutionsConsolidatedPdfDoc,
+  downloadAllInstitutionsSeparatePdfs,
   downloadAllInstitutionsZip,
   downloadSingleInstitutionPdf,
   downloadAllInstitutionsConsolidatedPdf

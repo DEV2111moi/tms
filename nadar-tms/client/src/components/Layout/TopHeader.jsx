@@ -26,7 +26,7 @@ const ROUTE_TITLES = {
   '/admin/alerts': 'FC Alerts'
 };
 
-export default function TopHeader() {
+export default function TopHeader({ onToggleMobileMenu }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -62,8 +62,24 @@ export default function TopHeader() {
         transition: 'all 0.2s ease'
       }}
     >
-      {/* Left: Breadcrumbs & Current Page Indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+      {/* Left: Hamburger (mobile) + Breadcrumbs & Current Page Indicator */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        {onToggleMobileMenu && (
+          <button
+            type="button"
+            className="mobile-hamburger-btn"
+            onClick={onToggleMobileMenu}
+            aria-label={t('Open Menu')}
+            title={t('Open Menu')}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+        )}
+
         <div
           onClick={() => navigate('/admin')}
           style={{
@@ -83,7 +99,7 @@ export default function TopHeader() {
           <span className="hide-on-mobile">{t('TMHNU Fleet')}</span>
         </div>
 
-        <span style={{ color: '#cbd5e1', fontSize: 13, userSelect: 'none' }}>/</span>
+        <span className="hide-on-mobile" style={{ color: '#cbd5e1', fontSize: 13, userSelect: 'none' }}>/</span>
 
         {/* Current Module Name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>

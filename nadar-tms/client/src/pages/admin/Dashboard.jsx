@@ -593,7 +593,7 @@ export default function Dashboard() {
         {/* ROW 4: OPERATIONAL DETAIL TABS (LIVE TRIPS & UNASSIGNED QUEUE)              */}
         {/* ========================================================================= */}
         <div style={{ marginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <div className="dashboard-tab-scroll" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <button
               className={`filter-chip ${activeViewTab === 'overview' ? 'active' : ''}`}
               onClick={() => setActiveViewTab('overview')}

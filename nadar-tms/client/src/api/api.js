@@ -130,6 +130,12 @@ const api = {
   createSubstitution: (data) => call('/substitutions', { method: 'POST', body: JSON.stringify(data) }),
   resolveSubstitution: (id) => call(`/substitutions/${id}/resolve`, { method: 'PUT' }),
   deleteSubstitution: (id) => call(`/substitutions/${id}`, { method: 'DELETE' }),
+
+  // Live GPS Telemetry & Tracking
+  gpsLive: () => call('/gps/live'),
+  gpsRaw: (packet) => call('/gps/raw', { method: 'POST', body: JSON.stringify({ packet }) }),
+  gpsSimulate: (data) => call('/gps/simulate', { method: 'POST', body: JSON.stringify(data) }),
 };
+
 
 export default api;

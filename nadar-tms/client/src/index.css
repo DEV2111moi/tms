@@ -2555,15 +2555,399 @@ a.nav-item.active {
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeOut { to { opacity: 0; } }
 
-/* ---- Responsive ---- */
+/* ========================================================================= */
+/* MOBILE NAVIGATION & RESPONSIVE CONSOLE SYSTEM                             */
+/* ========================================================================= */
+
+/* Hamburger Button in TopHeader (Mobile only) */
+.mobile-hamburger-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.mobile-hamburger-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.mobile-hamburger-btn:hover,
+.mobile-hamburger-btn:active {
+  background: #f0eeff;
+  color: #6854ec;
+  border-color: #cbd5e1;
+}
+
+/* Sidebar Backdrop (Drawer Mode on Mobile) */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 95;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Sidebar Mobile Close Button (✕) */
+.sidebar-mobile-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.18s ease;
+}
+
+.sidebar-mobile-close:hover,
+.sidebar-mobile-close:active {
+  background: #fee2e2;
+  color: #ef4444;
+  border-color: #fca5a5;
+}
+
+.sidebar-mobile-close svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Mobile Bottom Navigation Bar (Fixed bottom on smartphones) */
+.mobile-bottom-nav {
+  display: none;
+}
+
+/* Responsive Breakpoints (< 768px Phones & Tablets) */
 @media (max-width: 768px) {
-  .sidebar { display: none; }
-  .main-area { margin-left: 0; }
-  .page-head { padding: 16px 16px 0; }
-  .page-body { padding: 12px 16px 32px; }
-  .form-grid { grid-template-columns: 1fr; }
-  .cards-grid { grid-template-columns: repeat(2, 1fr); }
-  .modal { max-width: 100%; margin: 10px; }
+  /* Controls visibility */
+  .mobile-hamburger-btn {
+    display: inline-flex;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+  }
+
+  .sidebar-mobile-close {
+    display: inline-flex;
+  }
+
+  /* Slide-over Drawer for Sidebar */
+  .sidebar {
+    display: flex !important;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 285px;
+    max-width: 85vw;
+    z-index: 100 !important;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 12px 0 35px rgba(0, 0, 0, 0.22);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  /* Main area adjusts to 100% width with bottom nav safe-clearance */
+  .main-area {
+    margin-left: 0 !important;
+    padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
+    width: 100% !important;
+  }
+
+  /* Bottom Navigation Bar */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(226, 232, 240, 0.95);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
+    z-index: 90;
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  .mobile-bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #64748b;
+    text-decoration: none !important;
+    font-size: 10.5px;
+    font-weight: 600;
+    gap: 3px;
+    padding: 4px 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-bottom-nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .mobile-bottom-nav-icon svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .mobile-bottom-nav-label {
+    line-height: 1.1;
+    letter-spacing: 0.1px;
+    white-space: nowrap;
+  }
+
+  .mobile-bottom-nav-item:hover,
+  .mobile-bottom-nav-item:active {
+    color: #6854ec;
+  }
+
+  .mobile-bottom-nav-item.active {
+    color: #6854ec;
+  }
+
+  .mobile-bottom-nav-item.active .mobile-bottom-nav-icon {
+    transform: translateY(-2px);
+    color: #6854ec;
+  }
+
+  .mobile-bottom-nav-item.active .mobile-bottom-nav-label {
+    font-weight: 700;
+    color: #6854ec;
+  }
+
+  /* Page Head & Breadcrumbs */
+  .page-head {
+    padding: 14px 16px 8px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .page-title {
+    font-size: 20px !important;
+  }
+
+  .page-sub {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+
+  .dashboard-head-actions {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+  }
+
+  .dashboard-head-actions select {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .page-body {
+    padding: 12px 14px 28px !important;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .modal {
+    max-width: 100% !important;
+    margin: 10px !important;
+  }
+
+  /* 2x2 Hero KPI Grid for Smartphones */
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .socialeco-kpi-card {
+    padding: 14px 12px !important;
+    border-radius: 14px !important;
+  }
+
+  .socialeco-kpi-card__header {
+    margin-bottom: 8px !important;
+  }
+
+  .socialeco-kpi-card__brand {
+    font-size: 11.5px !important;
+    gap: 5px !important;
+  }
+
+  .socialeco-kpi-card__value {
+    font-size: 24px !important;
+  }
+
+  .socialeco-kpi-card__delta {
+    font-size: 10.5px !important;
+  }
+
+  .socialeco-kpi-card__label {
+    font-size: 11px !important;
+    margin-top: 2px !important;
+  }
+
+  .socialeco-card-arrow {
+    display: none !important;
+  }
+
+  /* Shift Operations Matrix Card */
+  .socialeco-card {
+    padding: 16px 14px !important;
+    border-radius: 14px !important;
+  }
+
+  .socialeco-card__head {
+    margin-bottom: 14px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .socialeco-card__title {
+    font-size: 14.5px !important;
+  }
+
+  .shift-segmented-nav {
+    width: 100% !important;
+    display: flex !important;
+  }
+
+  .shift-segment-btn {
+    flex: 1 !important;
+    justify-content: center !important;
+    padding: 7px 10px !important;
+    font-size: 11.5px !important;
+  }
+
+  .socialeco-shift-row {
+    grid-template-columns: 82px 1fr auto !important;
+    gap: 8px !important;
+    font-size: 11.5px !important;
+  }
+
+  .socialeco-shift-name {
+    font-size: 11.5px !important;
+  }
+
+  /* Bottom modules grid */
+  .socialeco-bot-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .socialeco-banner-card {
+    padding: 18px 16px !important;
+    border-radius: 14px !important;
+  }
+
+  .socialeco-banner-title {
+    font-size: 16px !important;
+  }
+
+  .socialeco-banner-sub {
+    font-size: 12px !important;
+    margin-top: 4px !important;
+  }
+
+  .socialeco-banner-btn {
+    margin-top: 14px !important;
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+
+  /* Smooth horizontal scroll for Dashboard tabs */
+  .dashboard-tab-scroll {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 6px !important;
+    gap: 8px !important;
+  }
+
+  .dashboard-tab-scroll::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .filter-chip {
+    padding: 7px 14px !important;
+    font-size: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Responsive Tables with touch momentum scrolling */
+  .table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    max-width: 100% !important;
+    border-radius: 12px !important;
+  }
+
+  .table-wrap .tbl {
+    min-width: 520px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* ---- Loading spinner ---- */
@@ -2842,10 +3226,33 @@ a.nav-item.active {
 @media (max-width: 768px) {
   .att-kpi-ribbon {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .att-kpi-card {
+    padding: 12px 12px;
+    border-radius: 14px;
+    gap: 10px;
+  }
+  .att-kpi-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+  }
+  .att-kpi-val {
+    font-size: 20px;
+  }
+  .att-kpi-label {
+    font-size: 11.5px;
+  }
+  .att-kpi-sub {
+    font-size: 10.5px;
+  }
+  .att-kpi-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 380px) {
   .att-kpi-ribbon {
     grid-template-columns: 1fr;
   }
@@ -3395,4 +3802,428 @@ body.lang-ta .btn {
     height: 50px;
   }
 }
+
+/* ==========================================================================
+   LIVE FLEET GPS TRACKING — MODERN ENTERPRISE UI
+   ========================================================================== */
+.live-gps-page {
+  padding: 24px 32px 32px;
+  background: var(--bg-main, #f4f6fa);
+  min-height: calc(100vh - 65px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.live-gps-header-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 18px 24px;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 4px 20px -2px rgba(115, 103, 240, 0.05), 0 2px 6px rgba(0, 0, 0, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.live-gps-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.live-gps-pulse-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #7c6cfc 0%, #6854ec 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(124, 108, 252, 0.35);
+  flex-shrink: 0;
+}
+
+.live-gps-header-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.live-gps-tcp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.live-gps-tcp-badge .beacon-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulseDot 1.6s infinite ease-in-out;
+}
+
+.live-gps-header-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.live-gps-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.live-gps-stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.live-gps-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-gps-grid-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 18px;
+  height: calc(100vh - 200px);
+  min-height: 560px;
+}
+
+@media (max-width: 1024px) {
+  .live-gps-grid-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+}
+
+/* Sidebar List */
+.live-gps-sidebar {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 4px 20px -2px rgba(115, 103, 240, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.live-gps-search-wrap {
+  padding: 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #edf2f7;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.live-gps-search-input-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.live-gps-search-input-box svg {
+  position: absolute;
+  left: 12px;
+  color: #94a3b8;
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
+}
+
+.live-gps-search-input {
+  width: 100%;
+  padding: 9px 12px 9px 36px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #1e293b;
+  background: #f8fafc;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.live-gps-search-input:focus {
+  background: #ffffff;
+  border-color: #7c6cfc;
+  box-shadow: 0 0 0 3px rgba(124, 108, 252, 0.15);
+}
+
+.live-gps-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.live-gps-tab-btn {
+  border: none;
+  background: transparent;
+  padding: 7px 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: center;
+}
+
+.live-gps-tab-btn.active {
+  background: #ffffff;
+  color: #6854ec;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.live-gps-bus-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.live-gps-bus-card {
+  background: #ffffff;
+  border: 1.5px solid #edf2f7;
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.live-gps-bus-card:hover {
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
+}
+
+.live-gps-bus-card.selected {
+  border-color: #7c6cfc;
+  background: #fbfaff;
+  box-shadow: 0 0 0 2px rgba(124, 108, 252, 0.2), 0 6px 16px rgba(124, 108, 252, 0.08);
+}
+
+.live-gps-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.live-gps-bus-badge-reg {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: 0.2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-gps-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.live-gps-status-pill.moving {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.live-gps-status-pill.online {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.live-gps-status-pill.idle {
+  background: #fefce8;
+  color: #a16207;
+  border: 1px solid #fef08a;
+}
+
+.live-gps-status-pill.offline {
+  background: #f8fafc;
+  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+}
+
+.live-gps-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.live-gps-card-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.live-gps-card-meta-lbl {
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.live-gps-card-meta-val {
+  font-weight: 700;
+  color: #334155;
+}
+
+/* Map Container */
+.live-gps-map-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 4px 20px -2px rgba(115, 103, 240, 0.05);
+  overflow: hidden;
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.live-gps-map-viewport {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+}
+
+/* Simulator Modal */
+.live-gps-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.live-gps-modal-card {
+  background: #ffffff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 580px;
+  padding: 26px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid #e2e8f0;
+  animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.live-gps-sample-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  transition: all 0.18s ease;
+  margin-bottom: 8px;
+}
+
+.live-gps-sample-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.live-gps-sample-item.active {
+  border-color: #7c6cfc;
+  background: #f0eeff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes gpsPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 16px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes campusGpsPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(104, 84, 236, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 18px rgba(104, 84, 236, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(104, 84, 236, 0);
+  }
+}
+
+@keyframes beaconFlash {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
 

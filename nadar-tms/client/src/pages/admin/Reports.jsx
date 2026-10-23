@@ -6,6 +6,7 @@ import {
   groupBusesByInstitution,
   exportSingleInstitutionBusReportPdf,
   exportAllInstitutionsConsolidatedPdf,
+  downloadAllInstitutionsSeparatePdfs,
   downloadAllInstitutionsZip,
   downloadSingleInstitutionPdf,
   downloadAllInstitutionsConsolidatedPdf
@@ -248,7 +249,7 @@ export default function Reports() {
     });
   };
 
-  const handleDownloadAllZip = async () => {
+  const handleDownloadAllSeparatePdfs = async () => {
     let repData = result?.data;
     if (!repData || result?.type !== 'bus_wise') {
       try {
@@ -275,20 +276,20 @@ export default function Reports() {
       return;
     }
 
-    toast('Generating ZIP with separate institution PDFs...');
+    toast(`Downloading separate PDFs for ${groups.length} institutions...`);
     try {
-      await downloadAllInstitutionsZip({
+      await downloadAllInstitutionsSeparatePdfs({
         institutionsGroups: groups,
         from: st.from,
         to: st.to,
         onProgress: (cur, tot, name) => {
-          toast(`Bundling PDF (${cur}/${tot}): ${name}...`);
+          toast(`Downloading PDF (${cur}/${tot}): ${name}...`);
         }
       });
-      toast('ZIP archive downloaded successfully!');
+      toast('All separate institution PDFs downloaded successfully!');
     } catch (err) {
       console.error(err);
-      toast('Failed to generate ZIP: ' + (err.message || 'Error'));
+      toast('Failed to download PDFs: ' + (err.message || 'Error'));
     }
   };
 
@@ -409,7 +410,7 @@ export default function Reports() {
                 <button
                   type="button"
                   className="btn btn-sm"
-                  onClick={handleDownloadAllZip}
+                  onClick={handleDownloadAllSeparatePdfs}
                   disabled={loading}
                   style={{
                     background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
@@ -424,10 +425,10 @@ export default function Reports() {
                     boxShadow: '0 2px 6px rgba(22,163,74,0.25)',
                     cursor: 'pointer'
                   }}
-                  title="Download all institutions' individual PDF files inside a single ZIP archive named with institution short names"
+                  title="Directly download individual PDF files for each institution (no ZIP archive)"
                 >
-                  <span>📦</span>
-                  <span>Download All as ZIP (Separate PDFs)</span>
+                  <span>📥</span>
+                  <span>Download All Institutions (Separate PDFs)</span>
                 </button>
 
                 <button
@@ -637,8 +638,8 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
   const [search, setSearch] = useState('');
   const [expandedBus, setExpandedBus] = useState(null);
   const [viewMode, setViewMode] = useState('detailed'); // 'detailed' | 'summary'
-  const [zipLoading, setZipLoading] = useState(false);
-  const [zipStatus, setZipStatus] = useState('');
+  const [separateLoading, setSeparateLoading] = useState(false);
+  const [separateStatus, setSeparateStatus] = useState('');
 
   const buses = data?.buses || [];
   const trips = data?.trips || [];
@@ -731,29 +732,29 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
     });
   };
 
-  const handleDownloadZip = async () => {
+  const handleDownloadAllSeparate = async () => {
     if (institutionGroups.length === 0) {
       alert('No institution fleet data available to export.');
       return;
     }
-    setZipLoading(true);
-    setZipStatus('Preparing ZIP...');
+    setSeparateLoading(true);
+    setSeparateStatus('Starting downloads...');
     try {
-      await downloadAllInstitutionsZip({
+      await downloadAllInstitutionsSeparatePdfs({
         institutionsGroups: institutionGroups,
         from: data?.from || st?.from,
         to: data?.to || st?.to,
         onProgress: (cur, tot, name) => {
-          setZipStatus(`Bundling (${cur}/${tot}): ${name}...`);
+          setSeparateStatus(`Downloading (${cur}/${tot}): ${name}...`);
         }
       });
-      setZipStatus('Downloaded!');
-      setTimeout(() => setZipStatus(''), 2500);
+      setSeparateStatus('Downloaded All!');
+      setTimeout(() => setSeparateStatus(''), 2500);
     } catch (err) {
-      console.error('ZIP download error:', err);
-      alert('Error creating ZIP: ' + (err.message || 'Unknown error'));
+      console.error('Download error:', err);
+      alert('Error downloading PDFs: ' + (err.message || 'Unknown error'));
     } finally {
-      setZipLoading(false);
+      setSeparateLoading(false);
     }
   };
 
@@ -791,7 +792,7 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '20px' }}>🏛️</span>
               <span style={{ fontWeight: 800, fontSize: '14.5px', color: '#1e3a8a', letterSpacing: '-0.2px' }}>
-                Institution-Wise Bus Reports (Direct PDF & ZIP Download)
+                Institution-Wise Bus Reports (Separate PDF Downloads & Cross-Verification)
               </span>
               <span style={{
                 fontSize: '11px',
@@ -806,17 +807,17 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
               </span>
             </div>
             <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px' }}>
-              Download a single ZIP archive containing individual PDFs named by institution, or print/preview the master consolidated PDF.
+              Directly download individual PDF files for each institution in 1-click (no ZIP), or preview/print the master consolidated PDF.
             </div>
           </div>
 
-          {/* Action Buttons: ZIP Download (Separate PDFs in 1-Click) + Master PDF */}
+          {/* Action Buttons: Separate PDFs Download + Master PDF */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
               className="btn btn-sm"
-              onClick={handleDownloadZip}
-              disabled={zipLoading}
+              onClick={handleDownloadAllSeparate}
+              disabled={separateLoading}
               style={{
                 background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                 color: '#ffffff',
@@ -829,16 +830,16 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
                 alignItems: 'center',
                 gap: '8px',
                 boxShadow: '0 2px 10px rgba(22,163,74,0.3)',
-                cursor: zipLoading ? 'wait' : 'pointer',
+                cursor: separateLoading ? 'wait' : 'pointer',
                 transition: 'all 0.15s ease'
               }}
-              title="Download all institutions' individual PDF files inside a single ZIP archive named with institution short names"
+              title="Directly download individual PDF files for each institution (no ZIP archive)"
             >
-              <span>{zipLoading ? '⏳' : '📦'}</span>
+              <span>{separateLoading ? '⏳' : '📥'}</span>
               <span>
-                {zipLoading
-                  ? (zipStatus || 'Generating ZIP Archive...')
-                  : 'Download All Institutions as ZIP (Separate PDFs in 1-Click)'}
+                {separateLoading
+                  ? (separateStatus || 'Downloading PDFs...')
+                  : 'Download All Institutions (Separate PDFs in 1-Click)'}
               </span>
             </button>
 

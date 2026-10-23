@@ -61,9 +61,31 @@ const { query } = require('./db/pool');
     `);
     console.log('✅ Checked/created daily_substitutions table.');
   } catch (e) {
-    console.error('Error ensuring daily_substitutions table:', e.message);
+    console.error('Note on daily_substitutions table:', e.message);
+  }
+
+  try {
+    await query(`ALTER TABLE bus_locations ADD COLUMN IF NOT EXISTS bus_id INT DEFAULT NULL`);
+    await query(`ALTER TABLE bus_locations ADD COLUMN IF NOT EXISTS imei VARCHAR(50) DEFAULT NULL`);
+    await query(`ALTER TABLE bus_locations ADD COLUMN IF NOT EXISTS speed_km DECIMAL(6,2) DEFAULT 0`);
+    await query(`ALTER TABLE bus_locations ADD COLUMN IF NOT EXISTS ignition TINYINT(1) DEFAULT 0`);
+    await query(`ALTER TABLE bus_locations ADD COLUMN IF NOT EXISTS raw_packet VARCHAR(255) DEFAULT NULL`);
+    await query(`ALTER TABLE bus_locations MODIFY COLUMN trip_id INT DEFAULT NULL`);
+    console.log('✅ Ensured bus_locations live tracking columns.');
+  } catch (e) {
+    try { await query(`ALTER TABLE bus_locations ADD COLUMN bus_id INT DEFAULT NULL`); } catch (e1) {}
+    try { await query(`ALTER TABLE bus_locations ADD COLUMN imei VARCHAR(50) DEFAULT NULL`); } catch (e2) {}
+    try { await query(`ALTER TABLE bus_locations ADD COLUMN speed_km DECIMAL(6,2) DEFAULT 0`); } catch (e3) {}
+    try { await query(`ALTER TABLE bus_locations ADD COLUMN ignition TINYINT(1) DEFAULT 0`); } catch (e4) {}
+    try { await query(`ALTER TABLE bus_locations ADD COLUMN raw_packet VARCHAR(255) DEFAULT NULL`); } catch (e5) {}
+    try { await query(`ALTER TABLE bus_locations MODIFY COLUMN trip_id INT DEFAULT NULL`); } catch (e6) {}
   }
 })();
+
+// Initialize GPS TCP Telemetry Server (default port 5050)
+const { startGpsTcpServer } = require('./services/gpsReceiver');
+const GPS_PORT = parseInt(process.env.GPS_PORT || '5050', 10);
+startGpsTcpServer(GPS_PORT);
 
 // Middleware
 app.use(cors());
@@ -71,7 +93,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // API routes
 app.use('/api', apiRouter);
-app.get('/api/health', (req, res) => res.json({ ok: true, service: 'nadar-tms' }));
+app.get('/api/health', (req, res) => res.json({ ok: true, service: 'nadar-tms', gps_port: GPS_PORT }));
 
 // Serve uploaded files
 const uploadDir = path.join(__dirname, '..', 'uploads');

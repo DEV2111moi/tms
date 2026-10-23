@@ -26,6 +26,8 @@ import JobCards from './pages/admin/JobCards';
 import Tyres from './pages/admin/Tyres';
 import FleetAlerts from './pages/admin/FleetAlerts';
 import AttendanceReport from './pages/admin/AttendanceReport';
+import LiveTracking from './pages/admin/LiveTracking';
+import GpsArchitectureExplainer from './pages/admin/GpsArchitectureExplainer';
 import Attendance from './pages/incharge/Attendance';
 import DriverPanel from './pages/driver/DriverPanel';
 import ParentTracker from './pages/parent/ParentTracker';
@@ -75,7 +77,12 @@ export default function App() {
                 <Route path="inventory" element={<Maintenance defaultTab="inventory" />} />
                 <Route path="tyres" element={<Tyres />} />
                 <Route path="alerts" element={<FleetAlerts />} />
+                <Route path="live-tracking" element={<LiveTracking />} />
+                <Route path="gps-explainer" element={<GpsArchitectureExplainer />} />
               </Route>
+
+              {/* Public/Direct Standalone GPS Architecture Explainer (For Tutor Presentation) */}
+              <Route path="/gps-explainer" element={<GpsArchitectureExplainer />} />
 
               {/* Incharge attendance marker */}
               <Route path="/incharge" element={

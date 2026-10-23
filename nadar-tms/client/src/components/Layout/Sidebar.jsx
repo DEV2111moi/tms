@@ -84,6 +84,14 @@ function NavIcon({ name, className = "nav-icon-svg" }) {
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
       );
+    case 'map':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
+          <line x1="9" y1="3" x2="9" y2="18" />
+          <line x1="15" y1="6" x2="15" y2="21" />
+        </svg>
+      );
     case 'report':
       return (
         <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -192,6 +200,16 @@ function NavIcon({ name, className = "nav-icon-svg" }) {
           <line x1="10" y1="14" x2="21" y2="3" />
         </svg>
       );
+    case 'satellite':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M13 7 9 3 5 7l4 4" />
+          <path d="m17 11 4 4-4 4-4-4" />
+          <path d="m8 12 4 4 6-6-4-4Z" />
+          <path d="m16 8 3-3" />
+          <path d="M9 21a6 6 0 0 0-6-6" />
+        </svg>
+      );
     default:
       return null;
   }
@@ -202,6 +220,8 @@ const GROUPS_ADMIN = [
     title: 'Overview',
     items: [
       { to: '/admin', icon: 'dashboard', label: 'Dashboard', end: true },
+      { to: '/admin/live-tracking', icon: 'map', label: 'Live Bus Tracking' },
+      { to: '/admin/gps-explainer', icon: 'satellite', label: 'GPS Explainer (Tutor)' },
     ],
   },
   {
@@ -247,6 +267,8 @@ const GROUPS_INST = [
     title: 'Overview',
     items: [
       { to: '/admin', icon: 'dashboard', label: 'Dashboard', end: true },
+      { to: '/admin/live-tracking', icon: 'map', label: 'Live Bus Tracking' },
+      { to: '/admin/gps-explainer', icon: 'satellite', label: 'GPS Explainer (Tutor)' },
     ],
   },
   {
@@ -280,6 +302,8 @@ const GROUPS_EXEC = [
     title: 'Overview',
     items: [
       { to: '/admin', icon: 'dashboard', label: 'Dashboard', end: true },
+      { to: '/admin/live-tracking', icon: 'map', label: 'Live Bus Tracking' },
+      { to: '/admin/gps-explainer', icon: 'satellite', label: 'GPS Explainer (Tutor)' },
     ],
   },
   {
@@ -303,7 +327,7 @@ const GROUPS_EXEC = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -318,8 +342,13 @@ export default function Sidebar() {
   }, []);
 
   const handleLogout = () => {
+    if (onClose) onClose();
     logout();
     navigate('/login');
+  };
+
+  const handleLinkClick = () => {
+    if (onClose) onClose();
   };
 
   const getInitials = (name) => {
@@ -332,82 +361,106 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="sidebar">
-      {/* Brand Header */}
-      <div className="sidebar-brand">
-        <div className="sidebar-brand-top">
-          <div className="brand-logo-badge" title="Nadar TMHNU Fleet">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 6v6m8-6v6" />
-              <path d="M4 16h16" />
-              <path d="M5 7a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7z" />
-              <circle cx="8" cy="14" r="1.5" />
-              <circle cx="16" cy="14" r="1.5" />
-              <path d="M6 18v2m12-2v2" />
-            </svg>
+    <>
+      {/* Mobile Drawer Backdrop */}
+      <div
+        className={`sidebar-backdrop ${isOpen ? 'active' : ''}`}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      <aside className={`sidebar ${isOpen ? 'mobile-open' : ''}`}>
+        {/* Brand Header */}
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-top">
+            <div className="brand-logo-badge" title="Nadar TMHNU Fleet">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 6v6m8-6v6" />
+                <path d="M4 16h16" />
+                <path d="M5 7a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7z" />
+                <circle cx="8" cy="14" r="1.5" />
+                <circle cx="16" cy="14" r="1.5" />
+                <path d="M6 18v2m12-2v2" />
+              </svg>
+            </div>
+            <div className="brand-titles">
+              <span className="brand-kicker">{t('THENI CENTRAL')}</span>
+              <span className="brand-name">TMHNU</span>
+            </div>
+
+            {/* Mobile Close Button (✕) */}
+            <button
+              type="button"
+              className="sidebar-mobile-close"
+              onClick={onClose}
+              aria-label={t('Close menu')}
+              title={t('Close menu')}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
-          <div className="brand-titles">
-            <span className="brand-kicker">{t('THENI CENTRAL')}</span>
-            <span className="brand-name">TMHNU</span>
+
+          <div className="sidebar-status-pill">
+            <span className="status-dot"></span>
+            <span>{t(portalName)}</span>
           </div>
         </div>
 
-        <div className="sidebar-status-pill">
-          <span className="status-dot"></span>
-          <span>{t(portalName)}</span>
-        </div>
-      </div>
+        {/* Navigation with categorized groups */}
+        <nav className="sidebar-nav">
+          {groups.map((group) => (
+            <div key={group.title} className="nav-group">
+              <div className="nav-group-label">{t(group.title)}</div>
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  onClick={handleLinkClick}
+                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <div className="nav-icon-wrap">
+                    <NavIcon name={item.icon} />
+                  </div>
+                  <span className="nav-label">{t(item.label)}</span>
+                  {item.badge && alertCount > 0 && (
+                    <span className="nav-badge">{alertCount}</span>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          ))}
+        </nav>
 
-      {/* Navigation with categorized groups */}
-      <nav className="sidebar-nav">
-        {groups.map((group) => (
-          <div key={group.title} className="nav-group">
-            <div className="nav-group-label">{t(group.title)}</div>
-            {group.items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              >
-                <div className="nav-icon-wrap">
-                  <NavIcon name={item.icon} />
-                </div>
-                <span className="nav-label">{t(item.label)}</span>
-                {item.badge && alertCount > 0 && (
-                  <span className="nav-badge">{alertCount}</span>
-                )}
-              </NavLink>
-            ))}
+        {/* Sidebar Footer with user badge */}
+        <div className="sidebar-foot">
+          <div className="sidebar-user-card">
+            <div className="sidebar-user-avatar">
+              {getInitials(user?.name)}
+            </div>
+            <div className="sidebar-user-meta">
+              <span className="sidebar-user-name" title={user?.name || t('Administrator')}>
+                {user?.name || t('Administrator')}
+              </span>
+              <span className="sidebar-user-role">
+                {t(role === 'institution' ? 'Campus Incharge' : role === 'executive' ? 'Executive' : 'Super Admin')}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn-signout-icon"
+              onClick={handleLogout}
+              title={t('Sign out of TMS')}
+            >
+              <NavIcon name="logout" />
+            </button>
           </div>
-        ))}
-      </nav>
-
-      {/* Sidebar Footer with user badge */}
-      <div className="sidebar-foot">
-        <div className="sidebar-user-card">
-          <div className="sidebar-user-avatar">
-            {getInitials(user?.name)}
-          </div>
-          <div className="sidebar-user-meta">
-            <span className="sidebar-user-name" title={user?.name || t('Administrator')}>
-              {user?.name || t('Administrator')}
-            </span>
-            <span className="sidebar-user-role">
-              {t(role === 'institution' ? 'Campus Incharge' : role === 'executive' ? 'Executive' : 'Super Admin')}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="btn-signout-icon"
-            onClick={handleLogout}
-            title={t('Sign out of TMS')}
-          >
-            <NavIcon name="logout" />
-          </button>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 

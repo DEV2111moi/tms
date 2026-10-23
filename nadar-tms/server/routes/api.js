@@ -15,6 +15,7 @@ const upload = require('../controllers/uploadController');
 const salary = require('../controllers/salaryController');
 const substitution = require('../controllers/substitutionController');
 const maintenance = require('../controllers/maintenanceController');
+const gps = require('../controllers/gpsController');
 
 // ---- Auth (public) ----
 router.post('/auth/login', auth.login);
@@ -105,6 +106,11 @@ router.post('/salaries/bulk-mark-paid', authenticate, requireRole('admin', 'inst
 router.get('/substitutions', authenticate, substitution.list);
 router.post('/substitutions', authenticate, requireRole('admin', 'institution'), substitution.create);
 router.put('/substitutions/:id/resolve', authenticate, requireRole('admin', 'institution'), substitution.resolve);
-router.delete('/substitutions/:id', authenticate, requireRole('admin', 'institution'), substitution.remove);
+// ---- Live GPS Telemetry & Tracking ----
+router.get('/gps/live', gps.getLive);
+router.get('/gps/stream', gps.stream);
+router.post('/gps/raw', gps.receiveRaw);
+router.post('/gps/simulate', gps.simulate);
 
 module.exports = router;
+
