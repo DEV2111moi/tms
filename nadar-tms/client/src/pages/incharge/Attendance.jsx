@@ -3,17 +3,64 @@ import api from '../../api/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/UI/Toast';
 import { useLanguage } from '../../context/LanguageContext';
-import LanguageSwitcher from '../../components/UI/LanguageSwitcher';
 import { useNavigate } from 'react-router-dom';
+import {
+  Users,
+  CheckCircle2,
+  UserX,
+  MapPin,
+  Sun,
+  Moon,
+  Clock,
+  Bus,
+  Phone,
+  User,
+  Navigation,
+  Search,
+  Check,
+  ChevronDown,
+  LogOut,
+  Key,
+  Eye,
+  EyeOff,
+  Lock,
+} from 'lucide-react';
+
+function getShiftTimingInfo() {
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const totalMins = hours * 60 + minutes;
+
+  // 6:00 AM = 360 mins, 11:00 AM = 660 mins
+  // 3:00 PM (15:00) = 900 mins, 7:00 PM (19:00) = 1140 mins
+  const isMorningActive = totalMins >= 360 && totalMins < 660; // 06:00 - 11:00
+  const isEveningActive = totalMins >= 900 && totalMins < 1140; // 15:00 - 19:00
+  const isMorningEnded = totalMins >= 660; // 11:00 AM or later
+  const isEveningEnded = totalMins >= 1140; // 7:00 PM or later
+
+  // Once morning ends (11:00 AM = 660 mins), automatically switch to evening
+  const autoShift = totalMins >= 660 ? 'evening' : 'morning';
+
+  return {
+    totalMins,
+    autoShift,
+    isMorningActive,
+    isEveningActive,
+    isMorningEnded,
+    isEveningEnded,
+    currentTimeStr: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+}
 
 export default function Attendance() {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
-
   const toast = useToast();
 
-  const [shift, setShift] = useState('morning1');
+  const [timingInfo, setTimingInfo] = useState(getShiftTimingInfo);
+  const [shift, setShift] = useState(() => getShiftTimingInfo().autoShift);
   const [routeId, setRouteId] = useState('');
   const [routes, setRoutes] = useState([]);
   const [trip, setTrip] = useState(null);
@@ -23,7 +70,66 @@ export default function Attendance() {
   const [savingId, setSavingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Gmail-style profile popover & password state
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwdSaving, setPwdSaving] = useState(false);
+  const [showPwdText, setShowPwdText] = useState(false);
+  const profileMenuRef = useRef(null);
+
   const locTimer = useRef(null);
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+        setShowProfileMenu(false);
+        setShowPasswordForm(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 4) {
+      toast('Password must be at least 4 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast('Passwords do not match.');
+      return;
+    }
+    setPwdSaving(true);
+    try {
+      await api.changePassword({ newPassword });
+      toast('Password updated successfully!');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPasswordForm(false);
+    } catch (err) {
+      toast(err.message || 'Could not update password');
+    }
+    setPwdSaving(false);
+  };
+
+  // Periodically update live time and window detection
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const nextTiming = getShiftTimingInfo();
+      setTimingInfo(prev => {
+        if (!prev.isMorningEnded && nextTiming.isMorningEnded) {
+          // 11:00 AM boundary just crossed! Auto-switch to evening
+          setShift('evening');
+        }
+        return nextTiming;
+      });
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   const loadTrip = async (sh, rId) => {
     setLoading(true);
@@ -39,7 +145,7 @@ export default function Attendance() {
       if (res.trip) {
         const ros = await api.roster(res.trip.id);
         setRoster(ros);
-        // Expand first stop by default or all stops if small
+        // Expand first stop by default
         if (ros.stops?.length) {
           const initialExpanded = {};
           ros.stops.forEach((st, idx) => {
@@ -91,7 +197,19 @@ export default function Attendance() {
     };
   }, [trip]);
 
+  const isShiftWindowActive = shift === 'morning' ? timingInfo.isMorningActive : timingInfo.isEveningActive;
+  const isMorningPast = timingInfo.isMorningEnded;
+  const isEveningPast = timingInfo.isEveningEnded;
+  const isShiftClosed = (shift === 'morning' && isMorningPast) ||
+                        (shift === 'evening' && isEveningPast) ||
+                        trip?.status === 'completed';
+  const canMarkAttendance = !isShiftClosed && trip?.status === 'running';
+
   const handleMark = async (studentId, stopId, curStatus) => {
+    if (!canMarkAttendance) {
+      toast('Attendance window is closed for this shift.');
+      return;
+    }
     const nextStatus = curStatus === 'present' ? 'absent' : 'present';
     setSavingId(studentId);
     try {
@@ -124,6 +242,10 @@ export default function Attendance() {
   };
 
   const handleMarkAllAtStop = async (stopId, students) => {
+    if (!canMarkAttendance) {
+      toast('Attendance window is closed for this shift.');
+      return;
+    }
     const unboarded = students.filter(s => s.status !== 'present');
     if (!unboarded.length) return;
     setSavingId(`stop-${stopId}`);
@@ -160,6 +282,10 @@ export default function Attendance() {
   };
 
   const handleSubmit = async () => {
+    if (!canMarkAttendance) {
+      toast('Attendance window is closed for this shift.');
+      return;
+    }
     if (!confirm('Are you sure you want to finish marking attendance for this trip? This will end the active trip.')) return;
     try {
       await api.submit(trip.id);
@@ -189,9 +315,24 @@ export default function Attendance() {
 
   const getInitials = (name) => {
     if (!name) return 'ST';
-    const parts = name.trim().split(/\s+/);
+    const clean = name.replace(/\(.*?\)/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    const parts = clean.split(/\s+/).filter(Boolean);
+    if (!parts.length) return name.trim().charAt(0).toUpperCase() || 'ST';
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const getUserAvatarLetter = (name) => {
+    if (!name) return 'M';
+    const clean = name.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    if (!clean) return name.trim().charAt(0) || 'M';
+    return clean.charAt(0);
+  };
+
+  const getDisplayName = (name) => {
+    if (!name) return t('Incharge');
+    const clean = name.replace(/\s*\(Incharge\)/i, '').trim();
+    return clean || name;
   };
 
   // Filtered stops and students based on search
@@ -219,28 +360,13 @@ export default function Attendance() {
   const absentStudents = roster?.summary?.absent || 0;
   const completionPct = totalStudents > 0 ? Math.round((presentStudents / totalStudents) * 100) : 0;
 
-  const shiftsList = [
-    { key: 'morning1', label: 'Morning 1', icon: '☀️' },
-    { key: 'morning2', label: 'Morning 2', icon: '🌤️' },
-    { key: 'morning3', label: 'Morning 3', icon: '☀️' },
-    { key: 'morning4', label: 'Morning 4', icon: '🌤️' },
-    { key: 'evening1', label: 'Evening 1', icon: '🌙' },
-    { key: 'evening2', label: 'Evening 2', icon: '⭐' },
-    { key: 'evening3', label: 'Evening 3', icon: '🌙' },
-    { key: 'evening4', label: 'Evening 4', icon: '⭐' },
-  ];
-
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       {/* Top Header */}
       <header className="topbar">
         <div className="topbar-brand">
           <div className="topbar-logo-badge">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 6c0-1.1.9-2 2-2h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6z"/>
-              <circle cx="8" cy="18" r="2"/><circle cx="16" cy="18" r="2"/>
-              <path d="M4 11h16M9 4v7M15 4v7"/>
-            </svg>
+            <Bus size={20} />
           </div>
           <div className="topbar-title-wrap">
             <span className="topbar-kicker">{t('TMHNU FLEET') || 'TMHNU FLEET'}</span>
@@ -248,95 +374,207 @@ export default function Attendance() {
           </div>
         </div>
 
-        <div className="topbar-user-wrap" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <LanguageSwitcher compact={true} />
-          <div className="topbar-user-chip">
-            <div className="topbar-avatar">{getInitials(user?.name)}</div>
-            <div>
-              <div className="topbar-who">{user?.name || t('Incharge')}</div>
-              <div className="topbar-role-tag">{t('Shift Supervisor')}</div>
-            </div>
-          </div>
-          <button className="signout-btn" onClick={handleLogout} title={t('Exit session')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-            {t('Exit')}
+        <div className="topbar-user-wrap" style={{ position: 'relative' }} ref={profileMenuRef}>
+          <button
+            type="button"
+            className={`gmail-avatar-btn ${showProfileMenu ? 'active' : ''}`}
+            onClick={() => setShowProfileMenu(prev => !prev)}
+            title={`${user?.name || 'Incharge'} — Profile & Bus Details`}
+            aria-label="Account details"
+          >
+            {getUserAvatarLetter(user?.name)}
           </button>
-        </div>
-      </header>
 
+          {/* Gmail-Style Account & Bus Details Popover */}
+          {showProfileMenu && (
+            <div className="gmail-profile-popover">
+              {/* Incharge Profile Header */}
+              <div className="gmail-popover-header">
+                <div className="gmail-popover-avatar-lg">
+                  {getUserAvatarLetter(user?.name)}
+                </div>
+                <div className="gmail-popover-name">{user?.name || 'Murugan (Incharge)'}</div>
+                <div className="gmail-popover-email">{user?.email || 'incharge@tms.in'}</div>
+                <span className="gmail-popover-badge">{t('Shift Supervisor')}</span>
+              </div>
 
-      {/* Session Header & Telemetry Banner */}
-      <section className="attendance-session-banner">
-        <div className="session-top-row">
-          <div className="session-shift-pills">
-            {shiftsList.map(s => (
-              <button
-                key={s.key}
-                type="button"
-                className={`session-shift-btn ${shift === s.key ? 'active' : ''}`}
-                onClick={() => setShift(s.key)}
-              >
-                <span>{s.icon}</span>
-                <span>{s.label}</span>
-              </button>
-            ))}
-          </div>
+              <div className="gmail-popover-body">
+                {/* Assigned Bus & Trip Details Card */}
+                <div className="gmail-bus-info-card">
+                  <div className="gmail-bus-info-title">
+                    <Bus size={13} />
+                    <span>Assigned Bus Details</span>
+                  </div>
+                  <div className="gmail-bus-info-grid">
+                    <div className="gmail-bus-info-row">
+                      <span className="gmail-bus-info-label">Bus:</span>
+                      <span className="gmail-bus-info-value mono">{trip?.registration_number || 'TN27L4419'}</span>
+                    </div>
+                    <div className="gmail-bus-info-row">
+                      <span className="gmail-bus-info-label">Driver:</span>
+                      <span className="gmail-bus-info-value">{trip?.driver_name || 'UDHAYAMOORTHI K'}</span>
+                    </div>
+                    <div className="gmail-bus-info-row">
+                      <span className="gmail-bus-info-label">Phone:</span>
+                      {trip?.driver_phone || '9655343934' ? (
+                        <a
+                          href={`tel:${trip?.driver_phone || '9655343934'}`}
+                          className="gmail-bus-info-value"
+                          style={{ color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <Phone size={11} />
+                          <span>{trip?.driver_phone || '9655343934'}</span>
+                        </a>
+                      ) : (
+                        <span className="gmail-bus-info-value">—</span>
+                      )}
+                    </div>
+                    <div className="gmail-bus-info-row">
+                      <span className="gmail-bus-info-label">Route:</span>
+                      <span className="gmail-bus-info-value">{trip?.route_code || 'ROUTE 102'}</span>
+                    </div>
+                  </div>
+                </div>
 
-          {routes.length > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>Route:</span>
-              <select
-                className="session-route-picker"
-                value={routeId}
-                onChange={e => setRouteId(e.target.value)}
-              >
-                {routes.map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.route_code} — {r.route_name || r.name || 'Route'}
-                  </option>
-                ))}
-              </select>
+                {/* Actions: Forgot / Change Password */}
+                <div className="gmail-popover-actions">
+                  <button
+                    type="button"
+                    className="gmail-btn-action"
+                    onClick={() => setShowPasswordForm(prev => !prev)}
+                  >
+                    <Key size={14} style={{ color: '#6854ec' }} />
+                    <span>{showPasswordForm ? 'Hide Password Form' : 'Forgot / Change Password'}</span>
+                  </button>
+
+                  {showPasswordForm && (
+                    <form onSubmit={handleUpdatePassword} className="gmail-password-box">
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                        Set New Password:
+                      </div>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showPwdText ? 'text' : 'password'}
+                          className="gmail-pwd-input"
+                          placeholder="New password (min 4 chars)"
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPwdText(!showPwdText)}
+                          style={{ position: 'absolute', right: 8, top: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8' }}
+                        >
+                          {showPwdText ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                      <input
+                        type={showPwdText ? 'text' : 'password'}
+                        className="gmail-pwd-input"
+                        placeholder="Confirm new password"
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        required
+                      />
+                      <button
+                        type="submit"
+                        disabled={pwdSaving}
+                        className="gmail-pwd-submit"
+                      >
+                        {pwdSaving ? 'Saving...' : 'Update Password'}
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Sign Out Button */}
+                  <button
+                    type="button"
+                    className="gmail-popover-signout"
+                    onClick={handleLogout}
+                  >
+                    <LogOut size={14} />
+                    <span>Sign out</span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
-
-        {trip && (
-          <div className="session-telemetry-ribbon">
-            <div className="telemetry-chip mono">
-              <span>🚌 Bus:</span>
-              <strong>{trip.registration_number || '—'}</strong>
-            </div>
-            <div className="telemetry-chip">
-              <span>👤 Driver:</span>
-              <strong>{trip.driver_name || '—'}</strong>
-            </div>
-            {trip.driver_phone && (
-              <div className="telemetry-chip">
-                <span>📞</span>
-                <a href={`tel:${trip.driver_phone}`} style={{ color: '#93c5fd', textDecoration: 'none', fontWeight: 600 }}>
-                  {trip.driver_phone}
-                </a>
-              </div>
-            )}
-            <div className="telemetry-chip">
-              <span>📍 Route:</span>
-              <strong>{trip.route_code || 'Assigned'}</strong>
-            </div>
-
-            <div className={`telemetry-pill-status ${trip.status === 'running' ? 'telemetry-pill-status--running' : 'telemetry-pill-status--completed'}`}>
-              {trip.status === 'running' && <span className="telemetry-pulse-dot" />}
-              {trip.status === 'running' ? 'Live In-Transit' : trip.status.toUpperCase()}
-            </div>
-          </div>
-        )}
-      </section>
+      </header>
 
       {/* Main Boarding Content */}
-      <main className="page-body" style={{ flex: 1, padding: '20px 24px', maxWidth: 1200, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+      <main className="page-body attendance-page-main">
+        {/* Session Header & Timing Banner */}
+        <section className="attendance-session-banner">
+          <div className="session-top-row">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              {/* Segmented Shift Mode Controls */}
+              <div className="attendance-shift-segmented">
+                <button
+                  type="button"
+                  className={`attendance-shift-mode-btn ${shift === 'morning' ? 'active' : ''}`}
+                  onClick={() => setShift('morning')}
+                >
+                  <Sun size={15} style={{ color: shift === 'morning' ? '#eab308' : '#94a3b8' }} />
+                  <span>Morning Shift</span>
+                  {timingInfo.isMorningActive ? (
+                    <span className="attendance-auto-badge">LIVE</span>
+                  ) : timingInfo.isMorningEnded ? (
+                    <span className="attendance-auto-badge" style={{ background: '#f1f5f9', color: '#64748b' }}>CLOSED</span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  className={`attendance-shift-mode-btn ${shift === 'evening' ? 'active' : ''}`}
+                  onClick={() => setShift('evening')}
+                >
+                  <Moon size={15} style={{ color: shift === 'evening' ? '#6854ec' : '#94a3b8' }} />
+                  <span>Evening Shift</span>
+                  {(timingInfo.isEveningActive || timingInfo.autoShift === 'evening') && (
+                    <span className="attendance-auto-badge">LIVE</span>
+                  )}
+                </button>
+              </div>
+
+              {/* Timing & Window Status Indicator */}
+              <div className={`attendance-window-status-pill ${isShiftWindowActive ? 'is-active' : ''}`}>
+                <Clock size={14} />
+                <span>
+                  {shift === 'morning'
+                    ? (timingInfo.isMorningEnded
+                        ? 'Morning Window Closed (11:00 AM) • Read Only'
+                        : timingInfo.isMorningActive
+                        ? 'Live Morning Window Active (6:00 AM – 11:00 AM)'
+                        : 'Morning Window: 6:00 AM – 11:00 AM')
+                    : (timingInfo.isEveningActive
+                        ? 'Live Evening Window Active (3:00 PM – 7:00 PM)'
+                        : 'Evening Window: 3:00 PM – 7:00 PM')
+                  }
+                </span>
+                <span style={{ fontSize: 11, opacity: 0.7, marginLeft: 2 }}>• {timingInfo.currentTimeStr}</span>
+              </div>
+            </div>
+
+            {routes.length > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 700 }}>Route:</span>
+                <select
+                  className="session-route-picker"
+                  value={routeId}
+                  onChange={e => setRouteId(e.target.value)}
+                >
+                  {routes.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.route_code} — {r.route_name || r.name || 'Route'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </section>
+
         {loading ? (
           <div className="loading-center" style={{ minHeight: 280 }}>
             <div className="spinner" />
@@ -347,65 +585,65 @@ export default function Attendance() {
             {/* Metric Summary Cards */}
             <div className="attendance-summary-strip">
               <div className="attendance-summary-card">
-                <div className="attendance-summary-icon" style={{ background: '#e0f2fe', color: '#0369a1' }}>
-                  👥
+                <div className="attendance-summary-icon" style={{ background: '#ede9fe', color: '#6854ec' }}>
+                  <Users size={20} />
                 </div>
                 <div className="attendance-summary-content">
-                  <div className="attendance-summary-num" style={{ color: 'var(--navy)' }}>{totalStudents}</div>
-                  <div className="attendance-summary-lbl">Total Enrolled</div>
+                  <div className="attendance-summary-num">{totalStudents}</div>
+                  <div className="attendance-summary-lbl">Enrolled</div>
                 </div>
               </div>
 
               <div className="attendance-summary-card">
-                <div className="attendance-summary-icon" style={{ background: '#dcfce7', color: '#15803d' }}>
-                  ✓
+                <div className="attendance-summary-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
+                  <CheckCircle2 size={20} />
                 </div>
                 <div className="attendance-summary-content">
-                  <div className="attendance-summary-num" style={{ color: 'var(--present)' }}>{presentStudents}</div>
+                  <div className="attendance-summary-num" style={{ color: '#059669' }}>{presentStudents}</div>
                   <div className="attendance-summary-lbl">Boarded ({completionPct}%)</div>
                 </div>
               </div>
 
               <div className="attendance-summary-card">
-                <div className="attendance-summary-icon" style={{ background: '#fee2e2', color: '#b91c1c' }}>
-                  ✕
+                <div className="attendance-summary-icon" style={{ background: '#fef2f2', color: '#dc2626' }}>
+                  <UserX size={20} />
                 </div>
                 <div className="attendance-summary-content">
-                  <div className="attendance-summary-num" style={{ color: 'var(--absent)' }}>{absentStudents}</div>
-                  <div className="attendance-summary-lbl">Not Boarded</div>
+                  <div className="attendance-summary-num" style={{ color: '#dc2626' }}>{absentStudents}</div>
+                  <div className="attendance-summary-lbl">Pending</div>
                 </div>
               </div>
 
               <div className="attendance-summary-card">
-                <div className="attendance-summary-icon" style={{ background: '#fef3c7', color: '#b45309' }}>
-                  🚏
+                <div className="attendance-summary-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>
+                  <MapPin size={20} />
                 </div>
                 <div className="attendance-summary-content">
-                  <div className="attendance-summary-num" style={{ color: '#b45309' }}>{roster?.stops?.length || 0}</div>
-                  <div className="attendance-summary-lbl">Route Stops</div>
+                  <div className="attendance-summary-num" style={{ color: '#2563eb' }}>{roster?.stops?.length || 0}</div>
+                  <div className="attendance-summary-lbl">Stops</div>
                 </div>
               </div>
             </div>
 
             {/* Progress Bar */}
             {totalStudents > 0 && (
-              <div style={{ background: '#ffffff', borderRadius: 10, padding: '12px 18px', border: '1px solid #e2e8f0', marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+              <div className="attendance-progress-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--navy)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: '#1e293b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     Boarding Progress
                   </span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: completionPct === 100 ? '#15803d' : '#d97706' }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: completionPct === 100 ? '#059669' : '#6854ec' }}>
                     {presentStudents} of {totalStudents} boarded ({completionPct}%)
                   </span>
                 </div>
-                <div style={{ width: '100%', height: 8, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: 7, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
                   <div
                     style={{
                       height: '100%',
                       width: `${completionPct}%`,
                       background: completionPct === 100
-                        ? 'linear-gradient(90deg, #22c55e, #16a34a)'
-                        : 'linear-gradient(90deg, #f59e0b, #eab308)',
+                        ? 'linear-gradient(90deg, #10b981, #059669)'
+                        : 'linear-gradient(90deg, #7c6cfc, #6854ec)',
                       borderRadius: 6,
                       transition: 'width 0.4s ease'
                     }}
@@ -419,56 +657,78 @@ export default function Attendance() {
               <div className="journey-timeline-header">
                 <div>
                   <div className="journey-direction-title">
-                    <span>🚏</span>
+                    <Navigation size={17} style={{ color: '#6854ec', flexShrink: 0 }} />
                     <span>Route Timeline:</span>
-                    <span style={{ color: '#f59e0b', fontWeight: 700 }}>
+                    <span style={{ color: '#6854ec', fontWeight: 800 }}>
                       {roster?.direction?.from || 'Start Point'} → {roster?.direction?.to || 'Destination'}
                     </span>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3 }}>
-                    Expand any stop to view passengers or tap "Mark All" to board an entire stop.
+                  <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 3 }}>
+                    Expand stop to mark passengers or tap "Mark All" to board stop.
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <div className="journey-timeline-controls">
                   {/* Search filter */}
-                  <div style={{ position: 'relative', minWidth: 220 }}>
+                  <div className="attendance-search-wrap">
                     <input
                       type="text"
                       className="finput"
                       placeholder="Search student or roll #..."
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      style={{ paddingLeft: 32, height: 36, fontSize: 12.5, borderRadius: 8 }}
+                      style={{ paddingLeft: 32, height: 34, fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}
                     />
-                    <span style={{ position: 'absolute', left: 10, top: 9, color: '#94a3b8', fontSize: 13 }}>🔍</span>
+                    <Search size={14} style={{ position: 'absolute', left: 10, top: 10, color: '#94a3b8' }} />
                     {searchQuery && (
                       <button
                         type="button"
                         onClick={() => setSearchQuery('')}
-                        style={{ position: 'absolute', right: 8, top: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}
+                        style={{ position: 'absolute', right: 8, top: 7, border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 14 }}
                       >
-                        ✕
+                        ×
                       </button>
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={expandAll}
-                    style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#ffffff', fontSize: 12, fontWeight: 600, color: '#475569', cursor: 'pointer' }}
-                  >
-                    Expand All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={collapseAll}
-                    style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#ffffff', fontSize: 12, fontWeight: 600, color: '#475569', cursor: 'pointer' }}
-                  >
-                    Collapse
-                  </button>
+                  <div className="attendance-action-btns-row">
+                    <button
+                      type="button"
+                      onClick={expandAll}
+                      className="attendance-action-btn"
+                    >
+                      Expand All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={collapseAll}
+                      className="attendance-action-btn"
+                    >
+                      Collapse
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {/* Read-Only Notice when shift closed */}
+              {isShiftClosed && shift === 'morning' && (
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  marginBottom: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  fontSize: 12.5,
+                  color: '#475569',
+                  fontWeight: 600
+                }}>
+                  <Lock size={15} style={{ color: '#6854ec', flexShrink: 0 }} />
+                  <span>Morning attendance window ended at 11:00 AM. Showing entered records in read-only mode.</span>
+                </div>
+              )}
 
               {/* Stop cards */}
               {filteredStops.length > 0 ? (
@@ -487,14 +747,15 @@ export default function Attendance() {
                             <span className="stop-name">{st.stop_name}</span>
                             {st.scheduled_time && (
                               <span className="stop-time-tag">
-                                🕒 {st.scheduled_time.slice(0, 5)}
+                                <Clock size={11} style={{ marginRight: 3, verticalAlign: -1 }} />
+                                {st.scheduled_time.slice(0, 5)}
                               </span>
                             )}
                           </div>
                         </div>
 
                         <div className="stop-right" onClick={e => e.stopPropagation()}>
-                          {st.students.length > 0 && trip.status === 'running' && !isAllBoarded && (
+                          {st.students.length > 0 && canMarkAttendance && !isAllBoarded && (
                             <button
                               type="button"
                               className="btn-batch-mark"
@@ -502,7 +763,8 @@ export default function Attendance() {
                               onClick={() => handleMarkAllAtStop(st.id, st.students)}
                               title="Mark all unboarded students at this stop as Present"
                             >
-                              {isBatchSaving ? 'Boarding...' : 'Mark All Present ✓'}
+                              <Check size={12} />
+                              <span>{isBatchSaving ? 'Boarding...' : 'Mark All'}</span>
                             </button>
                           )}
 
@@ -512,10 +774,17 @@ export default function Attendance() {
 
                           <div
                             className="stop-chevron"
-                            style={{ cursor: 'pointer', padding: '4px' }}
+                            style={{ cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
                             onClick={() => toggleStopExpand(st.id)}
                           >
-                            ▼
+                            <ChevronDown
+                              size={16}
+                              style={{
+                                transform: isOpen ? 'rotate(180deg)' : 'none',
+                                transition: 'transform 0.2s ease',
+                                color: '#94a3b8'
+                              }}
+                            />
                           </div>
                         </div>
                       </div>
@@ -541,7 +810,7 @@ export default function Attendance() {
                                         {s.boarding_time && isPresent && (
                                           <>
                                             <span style={{ margin: '0 4px', opacity: 0.5 }}>•</span>
-                                            <span style={{ color: '#15803d', fontWeight: 600 }}>
+                                            <span style={{ color: '#059669', fontWeight: 600 }}>
                                               {new Date(s.boarding_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                           </>
@@ -551,20 +820,36 @@ export default function Attendance() {
                                   </div>
 
                                   <div>
-                                    <button
-                                      type="button"
-                                      className={`mark-btn ${isPresent ? 'present' : 'absent'}`}
-                                      disabled={isSaving || trip.status !== 'running'}
-                                      onClick={() => handleMark(s.id, st.id, s.status)}
-                                    >
-                                      {isSaving ? (
-                                        'Saving...'
-                                      ) : isPresent ? (
-                                        <>✓ Present</>
-                                      ) : (
-                                        <>Mark Present</>
-                                      )}
-                                    </button>
+                                    {canMarkAttendance ? (
+                                      <button
+                                        type="button"
+                                        className={`mark-btn ${isPresent ? 'present' : 'absent'}`}
+                                        disabled={isSaving}
+                                        onClick={() => handleMark(s.id, st.id, s.status)}
+                                      >
+                                        {isSaving ? (
+                                          'Saving...'
+                                        ) : isPresent ? (
+                                          <>
+                                            <Check size={13} />
+                                            <span>Present</span>
+                                          </>
+                                        ) : (
+                                          <>Mark Present</>
+                                        )}
+                                      </button>
+                                    ) : (
+                                      <span className={`mark-badge-readonly ${isPresent ? 'present' : 'absent'}`}>
+                                        {isPresent ? (
+                                          <>
+                                            <Check size={12} />
+                                            <span>Present</span>
+                                          </>
+                                        ) : (
+                                          <span>Absent</span>
+                                        )}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -581,12 +866,12 @@ export default function Attendance() {
                 })
               ) : (
                 <div style={{ padding: 36, textAlign: 'center', color: '#64748b' }}>
-                  <div style={{ fontSize: 24, marginBottom: 8 }}>🔍</div>
-                  <div style={{ fontWeight: 600 }}>No stops or students match "{searchQuery}"</div>
+                  <Search size={28} style={{ color: '#94a3b8', margin: '0 auto 8px', display: 'block' }} />
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>No stops or students match "{searchQuery}"</div>
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    style={{ marginTop: 10, padding: '6px 14px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', fontSize: 12 }}
+                    style={{ marginTop: 10, padding: '6px 14px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
                   >
                     Clear Search
                   </button>
@@ -595,35 +880,38 @@ export default function Attendance() {
             </div>
           </div>
         ) : (
-          <div className="empty" style={{ background: '#ffffff', borderRadius: 12, padding: 48, textAlign: 'center', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.04)' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🚍</div>
-            <div style={{ fontFamily: 'Oswald', fontSize: 20, fontWeight: 600, color: 'var(--navy)', marginBottom: 6 }}>
-              No Active Trip Assigned
+          <div className="empty" style={{ background: '#ffffff', borderRadius: 14, padding: '48px 24px', textAlign: 'center', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#ede9fe', color: '#6854ec', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <Bus size={32} />
             </div>
-            <p style={{ color: 'var(--text-dim)', fontSize: 14, maxWidth: 440, margin: '0 auto 18px' }}>
-              There is currently no running trip assigned for <b>{shiftsList.find(s => s.key === shift)?.label}</b>.
-              Try selecting another shift session or check with dispatch.
+            <div style={{ fontSize: 19, fontWeight: 800, color: '#1e293b', marginBottom: 6 }}>
+              No Active Trip Manifest Found
+            </div>
+            <p style={{ color: '#64748b', fontSize: 13.5, maxWidth: 440, margin: '0 auto 18px', lineHeight: 1.5 }}>
+              There is currently no running trip scheduled for <b>{shift === 'morning' ? 'Morning Shift' : 'Evening Shift'}</b>.
+              The system automatically detects shifts based on time ({shift === 'morning' ? '6:00 AM – 11:00 AM' : '3:00 PM – 7:00 PM'}).
             </p>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              {shiftsList.map(s => (
-                <button
-                  key={s.key}
-                  type="button"
-                  onClick={() => setShift(s.key)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 8,
-                    border: shift === s.key ? '2px solid #f59e0b' : '1px solid #cbd5e1',
-                    background: shift === s.key ? '#fffbeb' : '#ffffff',
-                    color: shift === s.key ? '#b45309' : '#475569',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    fontSize: 13
-                  }}
-                >
-                  {s.icon} {s.label}
-                </button>
-              ))}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setShift(shift === 'morning' ? 'evening' : 'morning')}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: 10,
+                  border: '1.5px solid #6854ec',
+                  background: '#6854ec',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+              >
+                {shift === 'morning' ? <Moon size={15} /> : <Sun size={15} />}
+                <span>Switch to {shift === 'morning' ? 'Evening Shift' : 'Morning Shift'}</span>
+              </button>
             </div>
           </div>
         )}
@@ -633,31 +921,35 @@ export default function Attendance() {
       {trip && (
         <footer className="attendance-bottom-bar">
           <div className="bottom-bar-summary">
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: trip.status === 'running' ? '#22c55e' : '#94a3b8' }} />
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: canMarkAttendance ? '#10b981' : '#94a3b8' }} />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--navy)' }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1e293b' }}>
                 {presentStudents} of {totalStudents} Passengers Boarded
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                Trip Status: <b style={{ textTransform: 'capitalize' }}>{trip.status}</b> • Bus {trip.registration_number || '—'}
+              <div style={{ fontSize: 11.5, color: '#64748b' }}>
+                Trip Status: <b style={{ textTransform: 'capitalize', color: canMarkAttendance ? '#059669' : '#64748b' }}>{trip.status}</b> • Bus {trip.registration_number || '—'}
               </div>
             </div>
           </div>
 
-          {trip.status === 'running' ? (
+          {canMarkAttendance ? (
             <button
               type="button"
               className="bottom-bar-btn-submit"
               onClick={handleSubmit}
             >
               <span>Submit Attendance & End Trip</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              <Check size={16} />
             </button>
+          ) : isShiftClosed && shift === 'morning' ? (
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', padding: '10px 16px', background: '#f1f5f9', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Lock size={15} style={{ color: '#6854ec' }} />
+              <span>Morning Window Closed (Read Only)</span>
+            </div>
           ) : (
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', padding: '10px 16px', background: '#f1f5f9', borderRadius: 8 }}>
-              ✓ Trip Closed & Attendance Submitted
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', padding: '10px 16px', background: '#f1f5f9', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Check size={15} style={{ color: '#059669' }} />
+              <span>Trip Closed & Attendance Submitted</span>
             </div>
           )}
         </footer>

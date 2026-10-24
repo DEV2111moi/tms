@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom';
 import api from '../../api/api';
 import { useToast } from '../../components/UI/Toast';
+import { useAuth } from '../../context/AuthContext';
 import {
   FLEET_ROAD_ROUTES,
   ALL_THENI_ROUTES_ARRAY,
@@ -563,6 +564,7 @@ function BusVehicleObject({
 }
 
 export default function LiveTracking() {
+  const { user } = useAuth();
   const [buses, setBuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedBusReg, setSelectedBusReg] = useState(null);
@@ -1386,26 +1388,28 @@ export default function LiveTracking() {
             <span>Test GPS Packet Simulator</span>
           </button>
 
-          <Link
-            to="/admin/gps-explainer"
-            className="btn btn-sm"
-            style={{
-              fontWeight: 800,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              background: '#312e81',
-              color: '#ffffff',
-              padding: '7px 14px',
-              borderRadius: 10,
-              textDecoration: 'none',
-              boxShadow: '0 2px 8px rgba(49, 46, 129, 0.2)',
-            }}
-            title="Open interactive GPS architecture & protocol explainer for your tutor"
-          >
-            <span>🎓</span>
-            <span>Tutor Explainer</span>
-          </Link>
+          {user?.role !== 'institution' && (
+            <Link
+              to="/admin/gps-explainer"
+              className="btn btn-sm"
+              style={{
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: '#312e81',
+                color: '#ffffff',
+                padding: '7px 14px',
+                borderRadius: 10,
+                textDecoration: 'none',
+                boxShadow: '0 2px 8px rgba(49, 46, 129, 0.2)',
+              }}
+              title="Open interactive GPS architecture & protocol explainer for your tutor"
+            >
+              <span>🎓</span>
+              <span>Tutor Explainer</span>
+            </Link>
+          )}
         </div>
       </div>
 

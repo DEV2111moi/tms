@@ -268,7 +268,6 @@ const GROUPS_INST = [
     items: [
       { to: '/admin', icon: 'dashboard', label: 'Dashboard', end: true },
       { to: '/admin/live-tracking', icon: 'map', label: 'Live Bus Tracking' },
-      { to: '/admin/gps-explainer', icon: 'satellite', label: 'GPS Explainer (Tutor)' },
     ],
   },
   {
@@ -292,7 +291,6 @@ const GROUPS_INST = [
       { to: '/admin/students', icon: 'student', label: 'Students' },
       { to: '/admin/users', icon: 'user', label: 'Bus Incharge Logins' },
       { to: '/admin/assignments', icon: 'link', label: 'Assign Incharge' },
-      { to: '/admin/driver-master-edit', icon: 'edit', label: 'Driver Master Edit' },
     ],
   },
 ];

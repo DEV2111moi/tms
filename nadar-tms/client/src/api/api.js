@@ -28,6 +28,7 @@ const api = {
   // Auth
   login: (email, password) => call('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   me: () => call('/auth/me'),
+  changePassword: (data) => call('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
 
   // Dashboard
   dashboard: (date) => call(`/dashboard${date ? `?date=${date}` : ''}`),
