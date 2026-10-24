@@ -77,8 +77,8 @@ function VisitorsDonut({ morning = 50, evening = 50, size = 125 }) {
   const off2 = c2 - (Math.min(100, evening) / 100) * c2;
 
   return (
-    <div style={{ position: 'relative', width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
-      <svg width={size} height={size} viewBox="0 0 120 120">
+    <div className="visitors-donut-wrap" style={{ position: 'relative', width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+      <svg width={size} height={size} viewBox="0 0 120 120" style={{ width: '100%', height: '100%' }}>
         {/* Outer Ring: Morning (Purple) */}
         <circle cx="60" cy="60" r={r1} fill="none" stroke="#f0eeff" strokeWidth="7.5" />
         <circle
@@ -111,8 +111,8 @@ function VisitorsDonut({ morning = 50, evening = 50, size = 125 }) {
         />
       </svg>
       <div style={{ position: 'absolute', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', lineHeight: 1.1 }}>100%</div>
-        <div style={{ fontSize: 9.5, fontWeight: 600, color: '#8c98a4', textTransform: 'uppercase', letterSpacing: '0.4px', marginTop: 2 }}>Active</div>
+        <div className="visitors-donut-text-val" style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', lineHeight: 1.1 }}>100%</div>
+        <div className="visitors-donut-text-sub" style={{ fontSize: 9.5, fontWeight: 600, color: '#8c98a4', textTransform: 'uppercase', letterSpacing: '0.4px', marginTop: 2 }}>Active</div>
       </div>
     </div>
   );
@@ -366,8 +366,8 @@ export default function Dashboard() {
           {/* Card 2: Duty Drivers */}
           <div
             className="socialeco-kpi-card stat-card--clickable"
-            onClick={() => navigate('/admin/driver-master-edit')}
-            title="Click to manage Drivers Roster"
+            onClick={() => navigate(isInstitution ? '/admin/drivers' : '/admin/driver-master-edit')}
+            title={isInstitution ? t('Duty Drivers') : "Click to manage Drivers Roster"}
           >
             <div className="socialeco-kpi-card__header">
               <div className="socialeco-kpi-card__brand">
@@ -514,57 +514,64 @@ export default function Dashboard() {
         </div>
 
         {/* ========================================================================= */}
-        {/* ROW 3: 4 BOTTOM MODULES (VISITORS DONUT + 2 METRIC TILES WITH ARROWS + BANNER) */}
+        {/* ROW 3: 4 BOTTOM MODULES (ORIGINAL 4-MODULE DESKTOP GRID + HORIZONTAL ON MOBILE) */}
         {/* ========================================================================= */}
         <div className="socialeco-bot-grid">
-          {/* Module 1: Shift Coverage Concentric Ring Donut */}
-          <div className="socialeco-card">
-            <div className="socialeco-card__head">
-              <div className="socialeco-card__title">Shift Coverage</div>
+          {/* 3 Metric Cards Group: Horizontal on Mobile, Seamless Grid on Desktop */}
+          <div className="socialeco-bot-metrics-row">
+            {/* Module 1: Shift Coverage Concentric Ring Donut */}
+            <div className="socialeco-card">
+              <div className="socialeco-card__head">
+                <div className="socialeco-card__title">Shift Coverage</div>
+              </div>
+              <VisitorsDonut morning={assignedRoutesPct || 85} evening={activeBusesPct || 70} size={125} />
+              <div className="socialeco-donut-legend" style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 12, fontSize: 11.5, color: '#64748b' }}>
+                <span style={{ color: '#7c6cfc', fontWeight: 600 }}>● Morning</span>
+                <span style={{ color: '#ff9f43', fontWeight: 600 }}>● Evening</span>
+              </div>
             </div>
-            <VisitorsDonut morning={assignedRoutesPct || 85} evening={activeBusesPct || 70} size={125} />
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 12, fontSize: 11.5, color: '#64748b' }}>
-              <span style={{ color: '#7c6cfc', fontWeight: 600 }}>● Morning</span>
-              <span style={{ color: '#ff9f43', fontWeight: 600 }}>● Evening</span>
-            </div>
-          </div>
 
-          {/* Module 2: Small Metric Tile with Arrow Button (Unassigned Alert) */}
-          <div
-            className="socialeco-metric-tile stat-card--clickable"
-            onClick={() => navigate('/admin/assignments')}
-          >
-            <div className="socialeco-tile-icon socialeco-tile-icon--purple">
-              <DashIcon name="alert" size={20} color="#7c6cfc" />
+            {/* Module 2: Small Metric Tile with Arrow Button (Unassigned Alert) */}
+            <div
+              className="socialeco-metric-tile stat-card--clickable"
+              onClick={() => navigate('/admin/assignments')}
+            >
+              <div className="socialeco-tile-icon socialeco-tile-icon--purple">
+                <DashIcon name="alert" size={20} color="#7c6cfc" />
+              </div>
+              <div className="socialeco-tile-value">{filteredUnassigned.length}</div>
+              <div className="socialeco-tile-sub">
+                <b className="socialeco-tile-sub-title">Unassigned Routes</b>
+                <span className="socialeco-tile-sub-desc"><br />Need vehicle allocation</span>
+              </div>
+              <button className="socialeco-tile-action-btn">
+                <span className="socialeco-btn-label-desktop">Assign Routes</span>
+                <span className="socialeco-btn-label-mobile">Assign</span>
+                <span className="arrow">→</span>
+              </button>
             </div>
-            <div className="socialeco-tile-value">{filteredUnassigned.length}</div>
-            <div className="socialeco-tile-sub">
-              <b>Unassigned Routes</b><br />Need vehicle allocation
-            </div>
-            <button className="socialeco-tile-action-btn">
-              <span>Assign Routes</span>
-              <span className="arrow">→</span>
-            </button>
-          </div>
 
-          {/* Module 3: Small Metric Tile with Arrow Button (FC & Alerts) */}
-          <div
-            className="socialeco-metric-tile stat-card--clickable"
-            onClick={() => navigate('/admin/alerts')}
-          >
-            <div className="socialeco-tile-icon socialeco-tile-icon--cyan">
-              <DashIcon name="shield" size={20} color="#00cfe8" />
+            {/* Module 3: Small Metric Tile with Arrow Button (FC & Alerts) */}
+            <div
+              className="socialeco-metric-tile stat-card--clickable"
+              onClick={() => navigate('/admin/alerts')}
+            >
+              <div className="socialeco-tile-icon socialeco-tile-icon--cyan">
+                <DashIcon name="shield" size={20} color="#00cfe8" />
+              </div>
+              <div className="socialeco-tile-value">
+                {complianceSummary ? complianceSummary.expiredCount + complianceSummary.expiringSoonCount : 0}
+              </div>
+              <div className="socialeco-tile-sub">
+                <b className="socialeco-tile-sub-title">Compliance Alerts</b>
+                <span className="socialeco-tile-sub-desc"><br />FC & Licence due</span>
+              </div>
+              <button className="socialeco-tile-action-btn socialeco-tile-action-btn--cyan">
+                <span className="socialeco-btn-label-desktop">View Alerts</span>
+                <span className="socialeco-btn-label-mobile">Alerts</span>
+                <span className="arrow">→</span>
+              </button>
             </div>
-            <div className="socialeco-tile-value">
-              {complianceSummary ? complianceSummary.expiredCount + complianceSummary.expiringSoonCount : 0}
-            </div>
-            <div className="socialeco-tile-sub">
-              <b>Compliance Alerts</b><br />FC & Licence due
-            </div>
-            <button className="socialeco-tile-action-btn socialeco-tile-action-btn--cyan">
-              <span>View Alerts</span>
-              <span className="arrow">→</span>
-            </button>
           </div>
 
           {/* Module 4: Purple Gradient Promo Banner */}
