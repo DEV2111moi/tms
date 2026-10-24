@@ -63,7 +63,11 @@ export default function App() {
                 <Route path="buses" element={<Buses />} />
                 <Route path="spare" element={<Spare />} />
                 <Route path="drivers" element={<Drivers />} />
-                <Route path="driver-master-edit" element={<DriverMasterEdit />} />
+                <Route path="driver-master-edit" element={
+                  <ProtectedRoute roles={['admin']}>
+                    <DriverMasterEdit />
+                  </ProtectedRoute>
+                } />
                 <Route path="driver-salary" element={<DriverSalary />} />
                 <Route path="students" element={<Students />} />
                 <Route path="routes" element={<RoutesStops />} />
@@ -78,7 +82,11 @@ export default function App() {
                 <Route path="tyres" element={<Tyres />} />
                 <Route path="alerts" element={<FleetAlerts />} />
                 <Route path="live-tracking" element={<LiveTracking />} />
-                <Route path="gps-explainer" element={<GpsArchitectureExplainer />} />
+                <Route path="gps-explainer" element={
+                  <ProtectedRoute roles={['admin', 'executive']}>
+                    <GpsArchitectureExplainer />
+                  </ProtectedRoute>
+                } />
               </Route>
 
               {/* Public/Direct Standalone GPS Architecture Explainer (For Tutor Presentation) */}

@@ -4,26 +4,33 @@ const { query } = require('../db/pool');
 exports.todayTrip = async (req, res) => {
   try {
     const role = req.user.role;
-    const shift = req.query.shift || 'morning';
+    const now = new Date();
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    const defaultShift = currentMins >= 660 ? 'evening' : 'morning';
+    const shiftReq = req.query.shift || defaultShift;
+    const isEvening = String(shiftReq).toLowerCase().startsWith('evening');
+    const shiftPattern = isEvening ? 'evening%' : 'morning%';
+
     let a, myRoutes = [];
     if (role === 'incharge') {
       myRoutes = await query(`SELECT a.route_id AS id, r.route_code, r.route_name FROM assignments a
-        JOIN routes r ON r.id=a.route_id WHERE a.incharge_id=? AND a.shift=? ORDER BY r.route_code`, [req.user.id, shift]);
+        JOIN routes r ON r.id=a.route_id WHERE a.incharge_id=? AND (a.shift=? OR a.shift LIKE ?) ORDER BY r.route_code`, [req.user.id, shiftReq, shiftPattern]);
       const rid = req.query.route_id;
-      a = (await query('SELECT * FROM assignments WHERE incharge_id=? AND shift=? ' + (rid ? 'AND route_id=? ' : '') + 'LIMIT 1',
-        rid ? [req.user.id, shift, rid] : [req.user.id, shift]))[0];
+      a = (await query('SELECT * FROM assignments WHERE incharge_id=? AND (shift=? OR shift LIKE ?) ' + (rid ? 'AND route_id=? ' : '') + 'ORDER BY id LIMIT 1',
+        rid ? [req.user.id, shiftReq, shiftPattern, rid] : [req.user.id, shiftReq, shiftPattern]))[0];
     } else if (role === 'driver') {
       const dr = await query('SELECT id FROM drivers WHERE user_id=? LIMIT 1', [req.user.id]);
-      if (dr.length) a = (await query('SELECT * FROM assignments WHERE driver_id=? AND shift=? LIMIT 1', [dr[0].id, shift]))[0];
+      if (dr.length) a = (await query('SELECT * FROM assignments WHERE driver_id=? AND (shift=? OR shift LIKE ?) ORDER BY id LIMIT 1', [dr[0].id, shiftReq, shiftPattern]))[0];
     } else {
       const rid = req.query.route_id;
       a = rid
-        ? (await query('SELECT * FROM assignments WHERE route_id=? AND shift=? LIMIT 1', [rid, shift]))[0]
-        : (await query('SELECT * FROM assignments WHERE shift=? ORDER BY route_id LIMIT 1', [shift]))[0];
+        ? (await query('SELECT * FROM assignments WHERE route_id=? AND (shift=? OR shift LIKE ?) ORDER BY id LIMIT 1', [rid, shiftReq, shiftPattern]))[0]
+        : (await query('SELECT * FROM assignments WHERE (shift=? OR shift LIKE ?) ORDER BY route_id LIMIT 1', [shiftReq, shiftPattern]))[0];
     }
-    if (!a) return res.status(404).json({ error: `No ${shift} route is assigned to you.` });
+    if (!a) return res.status(404).json({ error: `No ${isEvening ? 'evening' : 'morning'} route is assigned to you.` });
 
-    let trips = await query('SELECT id FROM trips WHERE route_id=? AND trip_date=CURDATE() AND shift=? LIMIT 1', [a.route_id, shift]);
+    const shift = a.shift; // Use assigned shift key (e.g. morning1)
+    let trips = await query('SELECT id FROM trips WHERE route_id=? AND trip_date=CURDATE() AND (shift=? OR shift LIKE ?) LIMIT 1', [a.route_id, shift, shiftPattern]);
     let tripId = trips.length ? trips[0].id : (await query(
       'INSERT INTO trips (route_id, bus_id, driver_id, incharge_id, trip_date, shift, status) VALUES (?,?,?,?,CURDATE(),?,"running")',
       [a.route_id, a.bus_id, a.driver_id, a.incharge_id, shift])).insertId;
@@ -31,7 +38,7 @@ exports.todayTrip = async (req, res) => {
     const out = await query(`
       SELECT t.id, t.trip_date, t.shift, t.status,
              r.id AS route_id, r.route_code, r.route_name, r.origin, r.destination,
-             b.registration_number, d.name AS driver_name
+             b.registration_number, d.name AS driver_name, d.phone AS driver_phone
       FROM trips t JOIN routes r ON r.id=t.route_id
       LEFT JOIN buses b ON b.id=t.bus_id
       LEFT JOIN drivers d ON d.id=t.driver_id
@@ -91,6 +98,18 @@ exports.mark = async (req, res) => {
     return res.status(400).json({ error: 'Missing or invalid attendance details.' });
   }
   try {
+    const tr = (await query('SELECT shift, status FROM trips WHERE id=?', [tripId]))[0];
+    if (tr) {
+      const now = new Date();
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      const isMorning = String(tr.shift || '').toLowerCase().startsWith('morning');
+      if (isMorning && currentMins >= 660) {
+        return res.status(400).json({ error: 'Morning attendance window ended at 11:00 AM. Records are read-only.' });
+      }
+      if (tr.status === 'completed') {
+        return res.status(400).json({ error: 'Trip has already ended.' });
+      }
+    }
     const boarding = status === 'present' ? new Date() : null;
     await query(
       `INSERT INTO attendance (trip_id, student_id, stop_id, status, boarding_time, marked_by, attendance_date)

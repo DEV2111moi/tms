@@ -20,6 +20,7 @@ const gps = require('../controllers/gpsController');
 // ---- Auth (public) ----
 router.post('/auth/login', auth.login);
 router.get('/auth/me', authenticate, auth.me);
+router.post('/auth/change-password', authenticate, auth.changePassword);
 
 // ---- Dashboard ----
 router.get('/dashboard', authenticate, requireRole('admin', 'executive', 'institution'), dash.summary);

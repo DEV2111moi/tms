@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom';
 import api from '../../api/api';
 import { useToast } from '../../components/UI/Toast';
+import { useAuth } from '../../context/AuthContext';
 import { FLEET_ROAD_ROUTES } from '../../data/fleetRoadRoutes';
 import {
   Map,
@@ -434,6 +435,7 @@ function BusVehicleObject({
 }
 
 export default function LiveTracking() {
+  const { user } = useAuth();
   const [buses, setBuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedBusReg, setSelectedBusReg] = useState(null);
@@ -457,6 +459,7 @@ export default function LiveTracking() {
   const [simResult, setSimResult] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [showMapModal, setShowMapModal] = useState(false);
 
   // Google Maps Style Live Follow Camera & Route Breadcrumbs
   const [followMode, setFollowMode] = useState(true);
@@ -628,10 +631,10 @@ export default function LiveTracking() {
     if (isProviderStreamSimActive) {
       clearInterval(providerStreamTimerRef.current);
       setIsProviderStreamSimActive(false);
-      toast('⏸️ Live Provider Feed Stream paused');
+      toast('Live Provider Feed Stream paused');
     } else {
       setIsProviderStreamSimActive(true);
-      toast('📡 Provider Telemetry Feed Started — Sending live packets to /api/gps/raw...');
+      toast('Provider Telemetry Feed Started — Sending live packets to /api/gps/raw...');
 
       // Send telemetry packet every 1.5s as if coming from real GPS provider hardware
       providerStreamTimerRef.current = setInterval(async () => {
@@ -748,17 +751,50 @@ export default function LiveTracking() {
     return () => clearInterval(timer);
   }, [autoRefresh, followMode]);
 
-  // Focus map on bus
+  // Focus map on bus and open modal
   const handleSelectBus = (b) => {
     setSelectedBus(b);
     setFollowMode(true);
-    if (b.latitude && b.longitude && mapRef.current) {
-      mapRef.current.flyTo({
-        center: [Number(b.longitude), Number(b.latitude)],
-        zoom: 15,
-        duration: 1200,
-      });
-    }
+    setShowMapModal(true);
+    setTimeout(() => {
+      try {
+        if (mapRef.current) {
+          mapRef.current.resize();
+          if (b.latitude && b.longitude) {
+            mapRef.current.flyTo({
+              center: [Number(b.longitude), Number(b.latitude)],
+              zoom: 15,
+              duration: 800,
+            });
+          } else {
+            mapRef.current.flyTo({
+              center: activeCampus.center,
+              zoom: 13,
+              duration: 800,
+            });
+          }
+        }
+      } catch (e) {}
+    }, 150);
+  };
+
+  // Open fleet map overview in modal
+  const handleOpenFleetMap = () => {
+    setSelectedBus(null);
+    setFollowMode(false);
+    setShowMapModal(true);
+    setTimeout(() => {
+      try {
+        if (mapRef.current) {
+          mapRef.current.resize();
+          mapRef.current.flyTo({
+            center: activeCampus.center,
+            zoom: 12.5,
+            duration: 800,
+          });
+        }
+      } catch (e) {}
+    }, 150);
   };
 
   // Fly to college campus
@@ -800,7 +836,7 @@ export default function LiveTracking() {
     try {
       const res = await api.gpsRaw(rawPacket);
       setSimResult(res);
-      toast('✅ GPS Telemetry processed! Map updated.');
+      toast('GPS Telemetry processed! Map updated.');
       await fetchLocations();
 
       // If telemetry matched a bus, fly map to it
@@ -830,7 +866,7 @@ export default function LiveTracking() {
     if (isDriveSimActive) {
       clearInterval(driveTimerRef.current);
       setIsDriveSimActive(false);
-      toast('⏸️ Live Fleet Movement Paused');
+      toast('Live Fleet Movement Paused');
     } else {
       setIsDriveSimActive(true);
       setCurrentStepIndex(0);
@@ -851,7 +887,7 @@ export default function LiveTracking() {
           duration: 1200,
         });
       }
-      toast('▶️ Started Multi-Bus Fleet Trip! 5 College buses driving on their routes to Campus...');
+      toast('Started Multi-Bus Fleet Trip! 5 College buses driving on their routes to Campus...');
     }
   };
 
@@ -867,7 +903,7 @@ export default function LiveTracking() {
     const runStep = async () => {
       if (step >= TOTAL_SIM_STEPS) {
         setIsDriveSimActive(false);
-        toast('🎉 All 5 fleet buses have arrived and parked at Nadar Saraswathi Campus!');
+        toast('All 5 fleet buses have arrived and parked at Nadar Saraswathi Campus!');
         return;
       }
 
@@ -1028,20 +1064,18 @@ export default function LiveTracking() {
 
         {/* Action Controls & Counters */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '8px 14px', fontSize: 12, fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 14px', fontSize: 12, fontWeight: 700 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6854ec' }}>
-              <span>🏛️ <b>{busesInCampus.length}</b> at College</span>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#6854ec', display: 'inline-block' }} />
+              <span><b>{busesInCampus.length}</b> at Campus</span>
             </div>
             <span style={{ color: '#cbd5e1' }}>|</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#059669' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
               <span><b>{movingCount}</b> Moving</span>
             </div>
-            <span style={{ color: '#cbd5e1' }}>|</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#2563eb' }}>
-              <span><b>{onlineCount}</b> Online</span>
-            </div>
           </div>
+
 
           <button
             type="button"
@@ -1077,12 +1111,12 @@ export default function LiveTracking() {
             {isDriveSimActive ? (
               <>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#dc2626', animation: 'beaconFlash 1s infinite' }} />
-                <span>⏹️ Stop Movement</span>
+                <span>Stop Movement</span>
               </>
             ) : (
               <>
                 <Play style={{ width: 14, height: 14, color: '#059669', fill: '#059669' }} />
-                <span>▶️ Live Bus Movement</span>
+                <span>Live Bus Movement</span>
               </>
             )}
           </button>
@@ -1108,7 +1142,7 @@ export default function LiveTracking() {
             title="1-Click simulate telemetry for bus inside Vadapudupatti College Campus"
           >
             <Zap style={{ width: 14, height: 14, color: '#7c6cfc' }} />
-            <span>{isSimulating ? 'Simulating...' : '⚡ 1-Click Test (Campus Arrival)'}</span>
+            <span>{isSimulating ? 'Simulating...' : '1-Click Test (Campus Arrival)'}</span>
           </button>
 
           <button
@@ -1121,82 +1155,6 @@ export default function LiveTracking() {
             <span>Test GPS Packet Simulator</span>
           </button>
 
-          <Link
-            to="/admin/gps-explainer"
-            className="btn btn-sm"
-            style={{
-              fontWeight: 800,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              background: '#312e81',
-              color: '#ffffff',
-              padding: '7px 14px',
-              borderRadius: 10,
-              textDecoration: 'none',
-              boxShadow: '0 2px 8px rgba(49, 46, 129, 0.2)',
-            }}
-            title="Open interactive GPS architecture & protocol explainer for your tutor"
-          >
-            <span>🎓</span>
-            <span>Tutor Explainer</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Live Provider Telemetry Streaming Status Bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: isSseActive ? 'linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 100%)' : '#f8fafc',
-          border: `1px solid ${isSseActive ? '#a7f3d0' : '#e2e8f0'}`,
-          borderRadius: 12,
-          padding: '8px 16px',
-          marginBottom: 14,
-          fontSize: 12.5,
-          color: '#1e293b',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-            <span
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: '50%',
-                background: isSseActive ? '#10b981' : '#94a3b8',
-                boxShadow: isSseActive ? '0 0 0 3px rgba(16, 185, 129, 0.25)' : 'none',
-              }}
-            />
-            <span style={{ color: isSseActive ? '#065f46' : '#64748b' }}>
-              {isSseActive ? 'LIVE PROVIDER STREAM ACTIVE' : 'PROVIDER STREAM CONNECTING...'}
-            </span>
-          </div>
-
-          <span style={{ color: '#cbd5e1' }}>|</span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569', fontSize: 12 }}>
-            <span>📡 TCP Socket: <code style={{ background: '#ffffff', padding: '2px 5px', borderRadius: 4, border: '1px solid #e2e8f0', fontWeight: 700 }}>Port 5050</code></span>
-            <span>🌐 Webhook: <code style={{ background: '#ffffff', padding: '2px 5px', borderRadius: 4, border: '1px solid #e2e8f0', fontWeight: 700 }}>/api/gps/raw</code></span>
-          </div>
-
-          {latestProviderPacket && (
-            <>
-              <span style={{ color: '#cbd5e1' }}>|</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#047857', fontWeight: 600 }}>
-                <span>⚡ Incoming Provider Ping:</span>
-                <span style={{ fontFamily: 'monospace', fontWeight: 800 }}>{latestProviderPacket.reg}</span>
-                <span>({latestProviderPacket.speed} km/h)</span>
-                <span style={{ color: '#64748b', fontSize: 11 }}>at {latestProviderPacket.time}</span>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             type="button"
             onClick={toggleProviderStreamSimulation}
@@ -1204,21 +1162,21 @@ export default function LiveTracking() {
               background: isProviderStreamSimActive ? '#dc2626' : '#059669',
               color: '#ffffff',
               border: 'none',
-              borderRadius: 8,
-              padding: '6px 12px',
-              fontSize: 11.5,
+              borderRadius: 10,
+              padding: '7px 14px',
+              fontSize: 12,
               fontWeight: 800,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 5,
-              boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+              gap: 6,
+              boxShadow: '0 2px 8px rgba(5, 150, 105, 0.2)',
               transition: 'all 0.2s ease',
             }}
             title="Streams live simulated provider packets to backend /api/gps/raw so you can verify the bus running on incoming provider data!"
           >
-            <Activity style={{ width: 13, height: 13 }} />
-            <span>{isProviderStreamSimActive ? '⏹️ Stop Provider Feed' : '📡 Stream Provider Feed'}</span>
+            <Activity style={{ width: 14, height: 14 }} />
+            <span>{isProviderStreamSimActive ? 'Stop Provider Feed' : 'Stream Provider Feed'}</span>
           </button>
 
           <button
@@ -1227,146 +1185,258 @@ export default function LiveTracking() {
             style={{
               background: '#ffffff',
               color: '#4f46e5',
-              border: '1px solid #c7d2fe',
-              borderRadius: 8,
-              padding: '6px 10px',
-              fontSize: 11.5,
+              border: '1.5px solid #c7d2fe',
+              borderRadius: 10,
+              padding: '7px 14px',
+              fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 4,
+              gap: 6,
             }}
             title="View GPS hardware tracker setup instructions and webhook specifications"
           >
-            <Settings style={{ width: 13, height: 13 }} />
+            <Settings style={{ width: 14, height: 14 }} />
             <span>Hardware Setup</span>
           </button>
+
+          <button
+            type="button"
+            onClick={handleOpenFleetMap}
+            className="btn btn-sm"
+            style={{
+              fontWeight: 800,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
+              color: '#ffffff',
+              padding: '7px 14px',
+              borderRadius: 10,
+              cursor: 'pointer',
+              border: 'none',
+              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)',
+            }}
+            title="Open full interactive fleet map overview"
+          >
+            <Navigation style={{ width: 14, height: 14 }} />
+            <span>View Fleet Map</span>
+          </button>
+
+          {user?.role !== 'institution' && (
+            <Link
+              to="/admin/gps-explainer"
+              className="btn btn-sm"
+              style={{
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: '#312e81',
+                color: '#ffffff',
+                padding: '7px 14px',
+                borderRadius: 10,
+                textDecoration: 'none',
+                boxShadow: '0 2px 8px rgba(49, 46, 129, 0.2)',
+              }}
+              title="Open interactive GPS architecture & protocol explainer for your tutor"
+            >
+              <span>Tutor Explainer</span>
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* Main Grid: Bus Sidebar (Left) + Interactive Map (Right) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 18, height: 'calc(100vh - 200px)', minHeight: 560 }}>
-        {/* Left Bus Directory */}
-        <div style={{ background: '#ffffff', borderRadius: 18, border: '1px solid rgba(226, 232, 240, 0.85)', boxShadow: '0 4px 20px -2px rgba(115, 103, 240, 0.05)', display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
-          {/* Search & Tabs */}
-          <div style={{ padding: 16, background: '#ffffff', borderBottom: '1px solid #edf2f7', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
-              <Compass style={{ position: 'absolute', left: 12, width: 16, height: 16, color: '#94a3b8', pointerEvents: 'none' }} />
-              <input
-                type="text"
-                placeholder="Search bus number, route, driver, IMEI..."
-                value={filterQuery}
-                onChange={(e) => setFilterQuery(e.target.value)}
-                style={{ width: '100%', padding: '9px 12px 9px 36px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, color: '#1e293b', background: '#f8fafc', outline: 'none', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 10 }}>
-              {[
-                { key: 'all', label: `All (${buses.length})` },
-                { key: 'campus', label: `At Clg (${busesInCampus.length})` },
-                { key: 'moving', label: `Moving (${movingCount})` },
-                { key: 'online', label: `Online (${onlineCount})` }
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setStatusFilter(tab.key)}
-                  style={{
-                    border: 'none',
-                    background: statusFilter === tab.key ? '#ffffff' : 'transparent',
-                    color: statusFilter === tab.key ? '#6854ec' : '#64748b',
-                    padding: '7px 2px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    boxShadow: statusFilter === tab.key ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                    textAlign: 'center',
-                    transition: 'all 0.18s ease',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {/* Full-Width Fleet Telemetry Table */}
+      <div
+        style={{
+          background: '#ffffff',
+          borderRadius: 18,
+          border: '1px solid rgba(226, 232, 240, 0.85)',
+          boxShadow: '0 4px 20px -2px rgba(115, 103, 240, 0.05)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Table Filters & Search Header */}
+        <div
+          style={{
+            padding: '16px 20px',
+            background: '#ffffff',
+            borderBottom: '1px solid #edf2f7',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 14,
+          }}
+        >
+          {/* Left: Search Box */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 380, maxWidth: '100%' }}>
+            <Compass style={{ position: 'absolute', left: 12, width: 16, height: 16, color: '#94a3b8', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              placeholder="Search bus number, route, driver, IMEI..."
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '9px 12px 9px 36px',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: 10,
+                fontSize: 13,
+                color: '#1e293b',
+                background: '#f8fafc',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
           </div>
 
-          {/* Scrollable Bus Cards */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {filteredBuses.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 16px', color: '#94a3b8', fontSize: 13 }}>
-                <div style={{ fontSize: 24, marginBottom: 8 }}>🔍</div>
-                No fleet buses match your filter.
-              </div>
-            ) : (
-              filteredBuses.map((b, idx) => {
-                const isSelected = (selectedBus?.registration_number && selectedBus.registration_number === b.registration_number) || (selectedBus?.bus_id && selectedBus.bus_id === b.bus_id);
-                const hasGps = Boolean(b.latitude && b.longitude);
-                const isMoving = Number(b.speed_km || 0) > 1;
-                const distToCampus = calculateDistanceKm(
-                  b.latitude,
-                  b.longitude,
-                  activeCampus.center[1],
-                  activeCampus.center[0]
-                );
-                const isInsideCampus = distToCampus !== null && distToCampus <= geofenceRadiusKm;
+          {/* Right: Status Filter Pills */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', padding: 4, borderRadius: 10 }}>
+            {[
+              { key: 'all', label: `All (${buses.length})` },
+              { key: 'campus', label: `At Campus (${busesInCampus.length})` },
+              { key: 'moving', label: `Moving (${movingCount})` }
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setStatusFilter(tab.key)}
+                style={{
+                  border: 'none',
+                  background: statusFilter === tab.key ? '#ffffff' : 'transparent',
+                  color: statusFilter === tab.key ? '#6854ec' : '#64748b',
+                  padding: '7px 14px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  boxShadow: statusFilter === tab.key ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.18s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-                return (
-                  <div
-                    key={b.bus_id ? `fleet-bus-${b.bus_id}` : (b.registration_number ? `fleet-reg-${b.registration_number}` : `fleet-idx-${idx}`)}
-                    onClick={() => (isSelected ? setSelectedBus(null) : handleSelectBus(b))}
-                    style={{
-                      background: isSelected ? '#fbfaff' : '#ffffff',
-                      border: isSelected ? '1.5px solid #7c6cfc' : '1.5px solid #edf2f7',
-                      boxShadow: isSelected ? '0 0 0 2px rgba(124, 108, 252, 0.2), 0 6px 16px rgba(124, 108, 252, 0.08)' : 'none',
-                      borderRadius: 14,
-                      padding: '12px 14px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 8,
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1e293b', letterSpacing: '0.2px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span
-                          style={{
-                            width: 9,
-                            height: 9,
-                            borderRadius: '50%',
-                            background: FLEET_ROAD_ROUTES[b.registration_number]?.color || '#94a3b8',
-                            display: 'inline-block',
-                          }}
-                        />
-                        <span>🚌</span>
-                        <span>{b.registration_number}</span>
-                      </div>
-                      {hasGps ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          {isInsideCampus && (
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                padding: '2px 6px',
-                                borderRadius: 6,
-                                fontSize: 10,
-                                fontWeight: 800,
-                                background: '#ede9fe',
-                                color: '#6854ec',
-                                border: '1px solid #ddd6fe'
-                              }}
-                              title="Inside College Radius"
-                            >
-                              🏛️ At Clg
-                            </span>
-                          )}
+        {/* Responsive Table */}
+        <div style={{ overflowX: 'auto', width: '100%' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                <th style={{ padding: '12px 16px', width: 50 }}>#</th>
+                <th style={{ padding: '12px 16px' }}>Bus Registration</th>
+                <th style={{ padding: '12px 16px' }}>Assigned Route</th>
+                <th style={{ padding: '12px 16px' }}>Driver</th>
+                <th style={{ padding: '12px 16px' }}>Speed & Status</th>
+                <th style={{ padding: '12px 16px' }}>Campus Geofence</th>
+                <th style={{ padding: '12px 16px' }}>Ignition / IMEI</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center', width: 170 }}>Location Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredBuses.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '48px 16px', color: '#94a3b8' }}>
+                    <Compass style={{ width: 28, height: 28, color: '#94a3b8', margin: '0 auto 8px', display: 'block' }} />
+                    <div style={{ fontWeight: 700 }}>No fleet buses match your filter.</div>
+                  </td>
+                </tr>
+              ) : (
+                filteredBuses.map((b, idx) => {
+                  const hasGps = Boolean(b.latitude && b.longitude);
+                  const isMoving = Number(b.speed_km || 0) > 1;
+                  const distToCampus = calculateDistanceKm(
+                    b.latitude,
+                    b.longitude,
+                    activeCampus.center[1],
+                    activeCampus.center[0]
+                  );
+                  const isInsideCampus = distToCampus !== null && distToCampus <= geofenceRadiusKm;
+                  const routeColor = FLEET_ROAD_ROUTES[b.registration_number]?.color || '#94a3b8';
+
+                  return (
+                    <tr
+                      key={b.bus_id || b.registration_number || idx}
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        transition: 'background 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#fbfbfe')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      {/* S.No */}
+                      <td style={{ padding: '14px 16px', color: '#94a3b8', fontWeight: 600, fontSize: 12 }}>
+                        {idx + 1}
+                      </td>
+
+                      {/* Bus Registration */}
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ fontWeight: 800, color: '#1e293b', fontSize: 13.5 }}>
+                          {b.registration_number}
+                        </div>
+                        {b.bus_code && (
+                          <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                            Fleet #{b.bus_code}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Assigned Route */}
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ fontWeight: 700, color: '#334155' }}>
+                          {b.route_code || 'Unassigned'}
+                        </div>
+                        {b.route_name && b.route_name !== '—' && (
+                          <div style={{ fontSize: 11.5, color: '#64748b' }}>
+                            {b.route_name}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Driver */}
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ fontWeight: 700, color: '#334155' }}>
+                          {b.driver_name || '—'}
+                        </div>
+                        {b.driver_phone && (
+                          <a
+                            href={`tel:${b.driver_phone}`}
+                            style={{ fontSize: 11, color: '#64748b', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 2 }}
+                          >
+                            <Phone style={{ width: 11, height: 11, color: '#6854ec' }} />
+                            <span>{b.driver_phone}</span>
+                          </a>
+                        )}
+                      </td>
+
+                      {/* Speed & Status */}
+                      <td style={{ padding: '14px 16px' }}>
+                        {hasGps ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5,
+                              padding: '4px 10px',
+                              borderRadius: 8,
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              background: isMoving ? '#ecfdf5' : '#fefce8',
+                              color: isMoving ? '#047857' : '#a16207',
+                              border: `1px solid ${isMoving ? '#a7f3d0' : '#fef08a'}`,
+                            }}
+                          >
+                            {isMoving ? `${b.speed_km} km/h` : 'Idle (0 km/h)'}
+                          </span>
+                        ) : (
                           <span
                             style={{
                               display: 'inline-flex',
@@ -1374,717 +1444,763 @@ export default function LiveTracking() {
                               gap: 5,
                               padding: '3px 8px',
                               borderRadius: 8,
-                              fontSize: 10.5,
-                              fontWeight: 700,
-                              letterSpacing: '0.2px',
-                              background: isMoving ? '#ecfdf5' : '#fefce8',
-                              color: isMoving ? '#047857' : '#a16207',
-                              border: `1px solid ${isMoving ? '#a7f3d0' : '#fef08a'}`
+                              fontSize: 11,
+                              fontWeight: 600,
+                              background: '#f8fafc',
+                              color: '#94a3b8',
+                              border: '1px solid #e2e8f0',
                             }}
                           >
-                            {isMoving ? `🚗 ${b.speed_km} km/h` : '🅿️ Idle'}
+                            No GPS Fix
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Campus Geofence */}
+                      <td style={{ padding: '14px 16px' }}>
+                        {hasGps && distToCampus !== null ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5,
+                              fontWeight: 700,
+                              fontSize: 11.5,
+                              color: isInsideCampus ? '#059669' : '#475569',
+                              background: isInsideCampus ? '#ecfdf5' : '#f8fafc',
+                              padding: '3px 8px',
+                              borderRadius: 8,
+                              border: `1px solid ${isInsideCampus ? '#a7f3d0' : '#e2e8f0'}`,
+                            }}
+                          >
+                            {isInsideCampus ? `In Campus (${distToCampus} km)` : `${distToCampus} km away`}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#cbd5e1' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Ignition / IMEI */}
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.ignition ? '#10b981' : '#94a3b8', display: 'inline-block' }} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: b.ignition ? '#059669' : '#64748b' }}>
+                            {b.ignition ? 'ON' : 'OFF'}
                           </span>
                         </div>
-                      ) : (
-                        <span
+                        {b.gps_device_id && (
+                          <div style={{ fontSize: 10.5, color: '#94a3b8', fontFamily: 'monospace' }}>
+                            IMEI: {b.gps_device_id}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Location Action Button */}
+                      <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectBus(b)}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: 5,
-                            padding: '3px 8px',
-                            borderRadius: 8,
-                            fontSize: 10.5,
+                            justifyContent: 'center',
+                            background: hasGps
+                              ? 'linear-gradient(135deg, #7c6cfc 0%, #6854ec 100%)'
+                              : '#f1f5f9',
+                            color: hasGps ? '#ffffff' : '#64748b',
+                            border: 'none',
+                            padding: '7px 16px',
+                            borderRadius: 10,
+                            fontSize: 12,
                             fontWeight: 700,
-                            background: '#f8fafc',
-                            color: '#94a3b8',
-                            border: '1px solid #e2e8f0'
+                            cursor: 'pointer',
+                            boxShadow: hasGps ? '0 3px 10px rgba(124, 108, 252, 0.28)' : 'none',
+                            transition: 'all 0.18s ease',
                           }}
+                          title={hasGps ? `View live GPS map position of ${b.registration_number}` : 'Open campus map view'}
                         >
-                          No GPS Fix
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#475569' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                        <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: 11 }}>Route:</span>
-                        <span style={{ fontWeight: 700, color: '#334155', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {b.route_code || 'Unassigned'} {b.route_name && b.route_name !== '—' ? `(${b.route_name})` : ''}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                        <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: 11 }}>Driver:</span>
-                        <span style={{ fontWeight: 700, color: '#334155' }}>
-                          {b.driver_name || '—'}
-                        </span>
-                      </div>
-
-                      {hasGps && distToCampus !== null && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 }}>
-                          <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: 11 }}>Campus Distance:</span>
-                          <span style={{
-                            fontWeight: 700,
-                            fontSize: 11,
-                            color: isInsideCampus ? '#059669' : '#475569',
-                            background: isInsideCampus ? '#ecfdf5' : '#f8fafc',
-                            padding: '1px 6px',
-                            borderRadius: 6,
-                            border: `1px solid ${isInsideCampus ? '#a7f3d0' : '#e2e8f0'}`
-                          }}>
-                            {isInsideCampus ? `🎯 At Campus (${distToCampus} km)` : `📍 ${distToCampus} km away`}
-                          </span>
-                        </div>
-                      )}
-
-                      {hasGps && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                          <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: 11 }}>Ignition:</span>
-                          <span style={{ fontWeight: 700, fontSize: 11, color: b.ignition ? '#059669' : '#64748b' }}>
-                            {b.ignition ? '🔥 ON' : '⚪ OFF'}
-                          </span>
-                        </div>
-                      )}
-
-                      {b.gps_device_id && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2, fontSize: 10.5, color: '#94a3b8', fontFamily: 'monospace' }}>
-                          <span>IMEI: {b.gps_device_id}</span>
-                          {b.recorded_at && (
-                            <span>
-                              {new Date(b.recorded_at).toLocaleTimeString('en-IN', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                          <span>View Location</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
+      </div>
 
-        {/* Right Map Canvas powered by @mapcn/map with MapGeoJSON */}
-        <div style={{ background: '#ffffff', borderRadius: 18, border: '1px solid rgba(226, 232, 240, 0.85)', boxShadow: '0 4px 20px -2px rgba(115, 103, 240, 0.05)', overflow: 'hidden', position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
-          
-          {/* Floating Campus Radius Control Bar */}
+      {/* Map Location Modal */}
+      {showMapModal && (
+        <div
+          className="modal-bg"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 99999,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={() => setShowMapModal(false)}
+        >
           <div
             style={{
-              position: 'absolute',
-              top: 14,
-              left: 14,
-              zIndex: 10,
+              background: '#ffffff',
+              borderRadius: 20,
+              width: '95vw',
+              maxWidth: 1280,
+              height: '88vh',
+              maxHeight: 820,
               display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid #e2e8f0',
-              borderRadius: 14,
-              padding: '7px 12px',
-              boxShadow: '0 4px 18px rgba(0, 0, 0, 0.1)',
-              flexWrap: 'wrap',
-              maxWidth: 'calc(100% - 28px)',
+              flexDirection: 'column',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
+              border: '1px solid #cbd5e1',
+              overflow: 'hidden',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Toggle Geofence ON/OFF */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', margin: 0 }}>
-              <input
-                type="checkbox"
-                checked={showGeofence}
-                onChange={(e) => setShowGeofence(e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: '#6854ec', cursor: 'pointer' }}
-              />
-              <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span>🏛️</span>
-                <span>College Radius:</span>
-              </span>
-            </label>
-
-            {/* Campus Selector */}
-            <select
-              value={selectedCampusIndex}
-              onChange={(e) => {
-                const idx = Number(e.target.value);
-                setSelectedCampusIndex(idx);
-                if (mapRef.current) {
-                  mapRef.current.flyTo({
-                    center: COLLEGE_CAMPUSES[idx].center,
-                    zoom: 13,
-                    duration: 1000,
-                  });
-                }
-              }}
-              style={{
-                border: '1px solid #cbd5e1',
-                borderRadius: 8,
-                padding: '4px 8px',
-                fontSize: 12,
-                fontWeight: 700,
-                color: '#334155',
-                background: '#ffffff',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              {COLLEGE_CAMPUSES.map((c, i) => (
-                <option key={c.id} value={i}>
-                  {c.shortName}
-                </option>
-              ))}
-            </select>
-
-            {/* Radius Selector Pills */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#f1f5f9', padding: '2px 4px', borderRadius: 8 }}>
-              {[0.5, 1.0, 1.5, 2.5, 5.0].map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setGeofenceRadiusKm(r)}
-                  style={{
-                    border: 'none',
-                    background: geofenceRadiusKm === r ? '#6854ec' : 'transparent',
-                    color: geofenceRadiusKm === r ? '#ffffff' : '#64748b',
-                    padding: '3px 7px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    borderRadius: 6,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {r}km
-                </button>
-              ))}
-            </div>
-
-            {/* Fly to Campus Button */}
-            <button
-              type="button"
-              onClick={handleFlyToCampus}
-              style={{
-                border: '1px solid #e2e8f0',
-                background: '#ffffff',
-                color: '#4f46e5',
-                padding: '4px 10px',
-                fontSize: 11.5,
-                fontWeight: 700,
-                borderRadius: 8,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-              title="Center map on college campus"
-            >
-              <span>🎯</span>
-              <span>Center</span>
-            </button>
-
-            {/* District Fleet View Button */}
-            <button
-              type="button"
-              onClick={handleDistrictOverview}
-              style={{
-                border: '1px solid #e2e8f0',
-                background: '#ffffff',
-                color: '#6854ec',
-                padding: '4px 10px',
-                fontSize: 11.5,
-                fontWeight: 700,
-                borderRadius: 8,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-              title="View all 5 college routes across Theni district"
-            >
-              <span>🗺️</span>
-              <span>All Routes</span>
-            </button>
-
-            {/* Buses In Campus Pill */}
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 800,
-                background: busesInCampus.length > 0 ? '#ecfdf5' : '#f8fafc',
-                color: busesInCampus.length > 0 ? '#047857' : '#64748b',
-                padding: '3px 8px',
-                borderRadius: 8,
-                border: `1px solid ${busesInCampus.length > 0 ? '#a7f3d0' : '#e2e8f0'}`,
-              }}
-            >
-              {busesInCampus.length} in campus
-            </span>
-          </div>
-
-          <Map
-            ref={mapRef}
-            center={activeCampus.center} // Default centered on Nadar Saraswathi College Campus
-            zoom={12}
-            className="h-full w-full"
-          >
-            <MapControls position="bottom-right" />
-
-            {/* College Campus Radius Overlay using MapGeoJSON */}
-            {showGeofence && (
-              <MapGeoJSON
-                id={`college-radius-${activeCampus.id}`}
-                data={campusRadiusGeoJSON}
-                fillPaint={{
-                  'fill-color': '#7c6cfc',
-                  'fill-opacity': 0.22,
-                }}
-                linePaint={{
-                  'line-color': '#4f46e5',
-                  'line-width': 2.5,
-                  'line-dasharray': [3, 2],
-                }}
-              />
-            )}
-
-            {/* College Campus Center Marker */}
-            <MapMarker
-              longitude={activeCampus.center[0]}
-              latitude={activeCampus.center[1]}
-            >
-              <MarkerContent>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    background: '#ffffff',
-                    border: '2px solid #6854ec',
-                    borderRadius: 20,
-                    padding: '5px 10px',
-                    boxShadow: '0 4px 16px rgba(104, 84, 236, 0.35)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span style={{ fontSize: 16 }}>🏛️</span>
-                  <span style={{ fontWeight: 800, fontSize: 11, color: '#1e293b', whiteSpace: 'nowrap' }}>
-                    {activeCampus.shortName}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      background: '#ede9fe',
-                      color: '#6854ec',
-                      padding: '1px 6px',
-                      borderRadius: 8,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {geofenceRadiusKm} km
-                  </span>
-                </div>
-              </MarkerContent>
-
-              <MarkerPopup>
-                <div style={{ minWidth: 240, padding: 4 }}>
-                  <div style={{ fontWeight: 800, fontSize: 13.5, color: '#1e293b', marginBottom: 2 }}>
-                    🏛️ {activeCampus.name}
-                  </div>
-                  <p style={{ fontSize: 11.5, color: '#64748b', margin: '4px 0 8px' }}>
-                    {activeCampus.institutions}
-                  </p>
-                  <div style={{ fontSize: 11, background: '#f8fafc', padding: '6px 8px', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b' }}>Active Geofence:</span>
-                      <b>{geofenceRadiusKm} km Radius</b>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b' }}>Fleet Inside Radius:</span>
-                      <b style={{ color: '#059669' }}>{busesInCampus.length} buses arrived</b>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#94a3b8', fontFamily: 'monospace', marginTop: 2 }}>
-                      <span>Coordinates:</span>
-                      <span>{activeCampus.center[1]}°N, {activeCampus.center[0]}°E</span>
-                    </div>
-                  </div>
-                </div>
-              </MarkerPopup>
-            </MapMarker>
-
-            {/* Render MapMarker for every bus with coordinates */}
-            {buses
-              .filter((b) => b.latitude && b.longitude)
-              .map((b, idx) => {
-                const isSelected = (selectedBus?.registration_number && selectedBus.registration_number === b.registration_number) || (selectedBus?.bus_id && selectedBus.bus_id === b.bus_id);
-                const isMoving = Number(b.speed_km || 0) > 1;
-                const distToCampus = calculateDistanceKm(
-                  b.latitude,
-                  b.longitude,
-                  activeCampus.center[1],
-                  activeCampus.center[0]
-                );
-                const isInsideCampus = distToCampus !== null && distToCampus <= geofenceRadiusKm;
-                const routeInfo = FLEET_ROAD_ROUTES[b.registration_number];
-                const pinColor = isInsideCampus
-                  ? '#6854ec'
-                  : (routeInfo?.color || (isMoving ? '#10b981' : '#64748b'));
-
-                return (
-                  <MapMarker
-                    key={b.bus_id ? `marker-bus-${b.bus_id}` : (b.registration_number ? `marker-reg-${b.registration_number}` : `marker-idx-${idx}`)}
-                    longitude={Number(b.longitude)}
-                    latitude={Number(b.latitude)}
-                    onClick={() => (isSelected ? setSelectedBus(null) : setSelectedBus(b))}
-                  >
-                    <MarkerContent>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'auto' }}>
-                        {/* Speed badge floating on top of moving vehicle */}
-                        {isMoving && (
-                          <div
-                            style={{
-                              background: 'rgba(15, 23, 42, 0.92)',
-                              color: '#34d399',
-                              fontSize: 9.5,
-                              fontWeight: 800,
-                              padding: '1px 6px',
-                              borderRadius: 8,
-                              marginBottom: 3,
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                              whiteSpace: 'nowrap',
-                              border: '1px solid rgba(52, 211, 153, 0.35)',
-                              pointerEvents: 'none',
-                            }}
-                          >
-                            {b.speed_km} km/h
-                          </div>
-                        )}
-
-                        {/* Realistic 3D/Top-Down Bus Vehicle Object */}
-                        <BusVehicleObject
-                          color={pinColor}
-                          bearing={b.bearing || 0}
-                          isSelected={isSelected}
-                          isMoving={isMoving}
-                          isInsideCampus={isInsideCampus}
-                          registration={b.registration_number}
-                        />
-
-                        {/* Bus Registration Tag */}
-                        <div
-                          style={{
-                            fontSize: 9,
-                            fontWeight: 800,
-                            background: '#ffffff',
-                            color: '#1e293b',
-                            padding: '1px 5px',
-                            borderRadius: 6,
-                            marginTop: 3,
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-                            border: `1.5px solid ${pinColor}`,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {b.registration_number}
-                        </div>
-                      </div>
-                    </MarkerContent>
-
-                    {/* Pop-up on marker click */}
-                    <MarkerPopup>
-                      <div style={{ minWidth: 230, padding: 4 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginBottom: 8 }}>
-                          <span style={{ fontWeight: 800, fontSize: 14, color: '#1e293b', fontFamily: 'monospace' }}>
-                            {b.registration_number}
-                          </span>
-                          <span
-                            style={{
-                              background: isMoving ? '#ecfdf5' : '#f1f5f9',
-                              color: isMoving ? '#047857' : '#475569',
-                              padding: '2px 8px',
-                              borderRadius: 6,
-                              fontSize: 11,
-                              fontWeight: 700
-                            }}
-                          >
-                            {isMoving ? `🚗 ${b.speed_km} km/h` : 'Stopped'}
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#334155' }}>
-                          <div>
-                            <span style={{ color: '#94a3b8' }}>Campus Proximity:</span>{' '}
-                            <b style={{ color: isInsideCampus ? '#059669' : '#334155' }}>
-                              {isInsideCampus ? `🎯 Inside Campus (${distToCampus} km)` : `📍 ${distToCampus} km away`}
-                            </b>
-                          </div>
-                          <div>
-                            <span style={{ color: '#94a3b8' }}>Route:</span>{' '}
-                            <b>{b.route_code || '—'}</b> {b.route_name && b.route_name !== '—' ? `(${b.route_name})` : ''}
-                          </div>
-                          <div>
-                            <span style={{ color: '#94a3b8' }}>Driver:</span>{' '}
-                            <b>{b.driver_name || '—'}</b>
-                            {b.driver_phone && (
-                              <a
-                                href={`tel:${b.driver_phone}`}
-                                style={{ marginLeft: 8, color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}
-                              >
-                                📞 {b.driver_phone}
-                              </a>
-                            )}
-                          </div>
-                          <div>
-                            <span style={{ color: '#94a3b8' }}>Ignition:</span>{' '}
-                            <b style={{ color: b.ignition ? '#059669' : '#94a3b8' }}>
-                              {b.ignition ? '🔥 ON' : '⚪ OFF'}
-                            </b>
-                          </div>
-                          <div style={{ fontSize: 10.5, color: '#94a3b8', fontFamily: 'monospace', marginTop: 4 }}>
-                            Coords: {Number(b.latitude).toFixed(5)}, {Number(b.longitude).toFixed(5)}
-                          </div>
-                          {b.recorded_at && (
-                            <div style={{ fontSize: 10.5, color: '#94a3b8', fontFamily: 'monospace' }}>
-                              Updated: {new Date(b.recorded_at).toLocaleTimeString('en-IN')}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </MarkerPopup>
-                  </MapMarker>
-                );
-              })}
-
-            {/* Highway Route & Live GPS Trail: ONLY shown when a bus is clicked/selected */}
-            {selectedBus && (() => {
-              const reg = selectedBus.registration_number;
-              const route = FLEET_ROAD_ROUTES[reg];
-              const busTrail = breadcrumbs[reg] || [];
-              const routeColor = route?.color || '#6854ec';
-
-              return (
-                <React.Fragment key={reg}>
-                  {/* Planned Highway Route Line on physical roads (Only for selected bus) */}
-                  {route && route.coordinates && (
-                    <MapRoute
-                      id={`selected-bus-route-${reg}`}
-                      coordinates={route.coordinates}
-                      color={routeColor}
-                      width={6}
-                      opacity={0.85}
-                    />
-                  )}
-
-                  {/* Live GPS Trail Breadcrumbs for this selected bus */}
-                  {busTrail.length >= 2 && (
-                    <MapRoute
-                      id={`selected-bus-trail-${reg}`}
-                      coordinates={busTrail}
-                      color="#f59e0b"
-                      width={5.5}
-                      opacity={0.95}
-                    />
-                  )}
-                </React.Fragment>
-              );
-            })()}
-          </Map>
-
-          {/* Floating Google Maps-Style Live Navigation Card */}
-          {selectedBus && selectedBus.latitude && selectedBus.longitude && (
+            {/* Modal Header */}
             <div
-              onClick={(e) => e.stopPropagation()}
               style={{
-                position: 'absolute',
-                bottom: 18,
-                left: 18,
-                zIndex: 10,
-                background: 'rgba(255, 255, 255, 0.98)',
-                backdropFilter: 'blur(12px)',
-                borderRadius: 16,
-                padding: '14px 18px',
-                boxShadow: '0 12px 36px rgba(0, 0, 0, 0.18)',
-                border: '1.5px solid #7c6cfc',
+                padding: '14px 22px',
+                background: '#ffffff',
+                borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
-                width: 340,
-                maxWidth: 'calc(100% - 36px)',
-                animation: 'slideUp 0.2s ease',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 12,
               }}
             >
-              {/* Top Row: Reg, Live Badge & Close */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
-                    🚌
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b', letterSpacing: '0.2px' }}>
-                      {selectedBus.registration_number}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#64748b' }}>
-                      {selectedBus.institution_name ? `${selectedBus.institution_name} • ` : ''}
-                      {selectedBus.route_code || 'Unassigned'}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      background: '#ecfdf5',
-                      color: '#059669',
-                      padding: '2px 8px',
-                      borderRadius: 20,
-                      fontSize: 10,
-                      fontWeight: 800,
-                      border: '1px solid #a7f3d0',
-                    }}
-                  >
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                    LIVE
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setSelectedBus(null);
-                      setFollowMode(false);
-                    }}
-                    style={{
-                      border: 'none',
-                      background: '#f1f5f9',
-                      color: '#64748b',
-                      width: 26,
-                      height: 26,
-                      borderRadius: '50%',
-                      cursor: 'pointer',
-                      fontWeight: 800,
-                      fontSize: 13,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#fee2e2';
-                      e.currentTarget.style.color = '#ef4444';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#f1f5f9';
-                      e.currentTarget.style.color = '#64748b';
-                    }}
-                    title="Close and Deselect Bus"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-
-              {/* Telemetry Stats Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, background: '#f8fafc', padding: '8px 10px', borderRadius: 10, border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 9.5, color: '#94a3b8', fontWeight: 700 }}>SPEED</div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: Number(selectedBus.speed_km || 0) > 1 ? '#059669' : '#64748b' }}>
-                    {selectedBus.speed_km || 0} km/h
-                  </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #7c6cfc 0%, #6854ec 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Navigation style={{ width: 18, height: 18 }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 9.5, color: '#94a3b8', fontWeight: 700 }}>IGNITION</div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: selectedBus.ignition ? '#059669' : '#94a3b8' }}>
-                    {selectedBus.ignition ? '🔥 ON' : '⚪ OFF'}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 9.5, color: '#94a3b8', fontWeight: 700 }}>CAMPUS DIST</div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#6854ec' }}>
-                    {calculateDistanceKm(selectedBus.latitude, selectedBus.longitude, activeCampus.center[1], activeCampus.center[0]) || '—'} km
-                  </div>
-                </div>
-              </div>
-
-              {/* Route & Driver Details */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748b' }}>Route:</span>
-                  <b>{selectedBus.route_name && selectedBus.route_name !== '—' ? `${selectedBus.route_code} (${selectedBus.route_name})` : (selectedBus.route_code || 'Unassigned')}</b>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#64748b' }}>Driver:</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <b>{selectedBus.driver_name || 'Unassigned'}</b>
-                    {selectedBus.driver_phone && (
-                      <a
-                        href={`tel:${selectedBus.driver_phone}`}
-                        style={{ color: '#2563eb', fontWeight: 700, textDecoration: 'none', background: '#eff6ff', padding: '1px 5px', borderRadius: 6, fontSize: 10.5 }}
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>{selectedBus ? selectedBus.registration_number : 'Fleet Live GPS Map'}</span>
+                    {selectedBus && (
+                      <span
+                        style={{
+                          background: Number(selectedBus.speed_km || 0) > 1 ? '#ecfdf5' : '#fefce8',
+                          color: Number(selectedBus.speed_km || 0) > 1 ? '#047857' : '#a16207',
+                          border: `1px solid ${Number(selectedBus.speed_km || 0) > 1 ? '#a7f3d0' : '#fef08a'}`,
+                          padding: '2px 8px',
+                          borderRadius: 20,
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
                       >
-                        📞 Call
-                      </a>
+                        {Number(selectedBus.speed_km || 0) > 1 ? `${selectedBus.speed_km} km/h` : 'Idle'}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                    {selectedBus ? (
+                      <>
+                        <b>Route:</b> {selectedBus.route_code || 'Unassigned'} {selectedBus.route_name ? `(${selectedBus.route_name})` : ''} &bull; <b>Driver:</b> {selectedBus.driver_name || '—'}
+                      </>
+                    ) : (
+                      'All 124 fleet vehicles and college campus geofence'
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Actions: Follow Toggle & Open in Google Maps */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {selectedBus?.latitude && selectedBus?.longitude && (
+                  <a
+                    href={`https://www.google.com/maps?q=${selectedBus.latitude},${selectedBus.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      color: '#1e293b',
+                      padding: '7px 12px',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                    }}
+                  >
+                    <ExternalLink style={{ width: 13, height: 13, color: '#475569' }} />
+                    <span>Google Maps ↗</span>
+                  </a>
+                )}
                 <button
                   type="button"
-                  onClick={() => setFollowMode(!followMode)}
+                  onClick={() => setShowMapModal(false)}
                   style={{
-                    flex: 1,
-                    border: followMode ? '1.5px solid #6854ec' : '1px solid #cbd5e1',
-                    background: followMode ? '#ede9fe' : '#ffffff',
-                    color: followMode ? '#5b21b6' : '#64748b',
-                    padding: '7px 10px',
+                    border: 'none',
+                    background: '#f1f5f9',
+                    color: '#64748b',
+                    padding: '7px 14px',
                     borderRadius: 8,
-                    fontSize: 11.5,
-                    fontWeight: 800,
+                    fontSize: 12,
+                    fontWeight: 700,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 5,
+                    gap: 4,
                   }}
-                  title="When ON, camera automatically locks and tracks the bus as it drives"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#fee2e2';
+                    e.currentTarget.style.color = '#ef4444';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f1f5f9';
+                    e.currentTarget.style.color = '#64748b';
+                  }}
                 >
-                  <Target style={{ width: 13, height: 13, color: followMode ? '#6854ec' : '#94a3b8' }} />
-                  <span>{followMode ? '🎯 Following: ON' : 'Lock Camera'}</span>
+                  Close
                 </button>
-
-                <a
-                  href={`https://www.google.com/maps?q=${selectedBus.latitude},${selectedBus.longitude}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    flex: 1,
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    color: '#1e293b',
-                    padding: '7px 10px',
-                    borderRadius: 8,
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 5,
-                  }}
-                  title="Open live coordinate pin directly in Google Maps"
-                >
-                  <ExternalLink style={{ width: 12, height: 12, color: '#475569' }} />
-                  <span>Google Maps ↗</span>
-                </a>
               </div>
             </div>
-          )}
+
+            {/* Modal Map Content */}
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+              {/* Floating Campus Radius Control Bar */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 14,
+                  left: 14,
+                  zIndex: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 14,
+                  padding: '7px 12px',
+                  boxShadow: '0 4px 18px rgba(0, 0, 0, 0.1)',
+                  flexWrap: 'wrap',
+                  maxWidth: 'calc(100% - 28px)',
+                }}
+              >
+                {/* Toggle Geofence ON/OFF */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={showGeofence}
+                    onChange={(e) => setShowGeofence(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: '#6854ec', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontWeight: 800, fontSize: 12.5, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <MapPin style={{ width: 13, height: 13, color: '#6854ec' }} />
+                    <span>College Radius:</span>
+                  </span>
+                </label>
+
+                {/* Campus Selector */}
+                <select
+                  value={selectedCampusIndex}
+                  onChange={(e) => {
+                    const idx = Number(e.target.value);
+                    setSelectedCampusIndex(idx);
+                    if (mapRef.current) {
+                      mapRef.current.flyTo({
+                        center: COLLEGE_CAMPUSES[idx].center,
+                        zoom: 13,
+                        duration: 1000,
+                      });
+                    }
+                  }}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    padding: '4px 8px',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#334155',
+                    background: '#ffffff',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {COLLEGE_CAMPUSES.map((c, i) => (
+                    <option key={c.id} value={i}>
+                      {c.shortName}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Radius Selector Pills */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#f1f5f9', padding: '2px 4px', borderRadius: 8 }}>
+                  {[0.5, 1.0, 1.5, 2.5, 5.0].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setGeofenceRadiusKm(r)}
+                      style={{
+                        border: 'none',
+                        background: geofenceRadiusKm === r ? '#6854ec' : 'transparent',
+                        color: geofenceRadiusKm === r ? '#ffffff' : '#64748b',
+                        padding: '3px 7px',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {r}km
+                    </button>
+                  ))}
+                </div>
+
+                {/* Fly to Campus Button */}
+                <button
+                  type="button"
+                  onClick={handleFlyToCampus}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    color: '#4f46e5',
+                    padding: '4px 10px',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                  title="Center map on college campus"
+                >
+                  <Target style={{ width: 13, height: 13 }} />
+                  <span>Center</span>
+                </button>
+
+                {/* District Fleet View Button */}
+                <button
+                  type="button"
+                  onClick={handleDistrictOverview}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    color: '#6854ec',
+                    padding: '4px 10px',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                  title="View all 5 college routes across Theni district"
+                >
+                  <Navigation style={{ width: 13, height: 13 }} />
+                  <span>All Routes</span>
+                </button>
+
+                {/* Buses In Campus Pill */}
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    background: busesInCampus.length > 0 ? '#ecfdf5' : '#f8fafc',
+                    color: busesInCampus.length > 0 ? '#047857' : '#64748b',
+                    padding: '3px 8px',
+                    borderRadius: 8,
+                    border: `1px solid ${busesInCampus.length > 0 ? '#a7f3d0' : '#e2e8f0'}`,
+                  }}
+                >
+                  {busesInCampus.length} in campus
+                </span>
+              </div>
+
+              <Map
+                ref={mapRef}
+                center={selectedBus?.latitude && selectedBus?.longitude ? [Number(selectedBus.longitude), Number(selectedBus.latitude)] : activeCampus.center}
+                zoom={selectedBus?.latitude && selectedBus?.longitude ? 14 : 12}
+                className="h-full w-full"
+              >
+                <MapControls position="bottom-right" />
+
+                {/* College Campus Radius Overlay using MapGeoJSON */}
+                {showGeofence && (
+                  <MapGeoJSON
+                    id={`college-radius-${activeCampus.id}`}
+                    data={campusRadiusGeoJSON}
+                    fillPaint={{
+                      'fill-color': '#7c6cfc',
+                      'fill-opacity': 0.22,
+                    }}
+                    linePaint={{
+                      'line-color': '#4f46e5',
+                      'line-width': 2.5,
+                      'line-dasharray': [3, 2],
+                    }}
+                  />
+                )}
+
+                {/* College Campus Center Marker */}
+                <MapMarker
+                  longitude={activeCampus.center[0]}
+                  latitude={activeCampus.center[1]}
+                >
+                  <MarkerContent>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        background: '#ffffff',
+                        border: '2px solid #6854ec',
+                        borderRadius: 20,
+                        padding: '5px 10px',
+                        boxShadow: '0 4px 16px rgba(104, 84, 236, 0.35)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <MapPin style={{ width: 14, height: 14, color: '#6854ec' }} />
+                      <span style={{ fontWeight: 800, fontSize: 11, color: '#1e293b', whiteSpace: 'nowrap' }}>
+                        {activeCampus.shortName}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          background: '#ede9fe',
+                          color: '#6854ec',
+                          padding: '1px 6px',
+                          borderRadius: 8,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {geofenceRadiusKm} km
+                      </span>
+                    </div>
+                  </MarkerContent>
+
+                  <MarkerPopup>
+                    <div style={{ minWidth: 240, padding: 4 }}>
+                      <div style={{ fontWeight: 800, fontSize: 13.5, color: '#1e293b', marginBottom: 2 }}>
+                        {activeCampus.name}
+                      </div>
+                      <p style={{ fontSize: 11.5, color: '#64748b', margin: '4px 0 8px' }}>
+                        {activeCampus.institutions}
+                      </p>
+                      <div style={{ fontSize: 11, background: '#f8fafc', padding: '6px 8px', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#64748b' }}>Active Geofence:</span>
+                          <b>{geofenceRadiusKm} km Radius</b>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#64748b' }}>Fleet Inside Radius:</span>
+                          <b style={{ color: '#059669' }}>{busesInCampus.length} buses arrived</b>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#94a3b8', fontFamily: 'monospace', marginTop: 2 }}>
+                          <span>Coordinates:</span>
+                          <span>{activeCampus.center[1]}°N, {activeCampus.center[0]}°E</span>
+                        </div>
+                      </div>
+                    </div>
+                  </MarkerPopup>
+                </MapMarker>
+
+                {/* Render MapMarker for every bus with coordinates */}
+                {buses
+                  .filter((b) => b.latitude && b.longitude)
+                  .map((b, idx) => {
+                    const isSelected = (selectedBus?.registration_number && selectedBus.registration_number === b.registration_number) || (selectedBus?.bus_id && selectedBus.bus_id === b.bus_id);
+                    const isMoving = Number(b.speed_km || 0) > 1;
+                    const distToCampus = calculateDistanceKm(
+                      b.latitude,
+                      b.longitude,
+                      activeCampus.center[1],
+                      activeCampus.center[0]
+                    );
+                    const isInsideCampus = distToCampus !== null && distToCampus <= geofenceRadiusKm;
+                    const routeInfo = FLEET_ROAD_ROUTES[b.registration_number];
+                    const pinColor = isInsideCampus
+                      ? '#6854ec'
+                      : (routeInfo?.color || (isMoving ? '#10b981' : '#64748b'));
+
+                    return (
+                      <MapMarker
+                        key={b.bus_id ? `marker-bus-${b.bus_id}` : (b.registration_number ? `marker-reg-${b.registration_number}` : `marker-idx-${idx}`)}
+                        longitude={Number(b.longitude)}
+                        latitude={Number(b.latitude)}
+                        onClick={() => (isSelected ? setSelectedBus(null) : setSelectedBus(b))}
+                      >
+                        <MarkerContent>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'auto' }}>
+                            {/* Speed badge floating on top of moving vehicle */}
+                            {isMoving && (
+                              <div
+                                style={{
+                                  background: 'rgba(15, 23, 42, 0.92)',
+                                  color: '#34d399',
+                                  fontSize: 9.5,
+                                  fontWeight: 800,
+                                  padding: '1px 6px',
+                                  borderRadius: 8,
+                                  marginBottom: 3,
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                                  border: '1px solid rgba(52, 211, 153, 0.4)',
+                                  whiteSpace: 'nowrap',
+                                  letterSpacing: '0.2px',
+                                }}
+                              >
+                                {Number(b.speed_km).toFixed(2)} km/h
+                              </div>
+                            )}
+
+                            {/* Bus Vehicle 3D Representation */}
+                            <BusVehicleObject
+                              color={pinColor}
+                              busNumber={b.registration_number}
+                              speed={b.speed_km || 0}
+                              heading={b.heading != null ? b.heading : (routeInfo?.heading || 0)}
+                              isMoving={isMoving}
+                              isSelected={isSelected}
+                            />
+                          </div>
+                        </MarkerContent>
+
+                        <MarkerPopup>
+                          <div style={{ minWidth: 260, padding: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                              <div style={{ fontWeight: 800, fontSize: 14, color: '#1e293b' }}>
+                                {b.registration_number}
+                              </div>
+                              <span
+                                style={{
+                                  background: isMoving ? '#ecfdf5' : '#f8fafc',
+                                  color: isMoving ? '#059669' : '#64748b',
+                                  padding: '2px 8px',
+                                  borderRadius: 6,
+                                  fontSize: 10.5,
+                                  fontWeight: 800,
+                                  border: `1px solid ${isMoving ? '#a7f3d0' : '#e2e8f0'}`,
+                                }}
+                              >
+                                {isMoving ? `${b.speed_km} km/h` : 'Idle'}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 11.5, color: '#475569' }}>
+                              <div>
+                                <b>Route:</b> {b.route_code || 'Unassigned'} {b.route_name && b.route_name !== '—' ? `(${b.route_name})` : ''}
+                              </div>
+                              <div>
+                                <b>Driver:</b> {b.driver_name || '—'}
+                              </div>
+                              {distToCampus !== null && (
+                                <div style={{ color: isInsideCampus ? '#059669' : '#475569', fontWeight: 600 }}>
+                                  <b>Campus Dist:</b> {isInsideCampus ? `At Campus (${distToCampus} km)` : `${distToCampus} km away`}
+                                </div>
+                              )}
+                              <div>
+                                <b>Ignition:</b> {b.ignition ? 'ON' : 'OFF'}
+                              </div>
+                              {b.gps_device_id && (
+                                <div style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace' }}>
+                                  IMEI: {b.gps_device_id}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </MarkerPopup>
+                      </MapMarker>
+                    );
+                  })}
+
+                {/* Highway Route & Live GPS Trail */}
+                {selectedBus && (() => {
+                  const reg = selectedBus.registration_number;
+                  const route = FLEET_ROAD_ROUTES[reg];
+                  const busTrail = breadcrumbs[reg] || [];
+                  const routeColor = route?.color || '#6854ec';
+
+                  return (
+                    <React.Fragment key={reg}>
+                      {route && route.coordinates && (
+                        <MapRoute
+                          id={`selected-bus-route-${reg}`}
+                          coordinates={route.coordinates}
+                          color={routeColor}
+                          width={6}
+                          opacity={0.85}
+                        />
+                      )}
+                      {busTrail.length >= 2 && (
+                        <MapRoute
+                          id={`selected-bus-trail-${reg}`}
+                          coordinates={busTrail}
+                          color="#f59e0b"
+                          width={5.5}
+                          opacity={0.95}
+                        />
+                      )}
+                    </React.Fragment>
+                  );
+                })()}
+              </Map>
+
+              {/* Floating Live Navigation Card for selected bus */}
+              {selectedBus && selectedBus.latitude && selectedBus.longitude && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    bottom: 18,
+                    left: 18,
+                    zIndex: 10,
+                    background: 'rgba(255, 255, 255, 0.98)',
+                    backdropFilter: 'blur(12px)',
+                    borderRadius: 16,
+                    padding: '14px 18px',
+                    boxShadow: '0 12px 36px rgba(0, 0, 0, 0.18)',
+                    border: '1.5px solid #7c6cfc',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                    width: 340,
+                    maxWidth: 'calc(100% - 36px)',
+                    animation: 'slideUp 0.2s ease',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6854ec' }}>
+                        <Navigation style={{ width: 16, height: 16 }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b', letterSpacing: '0.2px' }}>
+                          {selectedBus.registration_number}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>
+                          {selectedBus.institution_name ? `${selectedBus.institution_name} • ` : ''}
+                          {selectedBus.route_code || 'Unassigned'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          background: '#ecfdf5',
+                          color: '#059669',
+                          padding: '2px 8px',
+                          borderRadius: 20,
+                          fontSize: 10,
+                          fontWeight: 800,
+                          border: '1px solid #a7f3d0',
+                        }}
+                      >
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                        LIVE
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, background: '#f8fafc', padding: '8px 10px', borderRadius: 10, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 9.5, color: '#94a3b8', fontWeight: 700 }}>SPEED</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: Number(selectedBus.speed_km || 0) > 1 ? '#059669' : '#64748b' }}>
+                        {selectedBus.speed_km || 0} km/h
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 9.5, color: '#94a3b8', fontWeight: 700 }}>IGNITION</div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: selectedBus.ignition ? '#059669' : '#94a3b8' }}>
+                        {selectedBus.ignition ? 'ON' : 'OFF'}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 9.5, color: '#94a3b8', fontWeight: 700 }}>CAMPUS</div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: '#6854ec' }}>
+                        {(() => {
+                          const dist = calculateDistanceKm(
+                            selectedBus.latitude,
+                            selectedBus.longitude,
+                            activeCampus.center[1],
+                            activeCampus.center[0]
+                          );
+                          if (dist === null) return '—';
+                          return dist <= geofenceRadiusKm ? 'At Campus' : `${dist}km`;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => setFollowMode(!followMode)}
+                      style={{
+                        flex: 1,
+                        border: '1px solid #cbd5e1',
+                        background: followMode ? '#ede9fe' : '#ffffff',
+                        color: followMode ? '#6854ec' : '#334155',
+                        padding: '7px 10px',
+                        borderRadius: 8,
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 5,
+                      }}
+                      title="When ON, camera automatically locks and tracks the bus as it drives"
+                    >
+                      <Target style={{ width: 13, height: 13, color: followMode ? '#6854ec' : '#94a3b8' }} />
+                      <span>{followMode ? 'Following: ON' : 'Lock Camera'}</span>
+                    </button>
+
+                    <a
+                      href={`https://www.google.com/maps?q=${selectedBus.latitude},${selectedBus.longitude}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        flex: 1,
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        color: '#1e293b',
+                        padding: '7px 10px',
+                        borderRadius: 8,
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 5,
+                      }}
+                      title="Open live coordinate pin directly in Google Maps"
+                    >
+                      <ExternalLink style={{ width: 12, height: 12, color: '#475569' }} />
+                      <span>Google Maps ↗</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Simulator Modal */}
       {showSimModal && (
@@ -2133,7 +2249,7 @@ export default function LiveTracking() {
             {/* Modal Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #edf2f7', paddingBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 24 }}>🧪</span>
+                <Cpu style={{ width: 22, height: 22, color: '#6854ec' }} />
                 <div>
                   <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#1e293b' }}>
                     GPS Telemetry Test Simulator
@@ -2158,10 +2274,12 @@ export default function LiveTracking() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 800,
-                  fontSize: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                ✕
+                <X style={{ width: 16, height: 16 }} />
               </button>
             </div>
 
@@ -2209,10 +2327,10 @@ export default function LiveTracking() {
                               cursor: isSimulating ? 'not-allowed' : 'pointer',
                             }}
                           >
-                            ⚡ Send This
+                            Send This
                           </button>
                           <span style={{ fontSize: 11, fontWeight: 600, color: isSelected ? '#7c6cfc' : '#94a3b8' }}>
-                            {isSelected ? '✓ Loaded' : 'Click to load'}
+                            {isSelected ? 'Loaded' : 'Click to load'}
                           </span>
                         </div>
                       </div>
@@ -2256,7 +2374,7 @@ export default function LiveTracking() {
             {/* Modal Actions */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4 }}>
               <span style={{ fontSize: 11, color: '#64748b' }}>
-                📡 TCP Port: <b>5050</b> | HTTP: <b>/api/gps/raw</b>
+                TCP Port: <b>5050</b> | HTTP: <b>/api/gps/raw</b>
               </span>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
@@ -2314,11 +2432,11 @@ export default function LiveTracking() {
                 }}
               >
                 {simResult.error ? (
-                  <div>❌ Error: {simResult.error}</div>
+                  <div>Error: {simResult.error}</div>
                 ) : (
                   <div>
                     <div style={{ fontWeight: 800, marginBottom: 6, color: '#15803d', fontSize: 13 }}>
-                      ✅ Telemetry Successfully Ingested:
+                      Telemetry Successfully Ingested:
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
                       <div>• IMEI: <b>{simResult.parsed?.imei}</b></div>
@@ -2401,11 +2519,12 @@ export default function LiveTracking() {
                   justifyContent: 'center',
                   color: '#ffffff',
                   cursor: 'pointer',
-                  fontSize: 14,
-                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                ✕
+                <X style={{ width: 16, height: 16 }} />
               </button>
             </div>
 
@@ -2454,7 +2573,7 @@ export default function LiveTracking() {
 
               {/* How it runs live */}
               <div style={{ background: '#ecfdf5', padding: 14, borderRadius: 12, border: '1px solid #a7f3d0', fontSize: 12.5, color: '#065f46' }}>
-                <b>⚡ Automatic Road Running:</b> Whenever a GPS coordinate packet hits either TCP Port 5050 or the HTTP Webhook, the backend immediately broadcasts it to this browser screen via Server-Sent Events (SSE). The bus marker on the map smoothly glides across the road to the new coordinates in real time!
+                <b>Automatic Road Running:</b> Whenever a GPS coordinate packet hits either TCP Port 5050 or the HTTP Webhook, the backend immediately broadcasts it to this browser screen via Server-Sent Events (SSE). The bus marker on the map smoothly glides across the road to the new coordinates in real time!
               </div>
             </div>
 
