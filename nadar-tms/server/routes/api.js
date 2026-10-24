@@ -111,6 +111,7 @@ router.get('/gps/live', gps.getLive);
 router.get('/gps/stream', gps.stream);
 router.post('/gps/raw', gps.receiveRaw);
 router.post('/gps/simulate', gps.simulate);
+router.post('/gps/assign-imei', authenticate, gps.assignImei);
 
 module.exports = router;
 

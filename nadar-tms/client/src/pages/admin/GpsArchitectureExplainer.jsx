@@ -365,6 +365,29 @@ In our Nadar Saraswathi TMS Fleet Tracking System, the real-time location pipeli
             <span>{copiedScript ? 'Copied Viva Script!' : 'Copy Viva Explainer Script'}</span>
           </button>
 
+          <a
+            href="/TMS_GPS_Architecture_Guide.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            download="TMS_GPS_Architecture_Guide.pdf"
+            style={{
+              background: '#10b981',
+              color: '#ffffff',
+              padding: '10px 18px',
+              borderRadius: 12,
+              fontWeight: 800,
+              fontSize: 13,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+              textDecoration: 'none',
+            }}
+          >
+            <span>📄</span>
+            <span>Download Architecture PDF</span>
+          </a>
+
           <Link
             to="/admin/live-tracking"
             style={{

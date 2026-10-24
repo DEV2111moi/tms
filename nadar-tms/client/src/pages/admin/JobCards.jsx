@@ -357,20 +357,40 @@ export default function JobCards() {
 
   const driverByBusMap = useMemo(() => {
     const map = {};
+    // 1. Direct assignments
     assignments.forEach(a => {
       if (a.bus_id && a.driver_id) {
         const d = drivers.find(drv => String(drv.id) === String(a.driver_id));
         if (d) map[String(a.bus_id)] = d;
       }
     });
-    // Fallback: driver with bus_id
+    // 2. Pre-joined driver on bus
+    buses.forEach(b => {
+      if (b.id && !map[String(b.id)]) {
+        if (b.current_driver_id || b.driver_id) {
+          const d = drivers.find(drv => String(drv.id) === String(b.current_driver_id || b.driver_id));
+          if (d) map[String(b.id)] = d;
+        } else if (b.driver_name && b.driver_name !== '—') {
+          map[String(b.id)] = { id: '', name: b.driver_name, phone: '' };
+        }
+      }
+    });
+    // 3. Match via route_id
+    buses.forEach(b => {
+      if (b.id && b.route_id && !map[String(b.id)]) {
+        const d = drivers.find(drv => drv.route_id && String(drv.route_id) === String(b.route_id));
+        if (d) map[String(b.id)] = d;
+      }
+    });
+    // 4. Fallback: driver with current_bus_id or allotted_bus_id
     drivers.forEach(d => {
-      if (d.bus_id && !map[String(d.bus_id)]) {
-        map[String(d.bus_id)] = d;
+      const bId = d.current_bus_id || d.allotted_bus_id || d.bus_id;
+      if (bId && !map[String(bId)]) {
+        map[String(bId)] = d;
       }
     });
     return map;
-  }, [assignments, drivers]);
+  }, [assignments, drivers, buses]);
 
   // Aggregate bus maintenance records
   const busRecords = useMemo(() => {
@@ -577,6 +597,9 @@ export default function JobCards() {
       parts.forEach(p => {
         if (p.part_name) lineEntries.push(`${p.part_name} - ${p.quantity} ${p.unit || ''}`);
       });
+    }
+    if (maint.other_expense_desc || Number(maint.other_expense_amount) > 0) {
+      lineEntries.push(`Other: ${maint.other_expense_desc || 'Extra Work'}${Number(maint.other_expense_amount) > 0 ? ` (₹${Number(maint.other_expense_amount).toFixed(2)})` : ''}`);
     }
     while (lineEntries.length < 13) {
       lineEntries.push('');
@@ -810,6 +833,12 @@ export default function JobCards() {
             <span>Labor Charges:</span>
             <b>₹${Number(maint.labor_charges || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>
           </div>
+          ${Number(maint.other_expense_amount) > 0 ? `
+          <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+            <span>Other Expense (${maint.other_expense_desc || 'Extra Work'}):</span>
+            <b>₹${Number(maint.other_expense_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>
+          </div>
+          ` : ''}
           <div style="display: flex; justify-content: space-between; padding: 6px 0; border-top: 1.5px solid #cbd5e1; font-size: 14px; color: #1e3a8a; font-weight: bold;">
             <span>GRAND TOTAL:</span>
             <span>₹${Number(maint.cost || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -860,6 +889,8 @@ export default function JobCards() {
       workshop_name: item.workshop_name || 'TMHNU Fleet Workshop',
       mechanic_name: item.mechanic_name || '',
       labor_charges: Number(item.labor_charges) || 0,
+      other_expense_desc: item.other_expense_desc || '',
+      other_expense_amount: Number(item.other_expense_amount) || 0,
       parts_cost: Number(item.parts_cost) || 0,
       cost: Number(item.cost) || 0,
       notes: item.notes || '',
@@ -913,7 +944,7 @@ export default function JobCards() {
       ...prev,
       parts_data: updated,
       parts_cost: newPartsCost,
-      cost: newPartsCost + (Number(prev.labor_charges) || 0)
+      cost: newPartsCost + (Number(prev.labor_charges) || 0) + (Number(prev.other_expense_amount) || 0)
     }));
   };
 
@@ -941,6 +972,8 @@ export default function JobCards() {
         workshop_name: editingBill.workshop_name,
         mechanic_name: editingBill.mechanic_name,
         labor_charges: editingBill.labor_charges,
+        other_expense_desc: editingBill.other_expense_desc || '',
+        other_expense_amount: Number(editingBill.other_expense_amount) || 0,
         parts_cost: editingBill.parts_cost,
         parts_data: editingBill.parts_data,
         job_card_no: editingBill.job_card_no || '',
@@ -1004,6 +1037,8 @@ export default function JobCards() {
       workshop_name: 'TMHNU Fleet Workshop',
       mechanic_name: '',
       labor_charges: 0,
+      other_expense_desc: '',
+      other_expense_amount: 0,
       parts_cost: 0,
       cost: 0,
       notes: '',
@@ -2188,23 +2223,29 @@ export default function JobCards() {
                         onChange={e => {
                           const bId = e.target.value;
                           const b = buses.find(x => String(x.id) === String(bId));
-                          const drv = driverByBusMap[String(bId)];
+                          const drv = driverByBusMap[String(bId)] || 
+                                      (b?.driver_name && b.driver_name !== '—' ? { name: b.driver_name, id: b.current_driver_id || b.driver_id } : null) ||
+                                      drivers.find(d => String(d.current_bus_id) === String(bId) || String(d.allotted_bus_id) === String(bId) || (b?.route_id && String(d.route_id) === String(b.route_id)));
                           setEditingBill(prev => ({
                             ...prev,
                             bus_id: bId,
-                            driver_name: drv?.name || prev.driver_name,
-                            driver_id: drv?.id || prev.driver_id,
+                            driver_name: drv?.name || '',
+                            driver_id: drv?.id || '',
                             odometer: b?.current_odometer_km || prev.odometer
                           }));
                         }}
                         style={{ fontWeight: 600 }}
                       >
                         <option value="">— Choose Bus —</option>
-                        {buses.map(b => (
-                          <option key={b.id} value={b.id}>
-                            {b.registration_number} {b.bus_model ? `(${b.bus_model})` : ''}
-                          </option>
-                        ))}
+                        {buses.map(b => {
+                          const drv = driverByBusMap[String(b.id)];
+                          const drvLabel = drv?.name ? ` · [Driver: ${drv.name}]` : (b.driver_name && b.driver_name !== '—' ? ` · [Driver: ${b.driver_name}]` : '');
+                          return (
+                            <option key={b.id} value={b.id}>
+                              {b.registration_number} {b.bus_model ? `(${b.bus_model})` : ''}{drvLabel}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 
@@ -2223,13 +2264,86 @@ export default function JobCards() {
                     </div>
 
                     <div>
-                      <label className="maint-form-label">Driver Name</label>
-                      <input
-                        type="text"
-                        className="maint-input-field"
-                        value={editingBill.driver_name || ''}
-                        onChange={e => setEditingBill({ ...editingBill, driver_name: e.target.value })}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className="maint-form-label" style={{ marginBottom: 2 }}>
+                          Driver Name
+                        </label>
+                        {(() => {
+                          const allotted = driverByBusMap[String(editingBill.bus_id)];
+                          if (allotted?.name && editingBill.driver_name !== allotted.name) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setEditingBill(prev => ({ ...prev, driver_name: allotted.name, driver_id: allotted.id || prev.driver_id }))}
+                                style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                                title="Reset to allotted bus driver"
+                              >
+                                ↺ Set: {allotted.name}
+                              </button>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          list="jobcard-driver-list"
+                          className="maint-input-field"
+                          placeholder="Select from list or type driver name"
+                          value={editingBill.driver_name || ''}
+                          onChange={e => {
+                            const val = e.target.value;
+                            const matched = drivers.find(d => 
+                              d.name.toLowerCase() === val.toLowerCase() || 
+                              `${d.name} (${d.assigned_bus_numbers || d.allotted_bus_reg || 'Fleet'})`.toLowerCase() === val.toLowerCase()
+                            );
+                            setEditingBill({
+                              ...editingBill,
+                              driver_name: matched ? matched.name : val,
+                              driver_id: matched ? matched.id : editingBill.driver_id
+                            });
+                          }}
+                          style={{
+                            fontWeight: 600,
+                            borderColor: editingBill.driver_name ? '#10b981' : undefined,
+                            background: editingBill.driver_name ? '#f0fdf4' : '#ffffff'
+                          }}
+                        />
+                        <datalist id="jobcard-driver-list">
+                          {drivers.map(d => {
+                            const busTag = d.assigned_bus_numbers || d.allotted_bus_reg;
+                            return (
+                              <option
+                                key={d.id}
+                                value={d.name}
+                                label={busTag ? `Allotted Bus: ${busTag}` : 'Driver'}
+                              >
+                                {d.name} {busTag ? `(Bus: ${busTag})` : ''}
+                              </option>
+                            );
+                          })}
+                        </datalist>
+                      </div>
+                      {(() => {
+                        const allotted = driverByBusMap[String(editingBill.bus_id)];
+                        if (allotted?.name) {
+                          return (
+                            <div style={{ fontSize: 11, color: '#059669', fontWeight: 600, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>✓ Allotted Driver:</span>
+                              <b>{allotted.name}</b>
+                              {allotted.phone ? <span style={{ color: '#64748b' }}>({allotted.phone})</span> : null}
+                            </div>
+                          );
+                        } else if (editingBill.bus_id) {
+                          return (
+                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>
+                              ℹ️ No driver currently assigned to this bus (select from list)
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
 
                     <div>
@@ -2396,7 +2510,7 @@ export default function JobCards() {
                                       ...editingBill,
                                       parts_data: updated,
                                       parts_cost: newCost,
-                                      cost: newCost + (Number(editingBill.labor_charges) || 0)
+                                      cost: newCost + (Number(editingBill.labor_charges) || 0) + (Number(editingBill.other_expense_amount) || 0)
                                     });
                                   }}
                                   style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}
@@ -2410,49 +2524,210 @@ export default function JobCards() {
                       </table>
                     </div>
                   )}
+
+                  {/* Other / Outside Workshop Expenses (Under Spare Parts) */}
+                  <div style={{
+                    marginTop: 16,
+                    padding: '14px 16px',
+                    background: '#f8fafc',
+                    border: '1.5px dashed #cbd5e1',
+                    borderRadius: 10
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 13 }}>🏷️</span>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: '#1e293b' }}>
+                          Other / Outside Expense (Typable)
+                        </span>
+                        <span style={{ fontSize: 11, color: '#64748b' }}>
+                          — Lathe work, welding, greasing, wash, alignment, etc.
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>Quick Pick:</span>
+                        {['Lathe Work', 'Welding', 'Greasing & Wash', 'Wheel Alignment', 'Electrical', 'Towing', 'RTO / Toll'].map(chip => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => setEditingBill(prev => ({
+                              ...prev,
+                              other_expense_desc: prev.other_expense_desc ? `${prev.other_expense_desc}, ${chip}` : chip
+                            }))}
+                            style={{
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: 12,
+                              padding: '2px 8px',
+                              fontSize: 10.5,
+                              fontWeight: 600,
+                              color: '#334155',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
+                          >
+                            + {chip}
+                          </button>
+                        ))}
+                        {editingBill.other_expense_desc && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingBill(prev => ({
+                              ...prev,
+                              other_expense_desc: '',
+                              other_expense_amount: 0,
+                              cost: (Number(prev.parts_cost) || 0) + (Number(prev.labor_charges) || 0)
+                            }))}
+                            style={{
+                              background: '#fee2e2',
+                              border: '1px solid #fecaca',
+                              borderRadius: 12,
+                              padding: '2px 7px',
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              color: '#dc2626',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ✕ Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, alignItems: 'center' }}>
+                      <div>
+                        <input
+                          type="text"
+                          list="jobcard-other-exp-suggestions"
+                          className="maint-input-field"
+                          placeholder="Type other expense reason / job description (e.g. Lathe work, Welding, Greasing, Wash...)"
+                          value={editingBill.other_expense_desc || ''}
+                          onChange={e => setEditingBill(prev => ({ ...prev, other_expense_desc: e.target.value }))}
+                          style={{ fontWeight: 600, height: 38 }}
+                        />
+                        <datalist id="jobcard-other-exp-suggestions">
+                          <option value="Lathe Turning & Bush Work" />
+                          <option value="Welding & Fabrication" />
+                          <option value="Greasing & Water Wash" />
+                          <option value="Wheel Alignment & Balancing" />
+                          <option value="Electrical & Starter Motor" />
+                          <option value="Radiator & Water Pump Work" />
+                          <option value="Body Tinkering & Painting" />
+                          <option value="Seat & Upholstery Repair" />
+                          <option value="Towing & Recovery Charges" />
+                          <option value="RTO Fitness / Toll Charges" />
+                        </datalist>
+                      </div>
+
+                      <div className="maint-currency-group" style={{ height: 38 }}>
+                        <span className="maint-currency-prefix">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="maint-currency-input"
+                          value={editingBill.other_expense_amount}
+                          onChange={e => {
+                            const o = Math.max(0, Number(e.target.value) || 0);
+                            setEditingBill(prev => ({
+                              ...prev,
+                              other_expense_amount: o,
+                              cost: (Number(prev.parts_cost) || 0) + (Number(prev.labor_charges) || 0) + o
+                            }));
+                          }}
+                          placeholder="0.00"
+                          style={{ height: 38 }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Section 3: Totals & Notes */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-                  <div>
-                    <label className="maint-form-label">Labor & Workshop Service Charges</label>
-                    <div className="maint-currency-group">
-                      <span className="maint-currency-prefix">₹</span>
+                {/* Section 3: Labor & Service Notes */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 12,
+                  padding: '16px 18px',
+                  marginBottom: 16
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 14 }}>
+                    {/* Labor Charges */}
+                    <div>
+                      <label className="maint-form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <MaintIcon name="wrench" size={13} color="#475569" />
+                        <span>Labor & Workshop Service Charges</span>
+                      </label>
+                      <div className="maint-currency-group">
+                        <span className="maint-currency-prefix">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="maint-currency-input"
+                          value={editingBill.labor_charges}
+                          onChange={e => {
+                            const l = Math.max(0, Number(e.target.value) || 0);
+                            setEditingBill(prev => ({
+                              ...prev,
+                              labor_charges: l,
+                              cost: (Number(prev.parts_cost) || 0) + l + (Number(prev.other_expense_amount) || 0)
+                            }));
+                          }}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Remarks */}
+                    <div>
+                      <label className="maint-form-label">Technician Remarks / Service Notes</label>
                       <input
-                        type="number"
-                        min="0"
-                        className="maint-currency-input"
-                        value={editingBill.labor_charges}
-                        onChange={e => {
-                          const l = Number(e.target.value) || 0;
-                          setEditingBill(prev => ({
-                            ...prev,
-                            labor_charges: l,
-                            cost: (Number(prev.parts_cost) || 0) + l
-                          }));
-                        }}
+                        type="text"
+                        className="maint-input-field"
+                        placeholder="Additional remarks, fitment notes, torque check..."
+                        value={editingBill.notes || ''}
+                        onChange={e => setEditingBill({ ...editingBill, notes: e.target.value })}
+                        style={{ height: 42 }}
                       />
                     </div>
                   </div>
-
-                  <div>
-                    <label className="maint-form-label">Technician Remarks / Service Notes</label>
-                    <input
-                      type="text"
-                      className="maint-input-field"
-                      value={editingBill.notes}
-                      onChange={e => setEditingBill({ ...editingBill, notes: e.target.value })}
-                    />
-                  </div>
                 </div>
 
-                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 13, color: '#1e40af' }}>
-                    Parts: <b>₹{Number(editingBill.parts_cost || 0).toFixed(2)}</b> + Labor: <b>₹{Number(editingBill.labor_charges || 0).toFixed(2)}</b>
-                  </span>
-                  <span style={{ fontSize: 16, fontWeight: 900, color: '#1e3a8a' }}>
-                    GRAND TOTAL: ₹{Number(editingBill.cost || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
+                {/* Grand Total Breakdown Ribbon */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',
+                  border: '1.5px solid #bfdbfe',
+                  borderRadius: 10,
+                  padding: '12px 18px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 10
+                }}>
+                  <div style={{ fontSize: 13, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span>Parts: <b style={{ color: '#0f172a' }}>₹{Number(editingBill.parts_cost || 0).toFixed(2)}</b></span>
+                    <span>+</span>
+                    <span>Labor: <b style={{ color: '#0f172a' }}>₹{Number(editingBill.labor_charges || 0).toFixed(2)}</b></span>
+                    {Number(editingBill.other_expense_amount) > 0 && (
+                      <>
+                        <span>+</span>
+                        <span style={{ background: '#fef3c7', padding: '1px 7px', borderRadius: 5, color: '#92400e', fontWeight: 600, border: '1px solid #fde68a' }}>
+                          Other ({editingBill.other_expense_desc || 'Exp'}): <b>₹{Number(editingBill.other_expense_amount || 0).toFixed(2)}</b>
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                      Grand Total:
+                    </span>
+                    <span style={{ fontSize: 19, fontWeight: 900, color: '#1e3a8a', fontFamily: 'monospace' }}>
+                      ₹{Number(editingBill.cost || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
               </div>
 

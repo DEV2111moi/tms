@@ -5,14 +5,27 @@ const { query } = require('../db/pool');
 exports.list = async (req, res) => {
   try {
     const params = []; const where = [];
-    let sql = 'SELECT id, name, email, phone, role, institution_id FROM users';
+    let sql = `
+      SELECT u.id, u.name, u.email, u.phone, u.role, u.institution_id,
+             COALESCE(
+               (SELECT b.registration_number FROM assignments a JOIN buses b ON b.id = a.bus_id JOIN drivers d ON d.id = a.driver_id WHERE (d.user_id = u.id OR (d.phone IS NOT NULL AND d.phone = u.phone) OR LOWER(TRIM(d.name)) = LOWER(TRIM(u.name))) LIMIT 1),
+               (SELECT b.registration_number FROM drivers d JOIN buses b ON b.route_id = d.route_id WHERE (d.user_id = u.id OR (d.phone IS NOT NULL AND d.phone = u.phone) OR LOWER(TRIM(d.name)) = LOWER(TRIM(u.name))) LIMIT 1),
+               (SELECT b.registration_number FROM assignments a JOIN buses b ON b.id = a.bus_id WHERE a.incharge_id = u.id LIMIT 1)
+             ) AS allotted_bus,
+             COALESCE(
+               (SELECT r.route_code FROM assignments a JOIN routes r ON r.id = a.route_id JOIN drivers d ON d.id = a.driver_id WHERE (d.user_id = u.id OR (d.phone IS NOT NULL AND d.phone = u.phone) OR LOWER(TRIM(d.name)) = LOWER(TRIM(u.name))) LIMIT 1),
+               (SELECT r.route_code FROM drivers d JOIN routes r ON r.id = d.route_id WHERE (d.user_id = u.id OR (d.phone IS NOT NULL AND d.phone = u.phone) OR LOWER(TRIM(d.name)) = LOWER(TRIM(u.name))) LIMIT 1),
+               (SELECT r.route_code FROM assignments a JOIN routes r ON r.id = a.route_id WHERE a.incharge_id = u.id LIMIT 1)
+             ) AS allotted_route
+      FROM users u
+    `;
     if (req.user.role === 'institution') {
       const me = (await query('SELECT institution_id FROM users WHERE id=?', [req.user.id]))[0] || {};
-      where.push('role = ?'); params.push('incharge');
-      where.push('institution_id = ?'); params.push(me.institution_id || 0);
-    } else if (req.query.role) { where.push('role = ?'); params.push(req.query.role); }
+      where.push('u.role = ?'); params.push('incharge');
+      where.push('u.institution_id = ?'); params.push(me.institution_id || 0);
+    } else if (req.query.role) { where.push('u.role = ?'); params.push(req.query.role); }
     if (where.length) sql += ' WHERE ' + where.join(' AND ');
-    sql += ' ORDER BY role, name';
+    sql += ' ORDER BY u.role, u.name';
     res.json({ items: await query(sql, params) });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Could not load user accounts.' }); }
 };

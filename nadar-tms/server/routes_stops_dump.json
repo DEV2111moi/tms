@@ -1,0 +1,1521 @@
+{
+  "1": {
+    "id": 1,
+    "code": "ROUTE 101",
+    "name": "THIRUMALAPURAM",
+    "origin": "PARK STOP",
+    "destination": "NSCET CLG",
+    "distance": "20.00",
+    "stops": [
+      {
+        "id": 8,
+        "name": "PARK STOP",
+        "seq": 1,
+        "lat": 10.013328,
+        "lng": 77.355474
+      },
+      {
+        "id": 9,
+        "name": "BODI OLD BUSSTAND",
+        "seq": 2,
+        "lat": 10.008432,
+        "lng": 77.34986
+      },
+      {
+        "id": 10,
+        "name": "THIRUMALAPURAM",
+        "seq": 3,
+        "lat": 10.016509,
+        "lng": 77.351869
+      },
+      {
+        "id": 11,
+        "name": "KAMARAJAR STATUE",
+        "seq": 4,
+        "lat": 10.006371,
+        "lng": 77.357938
+      },
+      {
+        "id": 12,
+        "name": "MEENAVILAKU",
+        "seq": 5,
+        "lat": 10.002819,
+        "lng": 77.381204
+      },
+      {
+        "id": 13,
+        "name": "KODANGIPATTI",
+        "seq": 6,
+        "lat": 9.994766,
+        "lng": 77.417897
+      },
+      {
+        "id": 14,
+        "name": "MARIYAMMAN KOVIL PATTI",
+        "seq": 7,
+        "lat": 9.99321,
+        "lng": 77.449722
+      },
+      {
+        "id": 15,
+        "name": "NSCET CLG",
+        "seq": 8,
+        "lat": 10.030301,
+        "lng": 77.506975
+      }
+    ]
+  },
+  "2": {
+    "id": 2,
+    "code": "ROUTE 102",
+    "name": "BODI",
+    "origin": "ARANMANAI STOP",
+    "destination": "NSCET CLG",
+    "distance": "25.00",
+    "stops": [
+      {
+        "id": 16,
+        "name": "ARANMANAI STOP",
+        "seq": 1,
+        "lat": 9.064687,
+        "lng": 77.591704
+      },
+      {
+        "id": 17,
+        "name": "PERUMAL KOVIL STOP",
+        "seq": 2,
+        "lat": 9.064687,
+        "lng": 77.591704
+      },
+      {
+        "id": 21,
+        "name": "POLICE STATION STOP",
+        "seq": 3,
+        "lat": 10.008621,
+        "lng": 77.349544
+      },
+      {
+        "id": 18,
+        "name": "NEW BUS STAND",
+        "seq": 4,
+        "lat": 10.008621,
+        "lng": 77.349544
+      },
+      {
+        "id": 19,
+        "name": "PANKAJAM PGHSS STOP",
+        "seq": 5,
+        "lat": 10.006325,
+        "lng": 77.348806
+      },
+      {
+        "id": 20,
+        "name": "KRISHNA NAGAR STOP",
+        "seq": 6,
+        "lat": 10.01039,
+        "lng": 77.350637
+      },
+      {
+        "id": 22,
+        "name": "RANGANATHAPURAM STOP",
+        "seq": 7,
+        "lat": 9.996343,
+        "lng": 77.347121
+      },
+      {
+        "id": 24,
+        "name": "NSCET CLG",
+        "seq": 9,
+        "lat": 10.030323,
+        "lng": 77.506942
+      }
+    ]
+  },
+  "3": {
+    "id": 3,
+    "code": "ROUTE 103",
+    "name": "CHINNAMANUR",
+    "origin": "G.H STOP",
+    "destination": "NSCET CLG",
+    "distance": "35.00",
+    "stops": [
+      {
+        "id": 25,
+        "name": "G.H STOP",
+        "seq": 1,
+        "lat": 9.845378,
+        "lng": 77.385818
+      },
+      {
+        "id": 26,
+        "name": "VOC ITI",
+        "seq": 2,
+        "lat": 9.842472,
+        "lng": 77.384277
+      },
+      {
+        "id": 27,
+        "name": "MUTHALAMMAN KOVIL STOP",
+        "seq": 3,
+        "lat": 9.841808,
+        "lng": 77.384319
+      },
+      {
+        "id": 28,
+        "name": "OM SAKTHI MEDICAL STOP",
+        "seq": 4,
+        "lat": 9.843174,
+        "lng": 77.379966
+      },
+      {
+        "id": 29,
+        "name": "GANDHI SILAI STOP",
+        "seq": 5,
+        "lat": 9.841092,
+        "lng": 77.379344
+      },
+      {
+        "id": 30,
+        "name": "CHURCH STOP",
+        "seq": 6,
+        "lat": 9.850152,
+        "lng": 77.383133
+      },
+      {
+        "id": 31,
+        "name": "NSCET CLG",
+        "seq": 7,
+        "lat": 10.030323,
+        "lng": 77.506942
+      }
+    ]
+  },
+  "4": {
+    "id": 4,
+    "code": "ROUTE 104",
+    "name": "AUNDIPATTI",
+    "origin": "AUNDIPATTI POLICESTATION",
+    "destination": "NSCET CLG",
+    "distance": "19.00",
+    "stops": [
+      {
+        "id": 32,
+        "name": "AUNTIPATTI POLICESTATION",
+        "seq": 1,
+        "lat": 9.999519,
+        "lng": 77.62263
+      },
+      {
+        "id": 33,
+        "name": "APOLLO PHRAMACY",
+        "seq": 2,
+        "lat": 9.998816,
+        "lng": 77.620419
+      },
+      {
+        "id": 34,
+        "name": "AVUDAYACHI MAHAL",
+        "seq": 3,
+        "lat": 10.000223,
+        "lng": 77.615936
+      },
+      {
+        "id": 35,
+        "name": "KANAVILAKU",
+        "seq": 4,
+        "lat": 10.007473,
+        "lng": 77.560949
+      },
+      {
+        "id": 36,
+        "name": "NSCET CLG",
+        "seq": 5,
+        "lat": 10.030323,
+        "lng": 77.506942
+      }
+    ]
+  },
+  "5": {
+    "id": 5,
+    "code": "ROUTE 105",
+    "name": "KOMBAI",
+    "origin": "KOMBAI",
+    "destination": "NSCET CLG",
+    "distance": "48.00",
+    "stops": [
+      {
+        "id": 37,
+        "name": "KOMABI",
+        "seq": 1,
+        "lat": 9.848859,
+        "lng": 77.295054
+      },
+      {
+        "id": 38,
+        "name": "METTUPATTI",
+        "seq": 2,
+        "lat": 9.884033,
+        "lng": 77.285966
+      },
+      {
+        "id": 39,
+        "name": "THEVARAM",
+        "seq": 3,
+        "lat": 9.896716,
+        "lng": 77.281406
+      },
+      {
+        "id": 40,
+        "name": "AZHAGARNAYAKKANPATTI",
+        "seq": 4,
+        "lat": 9.904074,
+        "lng": 77.308516
+      },
+      {
+        "id": 41,
+        "name": "SANGARAPURAM",
+        "seq": 5,
+        "lat": 9.909719,
+        "lng": 77.331841
+      },
+      {
+        "id": 42,
+        "name": "THIMMINAYAKKANPATTI VILAKU",
+        "seq": 6,
+        "lat": 9.927595,
+        "lng": 77.331536
+      },
+      {
+        "id": 43,
+        "name": "RASINGAPURAM",
+        "seq": 7,
+        "lat": 9.944485,
+        "lng": 77.336323
+      },
+      {
+        "id": 44,
+        "name": "SILAMALAI",
+        "seq": 8,
+        "lat": 9.962154,
+        "lng": 77.338759
+      },
+      {
+        "id": 45,
+        "name": "SILLAMARATHUPATTI",
+        "seq": 9,
+        "lat": 9.973071,
+        "lng": 77.353324
+      },
+      {
+        "id": 46,
+        "name": "DHARMATHUPPATTI",
+        "seq": 10,
+        "lat": 9.990166,
+        "lng": 77.35078
+      },
+      {
+        "id": 47,
+        "name": "MEENAKSHIPURAM",
+        "seq": 11,
+        "lat": 10.010778,
+        "lng": 77.361098
+      },
+      {
+        "id": 48,
+        "name": "NSCET CLG",
+        "seq": 12,
+        "lat": 10.030323,
+        "lng": 77.506942
+      }
+    ]
+  },
+  "6": {
+    "id": 6,
+    "code": "ROUTE 106",
+    "name": "GUDALUR",
+    "origin": "GUDALUR",
+    "destination": "NSCET CLG",
+    "distance": "54.00",
+    "stops": [
+      {
+        "id": 49,
+        "name": "GUDALUR",
+        "seq": 1,
+        "lat": 9.681941,
+        "lng": 77.244831
+      },
+      {
+        "id": 50,
+        "name": "KULLALAR MAHAL",
+        "seq": 2,
+        "lat": 9.733736,
+        "lng": 77.283299
+      },
+      {
+        "id": 51,
+        "name": "YUVARAJA THEATRE ",
+        "seq": 3,
+        "lat": 9.733168,
+        "lng": 77.282381
+      },
+      {
+        "id": 52,
+        "name": "GANDHI SILAI ",
+        "seq": 4,
+        "lat": 9.736155,
+        "lng": 77.28368
+      },
+      {
+        "id": 53,
+        "name": "CUMBUM SIGNAL ",
+        "seq": 5,
+        "lat": 9.738725,
+        "lng": 77.284391
+      },
+      {
+        "id": 54,
+        "name": " POLICE STATION ",
+        "seq": 6,
+        "lat": 9.74082,
+        "lng": 77.285401
+      },
+      {
+        "id": 55,
+        "name": "PUDHUPATTAI ",
+        "seq": 7,
+        "lat": 9.76064,
+        "lng": 77.30258
+      },
+      {
+        "id": 56,
+        "name": "HANUMANTHANPATTI ",
+        "seq": 8,
+        "lat": 9.78804,
+        "lng": 77.317945
+      },
+      {
+        "id": 57,
+        "name": "AMMAPATTI ",
+        "seq": 9,
+        "lat": 9.837663,
+        "lng": 77.341181
+      },
+      {
+        "id": 58,
+        "name": "ELLAPATTI ",
+        "seq": 10,
+        "lat": 9.841694,
+        "lng": 77.346417
+      },
+      {
+        "id": 59,
+        "name": "MARKAYANKOTTAI ",
+        "seq": 11,
+        "lat": 9.871809,
+        "lng": 77.350426
+      },
+      {
+        "id": 60,
+        "name": "KUCHANUR ",
+        "seq": 12,
+        "lat": 9.876796,
+        "lng": 77.374596
+      },
+      {
+        "id": 61,
+        "name": "KOOLAIYANUR ",
+        "seq": 13,
+        "lat": 9.908876,
+        "lng": 77.388443
+      },
+      {
+        "id": 62,
+        "name": "PALARPATTI ",
+        "seq": 14,
+        "lat": 9.938117,
+        "lng": 77.399881
+      },
+      {
+        "id": 63,
+        "name": "UPPUKOTTAI ",
+        "seq": 15,
+        "lat": 9.95756,
+        "lng": 77.408159
+      },
+      {
+        "id": 64,
+        "name": "MANIKAPURAM ",
+        "seq": 16,
+        "lat": 9.967502,
+        "lng": 77.417742
+      },
+      {
+        "id": 65,
+        "name": "SADAYALPATTI ",
+        "seq": 17,
+        "lat": 9.971353,
+        "lng": 77.426769
+      },
+      {
+        "id": 66,
+        "name": "NSCET CLG",
+        "seq": 18,
+        "lat": 10.030323,
+        "lng": 77.506942
+      }
+    ]
+  },
+  "7": {
+    "id": 7,
+    "code": "ROUTE 107",
+    "name": "PERIYAKULAM",
+    "origin": "JIO SMART POINT",
+    "destination": "NSCET CLG",
+    "distance": "6.00",
+    "stops": [
+      {
+        "id": 67,
+        "name": "JIO SMART POINT",
+        "seq": 1,
+        "lat": 10.12808,
+        "lng": 77.550632
+      },
+      {
+        "id": 68,
+        "name": "RMTC DEPO",
+        "seq": 2,
+        "lat": 10.125525,
+        "lng": 77.549011
+      },
+      {
+        "id": 69,
+        "name": "CSI CHURCH",
+        "seq": 3,
+        "lat": 10.12376,
+        "lng": 77.547635
+      },
+      {
+        "id": 70,
+        "name": "NSCET CLG",
+        "seq": 4,
+        "lat": 10.030323,
+        "lng": 77.506942
+      }
+    ]
+  },
+  "8": {
+    "id": 8,
+    "code": "ROUTE 108",
+    "name": "MOONDRANTHAL",
+    "origin": "MOONDRANTHAL",
+    "destination": "NSCET CLG",
+    "distance": "13.00",
+    "stops": [
+      {
+        "id": 71,
+        "name": "MOONDRANTHAL",
+        "seq": 1,
+        "lat": 10.119957,
+        "lng": 77.545827
+      },
+      {
+        "id": 72,
+        "name": "LAKSHMIPURAM ",
+        "seq": 2,
+        "lat": 10.075864,
+        "lng": 77.516686
+      },
+      {
+        "id": 73,
+        "name": "NSCET CLG",
+        "seq": 3,
+        "lat": 10.030169,
+        "lng": 77.507039
+      }
+    ]
+  },
+  "9": {
+    "id": 9,
+    "code": "ROUTE 109",
+    "name": "VARUSANADU",
+    "origin": "VARUSANADU",
+    "destination": "NSCET CLG",
+    "distance": "65.00",
+    "stops": [
+      {
+        "id": 74,
+        "name": "VARUSANADU",
+        "seq": 1,
+        "lat": 9.727689,
+        "lng": 77.516346
+      },
+      {
+        "id": 75,
+        "name": "MAYILADUMPARAI",
+        "seq": 2,
+        "lat": 9.787718,
+        "lng": 77.514103
+      },
+      {
+        "id": 76,
+        "name": "KUMANANTHOLU\t",
+        "seq": 3,
+        "lat": 9.755074,
+        "lng": 77.471231
+      },
+      {
+        "id": 77,
+        "name": "KADAMALAILkUNDU",
+        "seq": 4,
+        "lat": 9.811248,
+        "lng": 77.503712
+      },
+      {
+        "id": 78,
+        "name": "KUPPINAYAKANPATTI",
+        "seq": 5,
+        "lat": 9.876805,
+        "lng": 77.487738
+      },
+      {
+        "id": 79,
+        "name": "K.LAKSHMIPURAM\t",
+        "seq": 6,
+        "lat": 10.075876,
+        "lng": 77.517375
+      },
+      {
+        "id": 80,
+        "name": "SOLAITHEVANPATTI\t",
+        "seq": 7,
+        "lat": 9.794066,
+        "lng": 77.565601
+      },
+      {
+        "id": 81,
+        "name": "KANDAMANUR\t",
+        "seq": 8,
+        "lat": 9.920324,
+        "lng": 77.522381
+      },
+      {
+        "id": 82,
+        "name": "PONNAMALPATTI\t",
+        "seq": 9,
+        "lat": 9.941319,
+        "lng": 77.527877
+      },
+      {
+        "id": 83,
+        "name": "SUBBULAPURAM\t",
+        "seq": 10,
+        "lat": 10.007993,
+        "lng": 77.651042
+      },
+      {
+        "id": 84,
+        "name": "KANAVILAKKU",
+        "seq": 11,
+        "lat": 10.007263,
+        "lng": 77.56105
+      },
+      {
+        "id": 85,
+        "name": "THIRUMALAPURAM\t",
+        "seq": 12,
+        "lat": 10.033764,
+        "lng": 77.506626
+      },
+      {
+        "id": 86,
+        "name": "KUNNUR\t",
+        "seq": 13,
+        "lat": 10.026382,
+        "lng": 77.475922
+      },
+      {
+        "id": 87,
+        "name": "NSCET CLG",
+        "seq": 14,
+        "lat": 10.030169,
+        "lng": 77.507039
+      }
+    ]
+  },
+  "10": {
+    "id": 10,
+    "code": "ROUTE 110",
+    "name": "VEERAPANDI",
+    "origin": "VEERAPANDI",
+    "destination": "NSCET CLG",
+    "distance": "13.00",
+    "stops": [
+      {
+        "id": 88,
+        "name": "VEERAPANDI",
+        "seq": 1,
+        "lat": 9.967105,
+        "lng": 77.434951
+      },
+      {
+        "id": 89,
+        "name": "VAYALPATTI\t",
+        "seq": 2,
+        "lat": 9.973769,
+        "lng": 77.464878
+      },
+      {
+        "id": 90,
+        "name": "CHATHIRAPATTI\t",
+        "seq": 3,
+        "lat": 9.997747,
+        "lng": 77.478722
+      },
+      {
+        "id": 91,
+        "name": "MULLAINAGAR\t",
+        "seq": 4,
+        "lat": 9.992651,
+        "lng": 77.485868
+      },
+      {
+        "id": 92,
+        "name": "ARANMANAI PUDHUR\t",
+        "seq": 5,
+        "lat": 10.000307,
+        "lng": 77.488671
+      },
+      {
+        "id": 93,
+        "name": "ARANMANAIPUDUR VILAKKU\t",
+        "seq": 6,
+        "lat": 10.005453,
+        "lng": 77.48865
+      },
+      {
+        "id": 94,
+        "name": "NSCET CLG",
+        "seq": 7,
+        "lat": 10.030169,
+        "lng": 77.507039
+      }
+    ]
+  },
+  "11": {
+    "id": 11,
+    "code": "ROUTE 111",
+    "name": "USILAMPATTY",
+    "origin": "TELC STOP",
+    "destination": "NSCET CLG",
+    "distance": "96.00",
+    "stops": [
+      {
+        "id": 95,
+        "name": "TELC STOP",
+        "seq": 1,
+        "lat": 9.96075,
+        "lng": 77.788433
+      },
+      {
+        "id": 96,
+        "name": "MALAIYANDI THEATRE ",
+        "seq": 2,
+        "lat": 9.965021,
+        "lng": 77.794766
+      },
+      {
+        "id": 97,
+        "name": "KANNAN THEATRE ",
+        "seq": 3,
+        "lat": 9.965803,
+        "lng": 77.791003
+      },
+      {
+        "id": 98,
+        "name": " MURUGAN TEMPLE",
+        "seq": 4,
+        "lat": 9.965822,
+        "lng": 77.786756
+      },
+      {
+        "id": 99,
+        "name": "RC SCHOOL STOP",
+        "seq": 5,
+        "lat": 9.967592,
+        "lng": 77.782937
+      },
+      {
+        "id": 100,
+        "name": "NSCET CLG",
+        "seq": 6,
+        "lat": 10.030169,
+        "lng": 77.507039
+      }
+    ]
+  },
+  "12": {
+    "id": 12,
+    "code": "ROUTE 112",
+    "name": "T.SUBBULAPURAM",
+    "origin": "T.SUBBULAPURAM",
+    "destination": "NSCET CLG",
+    "distance": "23.00",
+    "stops": [
+      {
+        "id": 101,
+        "name": "T.SUBBULAPURAM",
+        "seq": 1,
+        "lat": 10.009231,
+        "lng": 77.652528
+      },
+      {
+        "id": 102,
+        "name": "KONDAMANAYAKAN PATTY",
+        "seq": 2,
+        "lat": 10.002603,
+        "lng": 77.629991
+      },
+      {
+        "id": 103,
+        "name": "BSNL STOP",
+        "seq": 3,
+        "lat": 10.00311,
+        "lng": 77.631236
+      },
+      {
+        "id": 104,
+        "name": "VAARUNI HOSPITAL",
+        "seq": 4,
+        "lat": 10.001115,
+        "lng": 77.618819
+      },
+      {
+        "id": 105,
+        "name": "ANJANAYAR KOVIL",
+        "seq": 5,
+        "lat": 10.000665,
+        "lng": 77.612284
+      },
+      {
+        "id": 106,
+        "name": "RANGANATHAPURAM\t",
+        "seq": 6,
+        "lat": 10.004517,
+        "lng": 77.583116
+      },
+      {
+        "id": 107,
+        "name": "MUTHANAM PATTY",
+        "seq": 7,
+        "lat": 10.006687,
+        "lng": 77.567494
+      },
+      {
+        "id": 108,
+        "name": "NSCET CLG",
+        "seq": 8,
+        "lat": 10.030169,
+        "lng": 77.507039
+      }
+    ]
+  },
+  "13": {
+    "id": 13,
+    "code": "ROUTE 113",
+    "name": "BOOTHIPURAM",
+    "origin": "BOOTHIPURAM",
+    "destination": "NSCET CLG",
+    "distance": "14.00",
+    "stops": [
+      {
+        "id": 109,
+        "name": "BOOTHIPURAM",
+        "seq": 1,
+        "lat": 10.00575,
+        "lng": 77.446332
+      },
+      {
+        "id": 110,
+        "name": "URAVINMURAI OFFICE ",
+        "seq": 2,
+        "lat": 10.010858,
+        "lng": 77.476935
+      },
+      {
+        "id": 111,
+        "name": "STATE BANK ",
+        "seq": 3,
+        "lat": 10.007666,
+        "lng": 77.473305
+      },
+      {
+        "id": 112,
+        "name": "VANI SWEETS ",
+        "seq": 4,
+        "lat": 10.015312,
+        "lng": 77.479013
+      },
+      {
+        "id": 113,
+        "name": "GOWMARI SWEETS ",
+        "seq": 5,
+        "lat": 10.017551,
+        "lng": 77.479244
+      },
+      {
+        "id": 114,
+        "name": "ARAVIND EYE HOSPITAL ",
+        "seq": 6,
+        "lat": 10.023814,
+        "lng": 77.47965
+      },
+      {
+        "id": 115,
+        "name": "PULLUKATTU STOP ",
+        "seq": 7,
+        "lat": 10.025979,
+        "lng": 77.479414
+      },
+      {
+        "id": 116,
+        "name": "CAFE MILAN ",
+        "seq": 8,
+        "lat": 10.039906,
+        "lng": 77.491821
+      },
+      {
+        "id": 117,
+        "name": "THATIVILAS ",
+        "seq": 9,
+        "lat": 10.018953,
+        "lng": 77.479725
+      },
+      {
+        "id": 118,
+        "name": " RMTC-ROUND ",
+        "seq": 10,
+        "lat": 10.048479,
+        "lng": 77.500677
+      },
+      {
+        "id": 119,
+        "name": "ANNAINJI VILAKU ",
+        "seq": 11,
+        "lat": 10.048479,
+        "lng": 77.500677
+      },
+      {
+        "id": 120,
+        "name": "ANNAINJI PALAM ",
+        "seq": 12,
+        "lat": 10.044,
+        "lng": 77.497077
+      },
+      {
+        "id": 121,
+        "name": "ANNAINJI ",
+        "seq": 13,
+        "lat": 10.043077,
+        "lng": 77.502733
+      },
+      {
+        "id": 122,
+        "name": " ANNAINJI PALLIVASAL ",
+        "seq": 14,
+        "lat": 10.04686,
+        "lng": 77.499419
+      },
+      {
+        "id": 123,
+        "name": " VADAPUTHUPETTI BUS STAND ",
+        "seq": 15,
+        "lat": 10.042732,
+        "lng": 77.508238
+      },
+      {
+        "id": 124,
+        "name": "VADAPUTHUPETTI ",
+        "seq": 16,
+        "lat": 10.042752,
+        "lng": 77.508279
+      },
+      {
+        "id": 125,
+        "name": "NSCET CLG",
+        "seq": 17,
+        "lat": 10.030169,
+        "lng": 77.507039
+      }
+    ]
+  },
+  "14": {
+    "id": 14,
+    "code": "ROUTE 114",
+    "name": "MT-PATTI",
+    "origin": "MT-PATTI",
+    "destination": "NSCET CLG",
+    "distance": "13.00",
+    "stops": [
+      {
+        "id": 126,
+        "name": "MT-PATTI",
+        "seq": 1,
+        "lat": 9.985018,
+        "lng": 77.454979
+      },
+      {
+        "id": 127,
+        "name": "ARASU NAGAR\t",
+        "seq": 2,
+        "lat": 9.983463,
+        "lng": 77.447766
+      },
+      {
+        "id": 128,
+        "name": "EB STOP\t",
+        "seq": 3,
+        "lat": 10.001589,
+        "lng": 77.468029
+      },
+      {
+        "id": 129,
+        "name": "MUTHU NAGAR\t",
+        "seq": 4,
+        "lat": 10.004459,
+        "lng": 77.469107
+      },
+      {
+        "id": 130,
+        "name": "CHANDRAPANDIAN MANDABAM\t",
+        "seq": 5,
+        "lat": 10.004975,
+        "lng": 77.471142
+      },
+      {
+        "id": 131,
+        "name": "JANAP TEXTILE\t",
+        "seq": 6,
+        "lat": 10.008836,
+        "lng": 77.475127
+      },
+      {
+        "id": 132,
+        "name": "NSM STOP\t",
+        "seq": 7,
+        "lat": 10.010108,
+        "lng": 77.484952
+      },
+      {
+        "id": 133,
+        "name": "BANGALAMEDU\t",
+        "seq": 8,
+        "lat": 10.008638,
+        "lng": 77.480951
+      },
+      {
+        "id": 134,
+        "name": "NSCET CLG",
+        "seq": 9,
+        "lat": 10.030169,
+        "lng": 77.507039
+      }
+    ]
+  },
+  "15": {
+    "id": 15,
+    "code": "ROUTE 115",
+    "name": "SAMATHARMAPURAM",
+    "origin": "OLD REGISTER OFFICE",
+    "destination": "NSCET CLG",
+    "distance": "5.00",
+    "stops": [
+      {
+        "id": 135,
+        "name": "OLD REGISTER OFFICE",
+        "seq": 1,
+        "lat": 10.014668,
+        "lng": 77.482736
+      },
+      {
+        "id": 136,
+        "name": "SAMATHARMAPURAM\t",
+        "seq": 2,
+        "lat": 8.725292,
+        "lng": 77.744286
+      },
+      {
+        "id": 137,
+        "name": "OLD GH\t",
+        "seq": 3,
+        "lat": 10.019241,
+        "lng": 77.484309
+      },
+      {
+        "id": 138,
+        "name": "OLD GH AUTO STAND\t",
+        "seq": 4,
+        "lat": 10.01733,
+        "lng": 77.48349
+      },
+      {
+        "id": 139,
+        "name": "RATHNA NAGAR STOP\t",
+        "seq": 5,
+        "lat": 10.04299,
+        "lng": 77.496041
+      },
+      {
+        "id": 140,
+        "name": "NSCET CLG",
+        "seq": 6,
+        "lat": 10.030169,
+        "lng": 77.507039
+      }
+    ]
+  },
+  "16": {
+    "id": 16,
+    "code": "ROUTE 116",
+    "name": "ALLINAGARAM",
+    "origin": "ALLINAGARAM",
+    "destination": "NSCET CLG",
+    "distance": "5.00",
+    "stops": [
+      {
+        "id": 141,
+        "name": "ALLINAGARAM",
+        "seq": 1,
+        "lat": 10.009344,
+        "lng": 77.487032
+      },
+      {
+        "id": 142,
+        "name": "KOHILA HOSPITAL\t",
+        "seq": 2,
+        "lat": 10.029897,
+        "lng": 77.480782
+      },
+      {
+        "id": 143,
+        "name": "B.K PATTI\t",
+        "seq": 3,
+        "lat": 10.03423,
+        "lng": 77.483338
+      },
+      {
+        "id": 144,
+        "name": "NSCET CLG",
+        "seq": 4,
+        "lat": 10.030169,
+        "lng": 77.507039
+      }
+    ]
+  },
+  "17": {
+    "id": 17,
+    "code": "ROUTE 117",
+    "name": "ODAIPATTY",
+    "origin": "SEEPALAKOTTAI",
+    "destination": "NSCET CLG",
+    "distance": "25.00",
+    "stops": [
+      {
+        "id": 145,
+        "name": "SEEPALAKOTTAI ",
+        "seq": 1,
+        "lat": 9.848392,
+        "lng": 77.450022
+      },
+      {
+        "id": 146,
+        "name": "KAMATCHIPURAM ",
+        "seq": 2,
+        "lat": 9.86511,
+        "lng": 77.454043
+      },
+      {
+        "id": 147,
+        "name": "V.C PURAM ",
+        "seq": 3,
+        "lat": 9.918985,
+        "lng": 77.47258
+      },
+      {
+        "id": 148,
+        "name": "KATTUNAYAKANPATTI ",
+        "seq": 4,
+        "lat": 9.924078,
+        "lng": 77.466273
+      },
+      {
+        "id": 149,
+        "name": "THAPPUGUNDU ",
+        "seq": 5,
+        "lat": 9.929848,
+        "lng": 77.464108
+      },
+      {
+        "id": 150,
+        "name": "KODUVILARPATTI ",
+        "seq": 6,
+        "lat": 9.979271,
+        "lng": 77.491362
+      },
+      {
+        "id": 151,
+        "name": "PASUMAI NAGAR ",
+        "seq": 7,
+        "lat": 9.988612,
+        "lng": 77.489818
+      },
+      {
+        "id": 152,
+        "name": "ARANMANAIPUTHUR ",
+        "seq": 8,
+        "lat": 10.00145,
+        "lng": 77.48879
+      },
+      {
+        "id": 153,
+        "name": "NSCET CLG",
+        "seq": 9,
+        "lat": 10.030169,
+        "lng": 77.507039
+      }
+    ]
+  },
+  "18": {
+    "id": 18,
+    "code": "ROUTE 118",
+    "name": "KK PATTI",
+    "origin": "KK PATTI",
+    "destination": "NSCET CLG",
+    "distance": "52.00",
+    "stops": [
+      {
+        "id": 154,
+        "name": "KK PATTI\t",
+        "seq": 1,
+        "lat": 9.740144,
+        "lng": 77.316063
+      },
+      {
+        "id": 155,
+        "name": "ROYAPPANPATTI\t",
+        "seq": 2,
+        "lat": 9.771039,
+        "lng": 77.334461
+      },
+      {
+        "id": 156,
+        "name": "ANAIMALAYAN PATTI\t",
+        "seq": 3,
+        "lat": 9.781694,
+        "lng": 77.337257
+      },
+      {
+        "id": 157,
+        "name": "GOKILAPURAM\t",
+        "seq": 4,
+        "lat": 9.784971,
+        "lng": 77.337509
+      },
+      {
+        "id": 158,
+        "name": "PTR COLONY\t",
+        "seq": 5,
+        "lat": 9.795039,
+        "lng": 77.323371
+      },
+      {
+        "id": 159,
+        "name": "PALAYAM BYPASS\t",
+        "seq": 6,
+        "lat": 9.802864,
+        "lng": 77.32834
+      },
+      {
+        "id": 160,
+        "name": "PALAYAM BUS STOP\t",
+        "seq": 7,
+        "lat": 9.805282,
+        "lng": 77.335495
+      },
+      {
+        "id": 161,
+        "name": "SEELAYAMPATTI\t",
+        "seq": 8,
+        "lat": 9.87334,
+        "lng": 77.392672
+      },
+      {
+        "id": 162,
+        "name": "KOTTUR\t",
+        "seq": 9,
+        "lat": 9.904337,
+        "lng": 77.404255
+      },
+      {
+        "id": 163,
+        "name": "UPPARPATTI\t",
+        "seq": 10,
+        "lat": 9.953297,
+        "lng": 77.419891
+      },
+      {
+        "id": 164,
+        "name": "VEERAPANDI\t",
+        "seq": 11,
+        "lat": 9.965111,
+        "lng": 77.435301
+      },
+      {
+        "id": 165,
+        "name": "NSCET STOP\t",
+        "seq": 12,
+        "lat": 10.030161,
+        "lng": 77.506385
+      }
+    ]
+  },
+  "19": {
+    "id": 19,
+    "code": "ROUTE 119",
+    "name": "RAJ SHREE",
+    "origin": "JAYAMANGALAM",
+    "destination": "NSCET CLG",
+    "distance": "19.00",
+    "stops": [
+      {
+        "id": 166,
+        "name": "JAYAMANGALAM",
+        "seq": 1,
+        "lat": 10.093828,
+        "lng": 77.609366
+      },
+      {
+        "id": 167,
+        "name": "MELMANGALAM",
+        "seq": 2,
+        "lat": 10.10096,
+        "lng": 77.584086
+      },
+      {
+        "id": 168,
+        "name": "VADUGAPATTI",
+        "seq": 3,
+        "lat": 10.103952,
+        "lng": 77.573083
+      },
+      {
+        "id": 169,
+        "name": "VADUGAPATTI BUS STOP",
+        "seq": 4,
+        "lat": 10.106275,
+        "lng": 77.571972
+      },
+      {
+        "id": 170,
+        "name": "THAMARAIKULAM",
+        "seq": 5,
+        "lat": 10.105311,
+        "lng": 77.563578
+      },
+      {
+        "id": 171,
+        "name": "THAMARAIKULAM SUB-COLLECTOR OFFICE",
+        "seq": 6,
+        "lat": 10.109517,
+        "lng": 77.551064
+      },
+      {
+        "id": 172,
+        "name": "J.A.COLLEGE",
+        "seq": 7,
+        "lat": 10.108734,
+        "lng": 77.546193
+      },
+      {
+        "id": 173,
+        "name": "KALLIPATTI",
+        "seq": 8,
+        "lat": 10.106784,
+        "lng": 77.543456
+      },
+      {
+        "id": 174,
+        "name": "KAILASAPATTI",
+        "seq": 9,
+        "lat": 10.094211,
+        "lng": 77.529669
+      },
+      {
+        "id": 175,
+        "name": "VADAPUDUPATTI",
+        "seq": 10,
+        "lat": 10.041055,
+        "lng": 77.511732
+      },
+      {
+        "id": 176,
+        "name": "NSCET CLG",
+        "seq": 11,
+        "lat": 10.030346,
+        "lng": 77.505709
+      }
+    ]
+  },
+  "20": {
+    "id": 20,
+    "code": "ROUTE 120",
+    "name": "AYYAMPALAYAM",
+    "origin": "AYYAMPALAYAM",
+    "destination": "NSCET CLG",
+    "distance": "47.00",
+    "stops": [
+      {
+        "id": 177,
+        "name": "AYYAMPALAYAM",
+        "seq": 1,
+        "lat": 10.227183,
+        "lng": 77.74839
+      },
+      {
+        "id": 178,
+        "name": "DEVARADANPATTI PIRIVU",
+        "seq": 2,
+        "lat": 10.218692,
+        "lng": 77.756359
+      },
+      {
+        "id": 179,
+        "name": "PATTIVEERANPATTI",
+        "seq": 3,
+        "lat": 10.212711,
+        "lng": 77.761707
+      },
+      {
+        "id": 180,
+        "name": "BATLAGUNDU",
+        "seq": 4,
+        "lat": 10.163884,
+        "lng": 77.758562
+      },
+      {
+        "id": 182,
+        "name": "KANAVAI PATTI",
+        "seq": 6,
+        "lat": 10.185223,
+        "lng": 77.734449
+      },
+      {
+        "id": 183,
+        "name": "G.THUMMALA PATTI",
+        "seq": 7,
+        "lat": 10.186238,
+        "lng": 77.713141
+      },
+      {
+        "id": 184,
+        "name": "GENGUVAR PATTI",
+        "seq": 8,
+        "lat": 10.170555,
+        "lng": 77.696957
+      },
+      {
+        "id": 185,
+        "name": "KAAT ROAD",
+        "seq": 9,
+        "lat": 10.155255,
+        "lng": 77.691501
+      },
+      {
+        "id": 186,
+        "name": "SAATHA KOVIL PATTI",
+        "seq": 10,
+        "lat": 10.148573,
+        "lng": 77.665021
+      },
+      {
+        "id": 187,
+        "name": "DEVATHANA PATTI",
+        "seq": 11,
+        "lat": 10.142469,
+        "lng": 77.643115
+      },
+      {
+        "id": 188,
+        "name": "THANGAMUTHU POLY",
+        "seq": 12,
+        "lat": 10.130001,
+        "lng": 77.601789
+      },
+      {
+        "id": 189,
+        "name": "E.PUTHU PATTI",
+        "seq": 13,
+        "lat": 10.129147,
+        "lng": 77.576853
+      },
+      {
+        "id": 190,
+        "name": "LAKSHMIPURAM BYPASS",
+        "seq": 14,
+        "lat": 10.072537,
+        "lng": 77.524202
+      },
+      {
+        "id": 191,
+        "name": "ANNANJI",
+        "seq": 15,
+        "lat": 10.043045,
+        "lng": 77.502749
+      },
+      {
+        "id": 192,
+        "name": "NSCET CLG",
+        "seq": 16,
+        "lat": 10.030346,
+        "lng": 77.505709
+      }
+    ]
+  },
+  "21": {
+    "id": 21,
+    "code": "ROUTE 121",
+    "name": "FOREST ROAD",
+    "origin": "NS BOYS SCHOOL",
+    "destination": "NSCET CLG",
+    "distance": "5.00",
+    "stops": [
+      {
+        "id": 193,
+        "name": "NS BOYS SCHOOL",
+        "seq": 1,
+        "lat": 10.010196,
+        "lng": 77.484982
+      },
+      {
+        "id": 194,
+        "name": "ANNAPARAJA MAHAL",
+        "seq": 2,
+        "lat": 10.012989,
+        "lng": 77.483775
+      },
+      {
+        "id": 195,
+        "name": "SHIVAJI NAGAR",
+        "seq": 3,
+        "lat": 10.014338,
+        "lng": 77.487836
+      },
+      {
+        "id": 196,
+        "name": "NSCET CLG",
+        "seq": 4,
+        "lat": 10.030346,
+        "lng": 77.505709
+      }
+    ]
+  }
+}

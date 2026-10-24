@@ -34,7 +34,9 @@ exports.saveMaintenanceWithParts = async (req, res) => {
       job_card_no,
       mileage,
       lamp,
-      serial_no
+      serial_no,
+      other_expense_desc,
+      other_expense_amount
     } = req.body;
 
     const finalBillNo = bill_no || generateBillNo();
@@ -51,9 +53,9 @@ exports.saveMaintenanceWithParts = async (req, res) => {
     const insertSql = `
       INSERT INTO maintenance_logs (
         bus_id, service_date, service_type, cost, odometer, next_due_date, notes,
-        bill_no, workshop_name, mechanic_name, labor_charges, parts_cost, parts_data,
-        driver_name, driver_id, job_card_no, mileage, lamp, serial_no
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        bill_no, workshop_name, mechanic_name, labor_charges, other_expense_desc, other_expense_amount,
+        parts_cost, parts_data, driver_name, driver_id, job_card_no, mileage, lamp, serial_no
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const result = await query(insertSql, [
       bus_id || null,
@@ -67,6 +69,8 @@ exports.saveMaintenanceWithParts = async (req, res) => {
       workshop_name || 'TMHNU Fleet Workshop',
       mechanic_name || null,
       labor_charges || 0,
+      other_expense_desc || null,
+      other_expense_amount || 0,
       parts_cost || 0,
       finalPartsData,
       driver_name || null,
@@ -119,6 +123,8 @@ exports.updateMaintenanceWithParts = async (req, res) => {
       workshop_name,
       mechanic_name,
       labor_charges,
+      other_expense_desc,
+      other_expense_amount,
       parts_cost,
       parts_data,
       driver_name,
@@ -173,8 +179,9 @@ exports.updateMaintenanceWithParts = async (req, res) => {
       UPDATE maintenance_logs SET
         bus_id = ?, service_date = ?, service_type = ?, cost = ?, odometer = ?,
         next_due_date = ?, notes = ?, bill_no = ?, workshop_name = ?,
-        mechanic_name = ?, labor_charges = ?, parts_cost = ?, parts_data = ?,
-        driver_name = ?, driver_id = ?, job_card_no = ?, mileage = ?, lamp = ?, serial_no = ?
+        mechanic_name = ?, labor_charges = ?, other_expense_desc = ?, other_expense_amount = ?,
+        parts_cost = ?, parts_data = ?, driver_name = ?, driver_id = ?,
+        job_card_no = ?, mileage = ?, lamp = ?, serial_no = ?
       WHERE id = ?
     `;
     await query(updateSql, [
@@ -189,6 +196,8 @@ exports.updateMaintenanceWithParts = async (req, res) => {
       workshop_name || 'TMHNU Fleet Workshop',
       mechanic_name || null,
       labor_charges || 0,
+      other_expense_desc || null,
+      other_expense_amount || 0,
       parts_cost || 0,
       finalPartsData,
       driver_name || null,

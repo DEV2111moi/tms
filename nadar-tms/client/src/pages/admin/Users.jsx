@@ -22,6 +22,23 @@ const COLUMNS = [
     const cls = v === 'admin' ? 'tag--danger' : v === 'driver' ? 'tag--ok' : v === 'incharge' ? 'tag--warn' : 'tag--off';
     return <span className={`tag ${cls}`}>{ROLE_LABEL[v] || v}</span>;
   } },
+  { 
+    key: 'allotted_bus', 
+    label: 'Allotted Bus / Route', 
+    render: (v, r) => {
+      if (r.allotted_bus) {
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '3px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12 }}>
+            🚌 <b>{r.allotted_bus}</b> {r.allotted_route ? `· ${r.allotted_route}` : ''}
+          </span>
+        );
+      }
+      if (r.role === 'driver' || r.role === 'incharge') {
+        return <span style={{ color: '#d97706', fontSize: 11, fontWeight: 600 }}>⚠️ Unassigned</span>;
+      }
+      return <span style={{ color: '#94a3b8' }}>—</span>;
+    } 
+  },
 ];
 
 export default function Users() {

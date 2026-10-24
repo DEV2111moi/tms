@@ -8,7 +8,8 @@ const {
   processTelemetry,
   getAllLiveLocations,
   liveBusLocations,
-  gpsEmitter
+  gpsEmitter,
+  invalidateBusImeiCache
 } = require('../services/gpsReceiver');
 const { query } = require('../db/pool');
 
@@ -332,4 +333,76 @@ exports.stream = (req, res) => {
     clearInterval(heartbeat);
     gpsEmitter.off('telemetry', onTelemetry);
   });
+};
+
+/**
+ * POST /api/gps/assign-imei
+ * Updates or assigns GPS device IMEI for a bus, syncs cache, and activates tracking
+ */
+exports.assignImei = async (req, res) => {
+  const { bus_id, imei, gps_enabled = 1 } = req.body || {};
+  if (!bus_id) {
+    return res.status(400).json({ error: 'bus_id is required' });
+  }
+
+  const cleanImei = imei ? String(imei).trim() : null;
+
+  try {
+    // If IMEI provided, check uniqueness across other buses
+    if (cleanImei) {
+      const existing = await query(
+        'SELECT id, registration_number, bus_code FROM buses WHERE gps_device_id = ? AND id != ? LIMIT 1',
+        [cleanImei, bus_id]
+      );
+      if (existing.length > 0) {
+        return res.status(400).json({
+          error: `IMEI ${cleanImei} is already assigned to Bus ${existing[0].registration_number} (${existing[0].bus_code || 'Fleet'}). Please unassign it first or use a unique tracker IMEI.`
+        });
+      }
+    }
+
+    // Update bus record in MySQL
+    await query(
+      'UPDATE buses SET gps_device_id = ?, gps_enabled = ? WHERE id = ?',
+      [cleanImei, cleanImei ? (gps_enabled ? 1 : 0) : 0, bus_id]
+    );
+
+    // Invalidate in-memory receiver cache so next telemetry packet immediately resolves the new mapping
+    if (typeof invalidateBusImeiCache === 'function') {
+      invalidateBusImeiCache(cleanImei);
+      invalidateBusImeiCache(); // clears lookup map
+    }
+
+    // Return updated bus details
+    const rows = await query(
+      `SELECT b.id AS bus_id, b.registration_number, b.bus_code, b.bus_name, b.gps_device_id, b.gps_enabled,
+              COALESCE(r.id, ar.id) AS route_id,
+              COALESCE(r.route_code, ar.route_code) AS route_code,
+              COALESCE(r.route_name, ar.route_name) AS route_name
+       FROM buses b
+       LEFT JOIN routes r ON r.id = b.route_id
+       LEFT JOIN (
+         SELECT bus_id, MAX(route_id) AS route_id
+         FROM assignments
+         WHERE bus_id IS NOT NULL
+         GROUP BY bus_id
+       ) a ON a.bus_id = b.id
+       LEFT JOIN routes ar ON ar.id = a.route_id
+       WHERE b.id = ? LIMIT 1`,
+      [bus_id]
+    );
+
+    const updated = rows[0] || { bus_id, gps_device_id: cleanImei, gps_enabled };
+
+    res.json({
+      success: true,
+      message: cleanImei
+        ? `GPS Device IMEI ${cleanImei} successfully assigned to ${updated.registration_number}!`
+        : `GPS Tracker unlinked from ${updated.registration_number}`,
+      bus: updated
+    });
+  } catch (err) {
+    console.error('assignImei error:', err);
+    res.status(500).json({ error: 'Failed to assign GPS IMEI: ' + err.message });
+  }
 };

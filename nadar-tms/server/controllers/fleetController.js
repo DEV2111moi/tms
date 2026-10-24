@@ -280,19 +280,35 @@ exports.refs = async (req, res) => {
         ORDER BY r.route_code
       `),
       query(`
-        SELECT b.id, b.registration_number, b.institution_id, b.vehicle_type, b.capacity, b.bus_model,
+        SELECT b.id, b.registration_number, b.bus_code, b.bus_name, b.institution_id, b.vehicle_type, b.capacity, b.bus_model, b.route_id, b.current_odometer_km,
                COALESCE(
                  (SELECT d.name FROM assignments a JOIN drivers d ON d.id = a.driver_id WHERE a.bus_id = b.id ORDER BY a.id DESC LIMIT 1),
+                 (SELECT d.name FROM drivers d WHERE d.route_id = b.route_id AND (d.status = 'active' OR d.status IS NULL) LIMIT 1),
                  (SELECT td.name FROM trips t JOIN drivers td ON td.id = t.driver_id WHERE t.bus_id = b.id AND t.trip_date = CURDATE() ORDER BY t.id DESC LIMIT 1)
                ) AS driver_name,
                COALESCE(
                  (SELECT a.driver_id FROM assignments a WHERE a.bus_id = b.id AND a.driver_id IS NOT NULL ORDER BY a.id DESC LIMIT 1),
+                 (SELECT d.id FROM drivers d WHERE d.route_id = b.route_id AND (d.status = 'active' OR d.status IS NULL) LIMIT 1),
                  (SELECT t.driver_id FROM trips t WHERE t.bus_id = b.id AND t.trip_date = CURDATE() AND t.driver_id IS NOT NULL ORDER BY t.id DESC LIMIT 1)
                ) AS driver_id
         FROM buses b
         ORDER BY b.registration_number
       `),
-      query('SELECT id, name, status, driver_type FROM drivers ORDER BY name'),
+      query(`
+        SELECT d.id, d.name, d.status, d.driver_type, d.phone, d.route_id,
+               r.route_code,
+               COALESCE(
+                 (SELECT b.registration_number FROM assignments a JOIN buses b ON b.id = a.bus_id WHERE a.driver_id = d.id ORDER BY a.id DESC LIMIT 1),
+                 (SELECT b.registration_number FROM buses b WHERE b.route_id = d.route_id LIMIT 1)
+               ) AS allotted_bus_reg,
+               COALESCE(
+                 (SELECT a.bus_id FROM assignments a WHERE a.driver_id = d.id AND a.bus_id IS NOT NULL ORDER BY a.id DESC LIMIT 1),
+                 (SELECT b.id FROM buses b WHERE b.route_id = d.route_id LIMIT 1)
+               ) AS allotted_bus_id
+        FROM drivers d
+        LEFT JOIN routes r ON r.id = d.route_id
+        ORDER BY d.name
+      `),
       query("SELECT id, name, institution_id FROM users WHERE role='incharge' ORDER BY name"),
       query('SELECT id, code, name, short_name FROM institutions ORDER BY name'),
     ]);

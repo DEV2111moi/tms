@@ -27,7 +27,7 @@ const TABLES = {
     order: 'route_id, sequence',
   },
   maintenance_logs: {
-    cols: ['bus_id', 'service_date', 'service_type', 'cost', 'odometer', 'next_due_date', 'notes', 'bill_no', 'workshop_name', 'mechanic_name', 'labor_charges', 'parts_cost', 'parts_data'],
+    cols: ['bus_id', 'service_date', 'service_type', 'cost', 'odometer', 'next_due_date', 'notes', 'bill_no', 'workshop_name', 'mechanic_name', 'labor_charges', 'other_expense_desc', 'other_expense_amount', 'parts_cost', 'parts_data', 'driver_name', 'driver_id', 'job_card_no', 'mileage', 'lamp', 'serial_no'],
     order: 'service_date DESC',
   },
   inventory_items: {
@@ -124,10 +124,15 @@ exports.list = (table) => async (req, res) => {
                GROUP_CONCAT(DISTINCT r.route_name ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_name,
                COALESCE(
                  NULLIF(GROUP_CONCAT(DISTINCT d.name ORDER BY d.name SEPARATOR ', '), ''),
+                 (SELECT drv.name FROM drivers drv WHERE drv.route_id = b.route_id AND (drv.status = 'active' OR drv.status IS NULL) LIMIT 1),
                  (SELECT td.name FROM trips t JOIN drivers td ON td.id = t.driver_id WHERE t.bus_id = b.id ORDER BY t.id DESC LIMIT 1),
                  '—'
                ) AS driver_name,
-               COALESCE(MAX(a.driver_id), (SELECT td.id FROM trips t JOIN drivers td ON td.id = t.driver_id WHERE t.bus_id = b.id ORDER BY t.id DESC LIMIT 1)) AS current_driver_id,
+               COALESCE(
+                 MAX(a.driver_id),
+                 (SELECT drv.id FROM drivers drv WHERE drv.route_id = b.route_id AND (drv.status = 'active' OR drv.status IS NULL) LIMIT 1),
+                 (SELECT td.id FROM trips t JOIN drivers td ON td.id = t.driver_id WHERE t.bus_id = b.id ORDER BY t.id DESC LIMIT 1)
+               ) AS current_driver_id,
                COALESCE(MAX(i.short_name), MAX(i.name), '—') AS institution_name,
 
                -- Daily Breakdown / Substitution info for requested date
@@ -182,12 +187,15 @@ exports.list = (table) => async (req, res) => {
     if (table === 'drivers') {
       let sql = `
         SELECT d.*,
-               MAX(a.bus_id) AS current_bus_id,
+               COALESCE(MAX(a.bus_id), (SELECT b2.id FROM buses b2 WHERE b2.route_id = d.route_id LIMIT 1)) AS current_bus_id,
                GROUP_CONCAT(DISTINCT a.bus_id ORDER BY a.bus_id SEPARATOR ',') AS current_bus_ids,
                COALESCE(MAX(a.route_id), d.route_id) AS current_route_id,
                GROUP_CONCAT(DISTINCT a.route_id ORDER BY a.route_id SEPARATOR ',') AS current_route_ids,
                COALESCE(d.institution_id, MAX(r.institution_id), MAX(b.institution_id)) AS current_institution_id,
-               GROUP_CONCAT(DISTINCT b.registration_number ORDER BY b.registration_number SEPARATOR ', ') AS assigned_bus_numbers,
+               COALESCE(
+                 NULLIF(GROUP_CONCAT(DISTINCT b.registration_number ORDER BY b.registration_number SEPARATOR ', '), ''),
+                 (SELECT b2.registration_number FROM buses b2 WHERE b2.route_id = d.route_id LIMIT 1)
+               ) AS assigned_bus_numbers,
                GROUP_CONCAT(DISTINCT r.route_code ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_code,
                GROUP_CONCAT(DISTINCT r.route_name ORDER BY r.route_code SEPARATOR ', ') AS assigned_route_name,
                COALESCE(MAX(i.short_name), MAX(i.name), '—') AS institution_name

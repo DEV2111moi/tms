@@ -496,47 +496,56 @@ export function MapRoute({
   color = "#2563eb",
   width = 4,
   opacity = 0.85,
+  dashArray = null,
 }) {
   const { map, isLoaded } = useMap();
   const sourceId = `source-${id}`;
   const layerId = `layer-${id}`;
 
+  // 1. Initialize source and layer once when map is loaded
   useEffect(() => {
-    if (!map || !isLoaded || coordinates.length < 2) return;
+    if (!map || !isLoaded) return;
 
-    if (!map.getSource(sourceId)) {
-      map.addSource(sourceId, {
-        type: "geojson",
-        data: {
-          type: "Feature",
-          properties: {},
-          geometry: {
-            type: "LineString",
-            coordinates,
+    try {
+      const validCoords = Array.isArray(coordinates) && coordinates.length >= 2 ? coordinates : [];
+
+      if (!map.getSource(sourceId)) {
+        map.addSource(sourceId, {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: "LineString",
+              coordinates: validCoords,
+            },
           },
-        },
-      });
+        });
+      }
 
-      map.addLayer({
-        id: layerId,
-        type: "line",
-        source: sourceId,
-        layout: { "line-join": "round", "line-cap": "round" },
-        paint: {
+      if (!map.getLayer(layerId)) {
+        const paintProps = {
           "line-color": color,
           "line-width": width,
           "line-opacity": opacity,
-        },
-      });
-    } else {
-      map.getSource(sourceId).setData({
-        type: "Feature",
-        properties: {},
-        geometry: {
-          type: "LineString",
-          coordinates,
-        },
-      });
+        };
+        if (Array.isArray(dashArray) && dashArray.length > 0) {
+          paintProps["line-dasharray"] = dashArray;
+        }
+
+        map.addLayer({
+          id: layerId,
+          type: "line",
+          source: sourceId,
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: paintProps,
+        });
+      }
+    } catch (err) {
+      console.warn("MapRoute init error:", err);
     }
 
     return () => {
@@ -545,7 +554,41 @@ export function MapRoute({
         if (map.getSource(sourceId)) map.removeSource(sourceId);
       } catch (e) {}
     };
-  }, [map, isLoaded, coordinates, color, width, opacity]);
+  }, [map, isLoaded, sourceId, layerId]);
+
+  // 2. High-performance coordinate updates via setData (never drops or destroys WebGL layer)
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+    try {
+      const src = map.getSource(sourceId);
+      if (src && typeof src.setData === "function") {
+        const validCoords = Array.isArray(coordinates) && coordinates.length >= 2 ? coordinates : [];
+        src.setData({
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: validCoords,
+          },
+        });
+      }
+    } catch (err) {}
+  }, [map, isLoaded, coordinates, sourceId]);
+
+  // 3. Update styling properties dynamically
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+    try {
+      if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, "line-color", color);
+        map.setPaintProperty(layerId, "line-width", width);
+        map.setPaintProperty(layerId, "line-opacity", opacity);
+        if (Array.isArray(dashArray) && dashArray.length > 0) {
+          map.setPaintProperty(layerId, "line-dasharray", dashArray);
+        }
+      }
+    } catch (err) {}
+  }, [map, isLoaded, color, width, opacity, dashArray, layerId]);
 
   return null;
 }
@@ -571,26 +614,27 @@ export function MapGeoJSON({
   const fillLayerId = `geojson-fill-${rawId}`;
   const lineLayerId = `geojson-line-${rawId}`;
 
-  const fillPaintKey = useMemo(() => JSON.stringify(fillPaint || {}), [fillPaint]);
-  const linePaintKey = useMemo(() => JSON.stringify(linePaint || {}), [linePaint]);
+  // Keep latest event handlers in ref
+  const handlersRef = useRef({ onClick, onMouseEnter, onMouseLeave });
+  useEffect(() => {
+    handlersRef.current = { onClick, onMouseEnter, onMouseLeave };
+  }, [onClick, onMouseEnter, onMouseLeave]);
 
+  // 1. Initialize source and layers once when map is loaded
   useEffect(() => {
     if (!map || !isLoaded || !data) return;
 
-    // 1. Source setup or update
-    let src = map.getSource(sourceId);
-    if (!src) {
-      map.addSource(sourceId, {
-        type: "geojson",
-        data,
-      });
-    } else {
-      src.setData(data);
-    }
+    try {
+      if (!map.getSource(sourceId)) {
+        map.addSource(sourceId, {
+          type: "geojson",
+          data,
+        });
+      } else {
+        map.getSource(sourceId).setData(data);
+      }
 
-    // 2. Fill Layer
-    if (fillPaint) {
-      if (!map.getLayer(fillLayerId)) {
+      if (fillPaint && !map.getLayer(fillLayerId)) {
         map.addLayer(
           {
             id: fillLayerId,
@@ -600,18 +644,9 @@ export function MapGeoJSON({
           },
           beforeId
         );
-      } else {
-        Object.entries(fillPaint).forEach(([prop, val]) => {
-          map.setPaintProperty(fillLayerId, prop, val);
-        });
       }
-    } else if (map.getLayer(fillLayerId)) {
-      map.removeLayer(fillLayerId);
-    }
 
-    // 3. Line/Outline Layer
-    if (linePaint) {
-      if (!map.getLayer(lineLayerId)) {
+      if (linePaint && !map.getLayer(lineLayerId)) {
         map.addLayer(
           {
             id: lineLayerId,
@@ -621,59 +656,87 @@ export function MapGeoJSON({
           },
           beforeId
         );
-      } else {
+      }
+
+      const clickHandler = (e) => handlersRef.current.onClick?.(e);
+      const enterHandler = (e) => {
+        map.getCanvas().style.cursor = "pointer";
+        handlersRef.current.onMouseEnter?.(e);
+      };
+      const leaveHandler = (e) => {
+        map.getCanvas().style.cursor = "";
+        handlersRef.current.onMouseLeave?.(e);
+      };
+
+      if (map.getLayer(fillLayerId)) {
+        map.on("click", fillLayerId, clickHandler);
+        map.on("mouseenter", fillLayerId, enterHandler);
+        map.on("mouseleave", fillLayerId, leaveHandler);
+      }
+      if (map.getLayer(lineLayerId)) {
+        map.on("click", lineLayerId, clickHandler);
+        map.on("mouseenter", lineLayerId, enterHandler);
+        map.on("mouseleave", lineLayerId, leaveHandler);
+      }
+
+      return () => {
+        try {
+          if (map.getLayer(fillLayerId)) {
+            map.off("click", fillLayerId, clickHandler);
+            map.off("mouseenter", fillLayerId, enterHandler);
+            map.off("mouseleave", fillLayerId, leaveHandler);
+            map.removeLayer(fillLayerId);
+          }
+          if (map.getLayer(lineLayerId)) {
+            map.off("click", lineLayerId, clickHandler);
+            map.off("mouseenter", lineLayerId, enterHandler);
+            map.off("mouseleave", lineLayerId, leaveHandler);
+            map.removeLayer(lineLayerId);
+          }
+          if (map.getSource(sourceId)) {
+            map.removeSource(sourceId);
+          }
+        } catch (err) {}
+      };
+    } catch (err) {
+      console.warn("MapGeoJSON mount error:", err);
+    }
+  }, [map, isLoaded, sourceId, fillLayerId, lineLayerId, beforeId]);
+
+  // 2. High-performance GeoJSON data updates via setData
+  useEffect(() => {
+    if (!map || !isLoaded || !data) return;
+    try {
+      const src = map.getSource(sourceId);
+      if (src && typeof src.setData === "function") {
+        src.setData(data);
+      }
+    } catch (err) {}
+  }, [map, isLoaded, data, sourceId]);
+
+  // 3. Dynamic fillPaint updates
+  useEffect(() => {
+    if (!map || !isLoaded || !fillPaint) return;
+    try {
+      if (map.getLayer(fillLayerId)) {
+        Object.entries(fillPaint).forEach(([prop, val]) => {
+          map.setPaintProperty(fillLayerId, prop, val);
+        });
+      }
+    } catch (err) {}
+  }, [map, isLoaded, fillPaint, fillLayerId]);
+
+  // 4. Dynamic linePaint updates
+  useEffect(() => {
+    if (!map || !isLoaded || !linePaint) return;
+    try {
+      if (map.getLayer(lineLayerId)) {
         Object.entries(linePaint).forEach(([prop, val]) => {
           map.setPaintProperty(lineLayerId, prop, val);
         });
       }
-    } else if (map.getLayer(lineLayerId)) {
-      map.removeLayer(lineLayerId);
-    }
-
-    // 4. Interactive Events
-    const clickHandler = (e) => onClick?.(e);
-    const enterHandler = (e) => {
-      map.getCanvas().style.cursor = "pointer";
-      onMouseEnter?.(e);
-    };
-    const leaveHandler = (e) => {
-      map.getCanvas().style.cursor = "";
-      onMouseLeave?.(e);
-    };
-
-    if (onClick) {
-      if (fillPaint) map.on("click", fillLayerId, clickHandler);
-      if (linePaint) map.on("click", lineLayerId, clickHandler);
-    }
-    if (onMouseEnter || onClick) {
-      if (fillPaint) map.on("mouseenter", fillLayerId, enterHandler);
-      if (linePaint) map.on("mouseenter", lineLayerId, enterHandler);
-    }
-    if (onMouseLeave || onClick) {
-      if (fillPaint) map.on("mouseleave", fillLayerId, leaveHandler);
-      if (linePaint) map.on("mouseleave", lineLayerId, leaveHandler);
-    }
-
-    return () => {
-      try {
-        if (onClick) {
-          if (fillPaint && map.getLayer(fillLayerId)) map.off("click", fillLayerId, clickHandler);
-          if (linePaint && map.getLayer(lineLayerId)) map.off("click", lineLayerId, clickHandler);
-        }
-        if (onMouseEnter || onClick) {
-          if (fillPaint && map.getLayer(fillLayerId)) map.off("mouseenter", fillLayerId, enterHandler);
-          if (linePaint && map.getLayer(lineLayerId)) map.off("mouseenter", lineLayerId, enterHandler);
-        }
-        if (onMouseLeave || onClick) {
-          if (fillPaint && map.getLayer(fillLayerId)) map.off("mouseleave", fillLayerId, leaveHandler);
-          if (linePaint && map.getLayer(lineLayerId)) map.off("mouseleave", lineLayerId, leaveHandler);
-        }
-        if (map.getLayer(lineLayerId)) map.removeLayer(lineLayerId);
-        if (map.getLayer(fillLayerId)) map.removeLayer(fillLayerId);
-        if (map.getSource(sourceId)) map.removeSource(sourceId);
-      } catch (err) {}
-    };
-  }, [map, isLoaded, data, fillPaintKey, linePaintKey, beforeId]);
+    } catch (err) {}
+  }, [map, isLoaded, linePaint, lineLayerId]);
 
   return null;
 }

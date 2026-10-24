@@ -2,7 +2,13 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom';
 import api from '../../api/api';
 import { useToast } from '../../components/UI/Toast';
-import { FLEET_ROAD_ROUTES } from '../../data/fleetRoadRoutes';
+import {
+  FLEET_ROAD_ROUTES,
+  ALL_THENI_ROUTES_ARRAY,
+  findRouteForBus,
+  THENI_DISTRICT_SECTORS,
+  THENI_DISTRICT_ROUTES,
+} from '../../data/fleetRoadRoutes';
 import {
   Map,
   MapMarker,
@@ -90,6 +96,129 @@ function calculateBearing(startLat, startLng, destLat, destLng) {
     Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
   const brng = (Math.atan2(y, x) * 180) / Math.PI;
   return (brng + 360) % 360;
+}
+
+/**
+ * Splits a full day route into:
+ * - fullRoute: entire scheduled route coordinates for the day
+ * - travelledTrack: road path from trip start origin up to current live position
+ * - upcomingTrack: remaining road path from current live position to college destination
+ * - originPoint: first coordinate where bus starts
+ * - destPoint: final coordinate where bus ends
+ * - travelledDistKm: distance covered today in km
+ * - totalDistKm: total length of the entire day's route in km
+ * - remainingDistKm: remaining distance to destination in km
+ */
+function getBusRouteSegments(routeCoordinates, currentLng, currentLat) {
+  if (!Array.isArray(routeCoordinates) || routeCoordinates.length < 2) {
+    return {
+      fullRoute: [],
+      travelledTrack: [],
+      upcomingTrack: [],
+      originPoint: null,
+      destPoint: null,
+      travelledDistKm: 0,
+      totalDistKm: 0,
+      remainingDistKm: 0,
+      closestIdx: 0,
+    };
+  }
+
+  const fullRoute = routeCoordinates;
+  const originPoint = fullRoute[0];
+  const destPoint = fullRoute[fullRoute.length - 1];
+  const totalDistKm = calculateTrackDistanceKm(fullRoute);
+
+  const curLng = Number(currentLng);
+  const curLat = Number(currentLat);
+
+  if (isNaN(curLng) || isNaN(curLat)) {
+    return {
+      fullRoute,
+      travelledTrack: [originPoint, originPoint],
+      upcomingTrack: fullRoute,
+      originPoint,
+      destPoint,
+      travelledDistKm: 0,
+      totalDistKm,
+      remainingDistKm: totalDistKm,
+      closestIdx: 0,
+    };
+  }
+
+  // Find index of route coordinate closest to current bus position
+  let closestIdx = 0;
+  let minDistSq = Infinity;
+
+  for (let i = 0; i < routeCoordinates.length; i++) {
+    const pt = routeCoordinates[i];
+    if (!pt || pt.length < 2) continue;
+    const rLng = Number(pt[0]);
+    const rLat = Number(pt[1]);
+    const dLng = rLng - curLng;
+    const dLat = rLat - curLat;
+    const distSq = dLng * dLng + dLat * dLat;
+    if (distSq < minDistSq) {
+      minDistSq = distSq;
+      closestIdx = i;
+    }
+  }
+
+  // Travelled track: from origin point up to closestIdx
+  const travelledSlice = routeCoordinates.slice(0, closestIdx + 1);
+  const travelledTrack = [...travelledSlice];
+
+  // Seamlessly connect the live bus coordinates to the end of the travelled track
+  const lastTravelled = travelledTrack[travelledTrack.length - 1];
+  if (!lastTravelled || Math.abs(lastTravelled[0] - curLng) > 0.00003 || Math.abs(lastTravelled[1] - curLat) > 0.00003) {
+    travelledTrack.push([curLng, curLat]);
+  }
+  if (travelledTrack.length < 2) {
+    travelledTrack.unshift(originPoint);
+  }
+
+  // Upcoming track: from current live position to destination
+  const upcomingSlice = routeCoordinates.slice(closestIdx + 1);
+  let upcomingTrack = [[curLng, curLat], ...upcomingSlice];
+  if (closestIdx >= routeCoordinates.length - 1) {
+    upcomingTrack = [];
+  } else if (upcomingTrack.length < 2 && destPoint) {
+    upcomingTrack.push(destPoint);
+  }
+
+  const travelledDistKm = calculateTrackDistanceKm(travelledTrack);
+  const remainingDistKm = Math.max(0, Number((totalDistKm - travelledDistKm).toFixed(1)));
+
+  return {
+    fullRoute,
+    travelledTrack,
+    upcomingTrack,
+    originPoint,
+    destPoint,
+    travelledDistKm,
+    totalDistKm,
+    remainingDistKm,
+    closestIdx,
+  };
+}
+
+// Backward compatible helper for travelled track only
+function getTravelledTrack(routeCoordinates, currentLng, currentLat) {
+  const segs = getBusRouteSegments(routeCoordinates, currentLng, currentLat);
+  return segs.travelledTrack;
+}
+
+// Helper to sum total distance of a coordinate path in km
+function calculateTrackDistanceKm(coords) {
+  if (!Array.isArray(coords) || coords.length < 2) return 0;
+  let totalKm = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    const d = calculateDistanceKm(p1[1], p1[0], p2[1], p2[0]);
+    if (d) totalKm += d;
+  }
+  return Number(totalKm.toFixed(1));
 }
 
 // 129 Exact Road-Snapped Coordinates from OpenStreetMap Highway Routing
@@ -461,6 +590,30 @@ export default function LiveTracking() {
   // Google Maps Style Live Follow Camera & Route Breadcrumbs
   const [followMode, setFollowMode] = useState(true);
   const [breadcrumbs, setBreadcrumbs] = useState({});
+  // Route Display Mode: 'full' (Entire Day Route + Travelled + Upcoming) | 'travelled' (Only past path)
+  const [routeDisplayMode, setRouteDisplayMode] = useState('full');
+
+  // Theni District Complete Transit Network Overlay & Filters
+  const [showDistrictNetwork, setShowDistrictNetwork] = useState(true);
+  const [selectedSector, setSelectedSector] = useState('all');
+  const [showRouteStops, setShowRouteStops] = useState(true);
+
+  // Filter routes according to selected Theni District Sector / Corridor
+  const displayedDistrictRoutes = useMemo(() => {
+    if (!Array.isArray(ALL_THENI_ROUTES_ARRAY)) return [];
+    if (selectedSector === 'all') return ALL_THENI_ROUTES_ARRAY;
+    return ALL_THENI_ROUTES_ARRAY.filter((r) => {
+      const s = (r.sector || '').toLowerCase();
+      const n = (r.routeName || '').toLowerCase();
+      if (selectedSector === 'west') return s.includes('west') || n.includes('bodi') || n.includes('kombai') || n.includes('thevaram') || n.includes('boothipuram') || n.includes('thirumalapuram');
+      if (selectedSector === 'south') return s.includes('south') || n.includes('cumbum') || n.includes('gudalur') || n.includes('chinnamanur') || n.includes('veerapandi') || n.includes('seepalakottai') || n.includes('royappanpatti') || n.includes('kk patti');
+      if (selectedSector === 'east') return s.includes('east') || n.includes('aundipatti') || n.includes('usilampatti') || n.includes('subbulapuram');
+      if (selectedSector === 'north') return s.includes('north') || n.includes('periyakulam') || n.includes('batlagundu') || n.includes('jayamangalam') || n.includes('ayyampalayam');
+      if (selectedSector === 'valley') return s.includes('valley') || n.includes('varusanadu') || n.includes('megamalai');
+      if (selectedSector === 'central') return s.includes('central') || n.includes('theni') || n.includes('allinagaram') || n.includes('samatharmapuram') || n.includes('forest road');
+      return true;
+    });
+  }, [selectedSector]);
 
   // Real-Time GPS Hardware / Provider Telemetry Stream State
   const [isSseActive, setIsSseActive] = useState(false);
@@ -470,6 +623,67 @@ export default function LiveTracking() {
   const providerStreamTimerRef = useRef(null);
   const providerStepRef = useRef(0);
   const activeAnimationsRef = useRef({});
+
+  // GPS Device IMEI Manager Modal State
+  const [imeiModalBus, setImeiModalBus] = useState(null);
+  const [imeiInput, setImeiInput] = useState('');
+  const [imeiGpsEnabled, setImeiGpsEnabled] = useState(true);
+  const [imeiSaving, setImeiSaving] = useState(false);
+  const [imeiError, setImeiError] = useState(null);
+
+  const openImeiModal = useCallback((bus) => {
+    if (!bus) return;
+    setImeiModalBus(bus);
+    setImeiInput(bus.gps_device_id || '');
+    setImeiGpsEnabled(bus.gps_enabled !== 0);
+    setImeiError(null);
+  }, []);
+
+  const handleSaveImei = async (e) => {
+    if (e) e.preventDefault();
+    if (!imeiModalBus) return;
+    const busId = imeiModalBus.id || imeiModalBus.bus_id;
+    if (!busId) {
+      toast('Bus ID missing, cannot update IMEI');
+      return;
+    }
+
+    setImeiSaving(true);
+    setImeiError(null);
+    try {
+      const cleanImei = imeiInput.trim();
+      const res = await api.gpsAssignImei({
+        bus_id: busId,
+        imei: cleanImei,
+        gps_enabled: imeiGpsEnabled ? 1 : 0
+      });
+
+      // Optimistically update local buses state
+      setBuses((prev) =>
+        prev.map((b) => {
+          if (
+            (b.id && b.id === busId) ||
+            (b.bus_id && b.bus_id === busId) ||
+            b.registration_number === imeiModalBus.registration_number
+          ) {
+            return {
+              ...b,
+              gps_device_id: cleanImei || null,
+              gps_enabled: cleanImei ? (imeiGpsEnabled ? 1 : 0) : 0,
+            };
+          }
+          return b;
+        })
+      );
+
+      toast(res.message || (cleanImei ? `GPS IMEI ${cleanImei} linked to ${imeiModalBus.registration_number}!` : `GPS device unassigned from ${imeiModalBus.registration_number}`));
+      setImeiModalBus(null);
+    } catch (err) {
+      setImeiError(err.message || 'Failed to update IMEI');
+    } finally {
+      setImeiSaving(false);
+    }
+  };
 
   // College Campus Geofence State
   const [showGeofence, setShowGeofence] = useState(true);
@@ -523,6 +737,31 @@ export default function LiveTracking() {
 
       // Calculate direction bearing angle towards incoming point
       const bearing = calculateBearing(startLat, startLng, targetLat, targetLng);
+
+      // High-performance optimization for 130 buses:
+      // Only the actively selected/followed bus runs the 60 FPS rAF interpolation loop.
+      // All other background buses update directly in a single tick to avoid running 130 concurrent rAF loops.
+      const isSelected = selectedBusRegRef.current === reg || (selectedBusRegRef.current && currentBus.bus_id === selectedBusRegRef.current);
+      if (!isSelected) {
+        const next = [...prevBuses];
+        next[idx] = {
+          ...currentBus,
+          ...incomingBus,
+          latitude: targetLat,
+          longitude: targetLng,
+          bearing,
+          is_online: true,
+        };
+        // Record breadcrumb trail for this bus
+        setBreadcrumbs((bPrev) => {
+          const list = bPrev[reg] || [];
+          return {
+            ...bPrev,
+            [reg]: [...list, [targetLng, targetLat]].slice(-50),
+          };
+        });
+        return next;
+      }
 
       // Cancel previous frame animation for this bus if still running
       if (activeAnimationsRef.current[reg]) {
@@ -707,13 +946,15 @@ export default function LiveTracking() {
           const next = { ...prev };
           uniqueItems.forEach((b) => {
             if (b.latitude && b.longitude) {
-              const key = b.bus_id || b.gps_device_id;
               const pt = [Number(b.longitude), Number(b.latitude)];
-              const curList = next[key] || [];
-              const lastPt = curList[curList.length - 1];
-              if (!lastPt || Math.abs(lastPt[0] - pt[0]) > 0.00001 || Math.abs(lastPt[1] - pt[1]) > 0.00001) {
-                next[key] = [...curList.slice(-40), pt];
-              }
+              const keys = [b.bus_id, b.gps_device_id, b.registration_number].filter(Boolean);
+              keys.forEach((key) => {
+                const curList = next[key] || [];
+                const lastPt = curList[curList.length - 1];
+                if (!lastPt || Math.abs(lastPt[0] - pt[0]) > 0.00001 || Math.abs(lastPt[1] - pt[1]) > 0.00001) {
+                  next[key] = [...curList.slice(-60), pt];
+                }
+              });
             }
           });
           return next;
@@ -772,17 +1013,41 @@ export default function LiveTracking() {
     }
   };
 
-  // Fit map view to whole Theni district (showing all 5 routes)
+  // Fit map view to whole Theni district (showing all routes)
   const handleDistrictOverview = () => {
     setSelectedBus(null);
     setFollowMode(false);
+    setSelectedSector('all');
+    setShowDistrictNetwork(true);
     if (mapRef.current) {
       mapRef.current.flyTo({
-        center: [77.4950, 10.0350],
-        zoom: 11.8,
+        center: [77.4800, 10.0100],
+        zoom: 10.8,
         duration: 1200,
       });
     }
+  };
+
+  // Fly and focus to specific Theni District Transit Corridors
+  const handleSelectSector = (secId) => {
+    setSelectedSector(secId);
+    setShowDistrictNetwork(true);
+    if (!mapRef.current) return;
+    const centers = {
+      all: { center: [77.4800, 10.0100], zoom: 10.8 },
+      west: { center: [77.3750, 10.0100], zoom: 11.8 },
+      south: { center: [77.3100, 9.8000], zoom: 11.2 },
+      east: { center: [77.6200, 10.0050], zoom: 11.5 },
+      north: { center: [77.5600, 10.1200], zoom: 11.5 },
+      valley: { center: [77.4800, 9.7500], zoom: 11.2 },
+      central: { center: [77.4850, 10.0200], zoom: 12.5 },
+    };
+    const target = centers[secId] || centers.all;
+    mapRef.current.flyTo({
+      center: target.center,
+      zoom: target.zoom,
+      duration: 1200,
+    });
   };
 
   // Test GPS Simulator Submit (accepts optional packet string for 1-click test)
@@ -1340,7 +1605,7 @@ export default function LiveTracking() {
                             width: 9,
                             height: 9,
                             borderRadius: '50%',
-                            background: FLEET_ROAD_ROUTES[b.registration_number]?.color || '#94a3b8',
+                            background: findRouteForBus(b)?.color || '#94a3b8',
                             display: 'inline-block',
                           }}
                         />
@@ -1446,19 +1711,65 @@ export default function LiveTracking() {
                         </div>
                       )}
 
-                      {b.gps_device_id && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2, fontSize: 10.5, color: '#94a3b8', fontFamily: 'monospace' }}>
-                          <span>IMEI: {b.gps_device_id}</span>
-                          {b.recorded_at && (
-                            <span>
-                              {new Date(b.recorded_at).toLocaleTimeString('en-IN', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      {/* Hardware GPS Tracker IMEI Status & Edit Button */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 6,
+                          marginTop: 4,
+                          paddingTop: 5,
+                          borderTop: '1px dashed #e2e8f0',
+                          fontSize: 10.5,
+                        }}
+                      >
+                        {b.gps_device_id ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'monospace', color: '#64748b' }}>
+                            <Radio style={{ width: 11, height: 11, color: '#10b981' }} />
+                            <span>IMEI: <b style={{ color: '#1e293b' }}>{b.gps_device_id}</b></span>
+                          </div>
+                        ) : (
+                          <span style={{ color: '#d97706', fontSize: 10, fontWeight: 700 }}>
+                            ⚠️ No GPS IMEI
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openImeiModal(b);
+                          }}
+                          style={{
+                            border: '1px solid #cbd5e1',
+                            background: '#ffffff',
+                            color: '#475569',
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#7c6cfc';
+                            e.currentTarget.style.color = '#7c6cfc';
+                            e.currentTarget.style.background = '#f5f3ff';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                            e.currentTarget.style.color = '#475569';
+                            e.currentTarget.style.background = '#ffffff';
+                          }}
+                          title="Assign or edit the hardware GPS device IMEI for this bus"
+                        >
+                          ✏️ {b.gps_device_id ? 'Edit IMEI' : 'Set IMEI'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1584,7 +1895,7 @@ export default function LiveTracking() {
               <span>Center</span>
             </button>
 
-            {/* District Fleet View Button */}
+            {/* Fleet Overview Button */}
             <button
               type="button"
               onClick={handleDistrictOverview}
@@ -1601,11 +1912,13 @@ export default function LiveTracking() {
                 alignItems: 'center',
                 gap: 4,
               }}
-              title="View all 5 college routes across Theni district"
+              title="View all fleet positions across Theni district"
             >
               <span>🗺️</span>
-              <span>All Routes</span>
+              <span>Fleet Overview</span>
             </button>
+
+
 
             {/* Buses In Campus Pill */}
             <span
@@ -1725,7 +2038,7 @@ export default function LiveTracking() {
                   activeCampus.center[0]
                 );
                 const isInsideCampus = distToCampus !== null && distToCampus <= geofenceRadiusKm;
-                const routeInfo = FLEET_ROAD_ROUTES[b.registration_number];
+                const routeInfo = findRouteForBus(b);
                 const pinColor = isInsideCampus
                   ? '#6854ec'
                   : (routeInfo?.color || (isMoving ? '#10b981' : '#64748b'));
@@ -1855,39 +2168,103 @@ export default function LiveTracking() {
                 );
               })}
 
-            {/* Highway Route & Live GPS Trail: ONLY shown when a bus is clicked/selected */}
-            {selectedBus && (() => {
-              const reg = selectedBus.registration_number;
-              const route = FLEET_ROAD_ROUTES[reg];
-              const busTrail = breadcrumbs[reg] || [];
-              const routeColor = route?.color || '#6854ec';
+            {/* ONLY SHOW THE PREVIOUS TRAVELLED ROUTE FOR THE SELECTED BUS */}
+            {selectedBus ? (() => {
+              const reg = selectedBus.registration_number || selectedBus.bus_id;
+              const route = findRouteForBus(selectedBus);
+              const routeColor = route?.color || '#10b981';
+
+              // Check if bus has recorded real physical GPS breadcrumbs
+              const busTrail = breadcrumbs[reg] || breadcrumbs[selectedBus.bus_id] || breadcrumbs[selectedBus.gps_device_id] || [];
+
+              // Calculate closest point and distance to predefined template route
+              let distToPlannedRoute = 0;
+              let segs = null;
+              if (route && Array.isArray(route.coordinates) && route.coordinates.length >= 2) {
+                segs = getBusRouteSegments(
+                  route.coordinates,
+                  selectedBus.longitude,
+                  selectedBus.latitude
+                );
+                const closestPt = route.coordinates[segs.closestIdx];
+                if (closestPt) {
+                  distToPlannedRoute = calculateDistanceKm(closestPt[1], closestPt[0], selectedBus.latitude, selectedBus.longitude) || 0;
+                }
+              }
+
+              // Extract travelled track:
+              // 1. If bus took an OPPOSITE / ALTERNATE road (Route 2 or detour > 120m away) and has GPS breadcrumbs:
+              //    Show the exact physical road the bus is driving on!
+              // 2. Otherwise use standard corridor road-snapped travelled track, falling back to breadcrumbs.
+              let travelledTrack = [];
+              let isOppositeOrDetourRoad = false;
+
+              if (busTrail.length >= 2 && distToPlannedRoute > 0.12) {
+                travelledTrack = busTrail;
+                isOppositeOrDetourRoad = true;
+              } else if (segs && segs.travelledTrack.length >= 2) {
+                travelledTrack = segs.travelledTrack;
+              } else if (busTrail.length >= 2) {
+                travelledTrack = busTrail;
+              }
+
+              if (travelledTrack.length < 2) return null;
+
+              const originPoint = travelledTrack[0];
 
               return (
-                <React.Fragment key={reg}>
-                  {/* Planned Highway Route Line on physical roads (Only for selected bus) */}
-                  {route && route.coordinates && (
-                    <MapRoute
-                      id={`selected-bus-route-${reg}`}
-                      coordinates={route.coordinates}
-                      color={routeColor}
-                      width={6}
-                      opacity={0.85}
-                    />
+                <React.Fragment key={`selected-travelled-only-${reg}`}>
+                  {/* Origin / Trip Start Marker */}
+                  {originPoint && originPoint.length >= 2 && (
+                    <MapMarker
+                      longitude={Number(originPoint[0])}
+                      latitude={Number(originPoint[1])}
+                    >
+                      <MarkerContent>
+                        <div
+                          style={{
+                            background: '#0f172a',
+                            color: '#ffffff',
+                            border: `2px solid ${routeColor}`,
+                            borderRadius: 12,
+                            padding: '3px 8px',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                            whiteSpace: 'nowrap',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <span>🚩</span>
+                          <span>Start: {route?.origin || route?.routeName || 'Trip Origin'}</span>
+                        </div>
+                      </MarkerContent>
+                      <MarkerPopup>
+                        <div style={{ padding: 4, fontSize: 12 }}>
+                          <div style={{ fontWeight: 800, color: '#0f172a' }}>
+                            🚩 Trip Origin: {route?.origin || route?.routeName || 'Origin'}
+                          </div>
+                          <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+                            {route?.routeCode || ''} • Started trip towards College Campus
+                          </div>
+                        </div>
+                      </MarkerPopup>
+                    </MapMarker>
                   )}
 
-                  {/* Live GPS Trail Breadcrumbs for this selected bus */}
-                  {busTrail.length >= 2 && (
-                    <MapRoute
-                      id={`selected-bus-trail-${reg}`}
-                      coordinates={busTrail}
-                      color="#f59e0b"
-                      width={5.5}
-                      opacity={0.95}
-                    />
-                  )}
+                  {/* Previous Travelled Track Line (Only the path behind the bus) */}
+                  <MapRoute
+                    id={`previous-bus-track-${reg}`}
+                    coordinates={travelledTrack}
+                    color={routeColor}
+                    width={6}
+                    opacity={0.92}
+                  />
                 </React.Fragment>
               );
-            })()}
+            })() : null}
           </Map>
 
           {/* Floating Google Maps-Style Live Navigation Card */}
@@ -2029,6 +2406,105 @@ export default function LiveTracking() {
                   </div>
                 </div>
               </div>
+
+              {/* GPS Tracker IMEI & Quick Edit Action */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: '#f8fafc',
+                  padding: '7px 10px',
+                  borderRadius: 10,
+                  border: '1px solid #e2e8f0',
+                  fontSize: 11.5,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Radio style={{ width: 13, height: 13, color: selectedBus.gps_device_id ? '#10b981' : '#94a3b8' }} />
+                  <span style={{ color: '#64748b' }}>GPS IMEI:</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 800, color: selectedBus.gps_device_id ? '#1e293b' : '#d97706' }}>
+                    {selectedBus.gps_device_id || 'Not Assigned'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openImeiModal(selectedBus)}
+                  style={{
+                    border: '1px solid #7c6cfc',
+                    background: '#ede9fe',
+                    color: '#6854ec',
+                    padding: '3px 9px',
+                    borderRadius: 6,
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                  title="Assign or update GPS device IMEI for this bus"
+                >
+                  ✏️ {selectedBus.gps_device_id ? 'Edit IMEI' : '+ Set IMEI'}
+                </button>
+              </div>
+
+              {/* Corridor Route Line Travelled & Remaining Progress */}
+              {(() => {
+                const route = findRouteForBus(selectedBus);
+                const reg = selectedBus.registration_number || selectedBus.bus_id;
+                const segs = route && Array.isArray(route.coordinates)
+                  ? getBusRouteSegments(route.coordinates, selectedBus.longitude, selectedBus.latitude)
+                  : { travelledDistKm: 0, remainingDistKm: 0, totalDistKm: 0 };
+
+                const travelled = segs.travelledDistKm || 0;
+                const total = segs.totalDistKm || Number(route?.totalKm || 0);
+                const remaining = segs.remainingDistKm || Math.max(0, Number((total - travelled).toFixed(1)));
+                const pct = total > 0 ? Math.min(100, Math.round((travelled / total) * 100)) : 0;
+
+                return (
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#166534', fontWeight: 800 }}>
+                        <span>🛣️</span>
+                        <span>{travelled} km travelled</span>
+                      </div>
+                      <span style={{ fontSize: 11, color: '#4338ca', fontWeight: 800 }}>
+                        {remaining} km remaining
+                      </span>
+                    </div>
+
+                    {/* Progress Bar along the route line */}
+                    <div style={{ width: '100%', height: 6, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: `${pct}%`,
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #10b981, #059669)',
+                          borderRadius: 4,
+                          transition: 'width 0.3s ease',
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b' }}>
+                      <span>🚩 <b>{route?.origin || 'Start'}</b></span>
+                      <span>Progress: <b>{pct}%</b></span>
+                      <span>🏁 <b>{route?.destination || 'NSCET Campus'}</b></span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Actions: Follow Toggle & Open in Google Maps */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 2 }}>
@@ -2477,6 +2953,327 @@ export default function LiveTracking() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* GPS Device IMEI Entry & Edit Modal */}
+      {imeiModalBus && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: 20,
+          }}
+          onClick={() => {
+            if (!imeiSaving) setImeiModalBus(null);
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: 520,
+              backgroundColor: '#ffffff',
+              borderRadius: 20,
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.35)',
+              border: '1px solid #e2e8f0',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 20,
+                  }}
+                >
+                  📡
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: '0.2px' }}>
+                    Configure GPS Device IMEI
+                  </h3>
+                  <p style={{ margin: 0, fontSize: 12, color: '#c7d2fe' }}>
+                    Link physical GPS tracker hardware to this vehicle
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!imeiSaving) setImeiModalBus(null);
+                }}
+                disabled={imeiSaving}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 30,
+                  height: 30,
+                  color: '#ffffff',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSaveImei} style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Bus Details Summary Banner */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 12,
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Vehicle Target
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: '#1e293b', fontFamily: 'monospace' }}>
+                    {imeiModalBus.registration_number}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>
+                    {imeiModalBus.bus_code ? `Fleet Code: ${imeiModalBus.bus_code}` : 'Central Fleet'}
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#4338ca' }}>
+                    {imeiModalBus.route_code || 'Unassigned Route'}
+                  </div>
+                </div>
+              </div>
+
+              {/* IMEI Input Field */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 800, color: '#334155', marginBottom: 6 }}>
+                  GPS Hardware IMEI / Device ID: <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={imeiInput}
+                    onChange={(e) => setImeiInput(e.target.value)}
+                    placeholder="e.g. 863071010318308 (15 digits)"
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '11px 14px',
+                      borderRadius: 10,
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: 14,
+                      fontFamily: 'monospace',
+                      color: '#0f172a',
+                      fontWeight: 700,
+                      outline: 'none',
+                      transition: 'border 0.2s ease',
+                    }}
+                    onFocus={(e) => { e.target.style.borderColor = '#6854ec'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#cbd5e1'; }}
+                  />
+                  {imeiInput && (
+                    <button
+                      type="button"
+                      onClick={() => setImeiInput('')}
+                      style={{
+                        position: 'absolute',
+                        right: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        fontWeight: 800,
+                      }}
+                      title="Clear field"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: '#64748b' }}>
+                  <span>Enter the 15-digit IMEI printed on the tracker SIM or sticker</span>
+                  <button
+                    type="button"
+                    onClick={() => setImeiInput('863071010318308')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#4f46e5',
+                      fontWeight: 700,
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      padding: 0,
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Use Sample Test IMEI
+                  </button>
+                </div>
+              </div>
+
+              {/* GPS Live Tracking Active Toggle */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  cursor: 'pointer',
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  border: '1px solid #e2e8f0',
+                  background: imeiGpsEnabled ? '#f0fdf4' : '#f8fafc',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={imeiGpsEnabled}
+                  onChange={(e) => setImeiGpsEnabled(e.target.checked)}
+                  style={{ width: 17, height: 17, accentColor: '#16a34a', cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: imeiGpsEnabled ? '#15803d' : '#475569' }}>
+                    Activate Live Telemetry Ingest
+                  </span>
+                  <span style={{ fontSize: 11, color: '#64748b' }}>
+                    Allow TCP socket listener (Port 5050) & HTTP webhooks to update this bus live
+                  </span>
+                </div>
+              </label>
+
+              {/* Error Message if any */}
+              {imeiError && (
+                <div
+                  style={{
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#b91c1c',
+                    borderRadius: 10,
+                    padding: '10px 14px',
+                    fontSize: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
+                  <span>{imeiError}</span>
+                </div>
+              )}
+
+              {/* High-Performance Architecture Notice */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontSize: 11.5,
+                  color: '#475569',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                }}
+              >
+                <Zap style={{ width: 15, height: 15, color: '#d97706', flexShrink: 0, marginTop: 2 }} />
+                <span>
+                  <b>High-Throughput Ready:</b> The receiver uses in-memory O(1) device mapping and indexed MySQL tables to comfortably handle <b>130+ concurrent buses</b> pinging every 5 seconds.
+                </span>
+              </div>
+
+              {/* Actions Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setImeiModalBus(null)}
+                  disabled={imeiSaving}
+                  style={{
+                    padding: '9px 18px',
+                    borderRadius: 10,
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={imeiSaving}
+                  style={{
+                    padding: '9px 22px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: imeiSaving ? '#94a3b8' : 'linear-gradient(135deg, #7c6cfc 0%, #6854ec 100%)',
+                    color: '#ffffff',
+                    fontSize: 13,
+                    fontWeight: 800,
+                    cursor: imeiSaving ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    boxShadow: '0 4px 14px rgba(104, 84, 236, 0.35)',
+                  }}
+                >
+                  {imeiSaving ? (
+                    <>
+                      <div className="spinner-sm" style={{ width: 14, height: 14 }} />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 style={{ width: 15, height: 15 }} />
+                      <span>Save GPS IMEI</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

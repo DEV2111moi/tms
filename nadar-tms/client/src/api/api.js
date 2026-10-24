@@ -135,6 +135,7 @@ const api = {
   gpsLive: () => call('/gps/live'),
   gpsRaw: (packet) => call('/gps/raw', { method: 'POST', body: JSON.stringify({ packet }) }),
   gpsSimulate: (data) => call('/gps/simulate', { method: 'POST', body: JSON.stringify(data) }),
+  gpsAssignImei: (data) => call('/gps/assign-imei', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 
