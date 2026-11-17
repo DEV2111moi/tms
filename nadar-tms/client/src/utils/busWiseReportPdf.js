@@ -48,42 +48,6 @@ const SHIFT_LABELS = {
  * Group buses and trips cleanly by institution
  */
 export function groupBusesByInstitution(buses = [], institutions = [], trips = [], substitutions = []) {
-  // Index trips by bus ID and registration number
-  const tripsByBus = {};
-  (trips || []).forEach(t => {
-    const bId = String(t.bus_id || '');
-    const reg = String(t.registration_number || '').trim().toUpperCase();
-    if (bId) {
-      if (!tripsByBus[bId]) tripsByBus[bId] = [];
-      tripsByBus[bId].push(t);
-    }
-    if (reg) {
-      if (!tripsByBus[reg]) tripsByBus[reg] = [];
-      tripsByBus[reg].push(t);
-    }
-  });
-
-  // Index substitutions
-  const getSubstitutionsForBus = (b) => {
-    if (b.breakdowns && b.breakdowns.length > 0) return b.breakdowns;
-    const busId = String(b.bus_id || b.id || '');
-    const reg = String(b.registration_number || '').trim().toUpperCase();
-    return (substitutions || []).filter(s =>
-      (busId && String(s.original_bus_id) === busId) ||
-      (reg && String(s.original_bus_number).trim().toUpperCase() === reg)
-    );
-  };
-
-  const getCoversForBus = (b) => {
-    if (b.cover_duties && b.cover_duties.length > 0) return b.cover_duties;
-    const busId = String(b.bus_id || b.id || '');
-    const reg = String(b.registration_number || '').trim().toUpperCase();
-    return (substitutions || []).filter(s =>
-      (busId && String(s.substitute_bus_id) === busId) ||
-      (reg && String(s.substitute_bus_number).trim().toUpperCase() === reg)
-    );
-  };
-
   const instMap = new Map();
 
   // Populate known institutions
@@ -92,6 +56,7 @@ export function groupBusesByInstitution(buses = [], institutions = [], trips = [
       id: inst.id,
       name: inst.name || inst.short_name,
       short_name: inst.short_name || inst.name,
+      code: inst.code,
       buses: []
     });
   });
@@ -103,49 +68,256 @@ export function groupBusesByInstitution(buses = [], institutions = [], trips = [
     buses: []
   };
 
-  buses.forEach(b => {
-    let matched = false;
-    const bInstId = b.institution_id ? String(b.institution_id) : null;
-    const bInstStr = (b.institution || '').toLowerCase().trim();
+  // Helper to determine if a trip belongs to an institution
+  const isTripForInst = (trip, inst) => {
+    if (!trip || !inst) return false;
+    const instId = String(inst.id);
+    const tripInstId = trip.institution_id != null ? String(trip.institution_id) : null;
 
-    // Primary matching by institution_id (exact foreign key)
-    if (bInstId && instMap.has(bInstId)) {
-      instMap.get(bInstId).buses.push(b);
-      matched = true;
-    } else if (bInstStr && bInstStr !== '—') {
-      // Fallback matching by institution short_name or full name
-      for (const [id, inst] of instMap.entries()) {
-        const sName = (inst.short_name || '').toLowerCase().trim();
-        const fName = (inst.name || '').toLowerCase().trim();
-        if ((sName && bInstStr.includes(sName)) || (fName && bInstStr.includes(fName))) {
-          inst.buses.push(b);
-          matched = true;
-          break;
-        }
+    // 1. If trip has a valid institution_id matching a known institution
+    if (tripInstId && instMap.has(tripInstId)) {
+      return tripInstId === instId;
+    }
+
+    // 2. If institution_id is missing or not in instMap, match by name / short_name / code
+    const tInstStr = String(trip.institution || trip.institution_name || '').toLowerCase().trim();
+    const sName = String(inst.short_name || '').toLowerCase().trim();
+    const fName = String(inst.name || '').toLowerCase().trim();
+    const code = String(inst.code || '').toLowerCase().trim();
+
+    if (tInstStr && tInstStr !== '—') {
+      if (sName && (tInstStr === sName || tInstStr.includes(sName))) return true;
+      if (fName && (tInstStr === fName || tInstStr.includes(fName))) return true;
+      if (code && tInstStr === code) return true;
+    }
+
+    // 3. Special alias check: T.M.H.N.U. SCHOOL / TMHNU belongs to MT PATTI
+    const rName = String(trip.route_name || '').toLowerCase();
+    const rCode = String(trip.route_code || '').toLowerCase();
+    const fullRouteText = `${rName} ${rCode}`;
+
+    const isMtPatti = sName.includes('mt patti') || sName.includes('mtpatti') || 
+                      fName.includes('melapettai') || fName.includes('tmhnu') || fName.includes('t.m.h.n.u');
+    if (isMtPatti) {
+      if (tInstStr.includes('t.m.h.n.u') || tInstStr.includes('tmhnu') ||
+          fullRouteText.includes('t.m.h.n.u') || fullRouteText.includes('tmhnu')) {
+        return true;
       }
     }
 
+    const isArts = sName.includes('arts') || fName.includes('arts') || sName.includes('nscas') || fName.includes('nscas');
+    if (isArts) {
+      if (tInstStr.includes('arts') || fullRouteText.includes('arts') || fullRouteText.includes('nscas')) {
+        return true;
+      }
+    }
+
+    const isEng = sName.includes('engineering') || fName.includes('engineering') || sName.includes('nscet') || fName.includes('nscet');
+    if (isEng) {
+      if (tInstStr.includes('engineering') || fullRouteText.includes('engineering') || fullRouteText.includes('nscet')) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  // Helper to determine if a substitution belongs to an institution
+  const isSubForInst = (s, inst) => {
+    if (!s || !inst) return false;
+    if (s.institution_id != null && String(s.institution_id) === String(inst.id)) return true;
+    const sName = String(inst.short_name || '').toLowerCase().trim();
+    const fName = String(inst.name || '').toLowerCase().trim();
+    const rName = String(s.route_name || '').toLowerCase();
+    const rCode = String(s.route_code || '').toLowerCase();
+    if (sName && (rName.includes(sName) || rCode.includes(sName))) return true;
+    if (fName && (rName.includes(fName) || rCode.includes(fName))) return true;
+    return true;
+  };
+
+  const getBusKeys = (b) => {
+    const keys = [];
+    if (b.bus_id != null && b.bus_id !== '') keys.push(String(b.bus_id));
+    if (b.id != null && b.id !== '') keys.push(String(b.id));
+    if (b.registration_number != null && b.registration_number !== '') {
+      keys.push(String(b.registration_number).trim().toUpperCase());
+    }
+    return keys;
+  };
+
+  // Partition trips by institution
+  const tripsByInst = new Map();
+  for (const [id] of instMap.entries()) {
+    tripsByInst.set(id, []);
+  }
+  const centralTrips = [];
+
+  (trips || []).forEach(t => {
+    let matched = false;
+    for (const [id, inst] of instMap.entries()) {
+      if (isTripForInst(t, inst)) {
+        tripsByInst.get(id).push(t);
+        matched = true;
+        break;
+      }
+    }
     if (!matched) {
-      centralGroup.buses.push(b);
+      centralTrips.push(t);
     }
   });
+
+  // Track which buses have any trips in the entire fleet
+  const busesWithTrips = new Set();
+  (trips || []).forEach(t => {
+    if (t.bus_id) busesWithTrips.add(String(t.bus_id));
+    if (t.registration_number) busesWithTrips.add(String(t.registration_number).trim().toUpperCase());
+  });
+
+  // Populate buses into each institution group
+  for (const [id, inst] of instMap.entries()) {
+    const instTrips = tripsByInst.get(id) || [];
+    
+    // Index this institution's trips by bus keys
+    const instTripsByBus = new Map();
+    instTrips.forEach(t => {
+      const keys = [];
+      if (t.bus_id) keys.push(String(t.bus_id));
+      if (t.registration_number) keys.push(String(t.registration_number).trim().toUpperCase());
+      keys.forEach(k => {
+        if (!instTripsByBus.has(k)) instTripsByBus.set(k, []);
+        instTripsByBus.get(k).push(t);
+      });
+    });
+
+    buses.forEach(b => {
+      const bKeys = getBusKeys(b);
+      let bInstTrips = [];
+      for (const k of bKeys) {
+        if (instTripsByBus.has(k)) {
+          bInstTrips = instTripsByBus.get(k);
+          break;
+        }
+      }
+
+      const hasTripsInThisInst = bInstTrips.length > 0;
+      const hasTripsAnywhere = bKeys.some(k => busesWithTrips.has(k));
+
+      // Primary institution match (used only if bus has 0 trips anywhere)
+      let isPrimaryMatch = false;
+      const bInstId = b.institution_id ? String(b.institution_id) : null;
+      const bInstStr = (b.institution || '').toLowerCase().trim();
+      const sName = (inst.short_name || '').toLowerCase().trim();
+      const fName = (inst.name || '').toLowerCase().trim();
+
+      if (bInstId && bInstId === id) {
+        isPrimaryMatch = true;
+      } else if (bInstStr && bInstStr !== '—') {
+        if ((sName && bInstStr.includes(sName)) || (fName && bInstStr.includes(fName))) {
+          isPrimaryMatch = true;
+        } else if (sName.includes('mt patti') && (bInstStr.includes('t.m.h.n.u') || bInstStr.includes('tmhnu'))) {
+          isPrimaryMatch = true;
+        }
+      }
+
+      if (hasTripsInThisInst || (!hasTripsAnywhere && isPrimaryMatch)) {
+        const totalKm = bInstTrips.reduce((sum, t) => sum + Number(t.km || 0), 0);
+        const totalTrips = bInstTrips.length;
+
+        const m1 = bInstTrips.filter(t => t.shift === 'morning1' || t.shift === 'morning');
+        const m2 = bInstTrips.filter(t => t.shift === 'morning2');
+        const m3 = bInstTrips.filter(t => t.shift === 'morning3');
+        const m4 = bInstTrips.filter(t => t.shift === 'morning4');
+        const e1 = bInstTrips.filter(t => t.shift === 'evening1' || t.shift === 'evening');
+        const e2 = bInstTrips.filter(t => t.shift === 'evening2');
+        const e3 = bInstTrips.filter(t => t.shift === 'evening3');
+        const e4 = bInstTrips.filter(t => t.shift === 'evening4');
+
+        const instRouteCodes = [...new Set(bInstTrips.map(t => t.route_code).filter(r => r && r !== '—'))];
+        const instDriversList = [...new Set(bInstTrips.map(t => t.driver_name).filter(d => d && d !== '—'))];
+
+        const instBus = {
+          ...b,
+          institution_id: inst.id,
+          institution: inst.short_name || inst.name,
+          institution_name: inst.name,
+          allTrips: bInstTrips,
+          total_km: hasTripsInThisInst ? totalKm : Number(b.total_km || 0),
+          total_trips: hasTripsInThisInst ? totalTrips : Number(b.total_trips || 0),
+          morning1_trips: m1.length,
+          morning1_km: m1.reduce((sum, t) => sum + Number(t.km || 0), 0),
+          morning2_trips: m2.length,
+          morning2_km: m2.reduce((sum, t) => sum + Number(t.km || 0), 0),
+          morning3_trips: m3.length,
+          morning3_km: m3.reduce((sum, t) => sum + Number(t.km || 0), 0),
+          morning4_trips: m4.length,
+          morning4_km: m4.reduce((sum, t) => sum + Number(t.km || 0), 0),
+          evening1_trips: e1.length,
+          evening1_km: e1.reduce((sum, t) => sum + Number(t.km || 0), 0),
+          evening2_trips: e2.length,
+          evening2_km: e2.reduce((sum, t) => sum + Number(t.km || 0), 0),
+          evening3_trips: e3.length,
+          evening3_km: e3.reduce((sum, t) => sum + Number(t.km || 0), 0),
+          evening4_trips: e4.length,
+          evening4_km: e4.reduce((sum, t) => sum + Number(t.km || 0), 0),
+          routes: instRouteCodes.length > 0 ? instRouteCodes.join(', ') : (hasTripsInThisInst ? '—' : (b.routes || '—')),
+          drivers: instDriversList.length > 0 ? instDriversList.join(', ') : (b.drivers || '—'),
+          breakdownsList: (substitutions || []).filter(s => {
+            const matchBus = bKeys.some(k => String(s.original_bus_id) === k || String(s.original_bus_number).trim().toUpperCase() === k);
+            return matchBus && isSubForInst(s, inst);
+          }),
+          coversList: (substitutions || []).filter(s => {
+            const matchBus = bKeys.some(k => String(s.substitute_bus_id) === k || String(s.substitute_bus_number).trim().toUpperCase() === k);
+            return matchBus && isSubForInst(s, inst);
+          })
+        };
+
+        inst.buses.push(instBus);
+      }
+    });
+  }
+
+  // Handle central group for unmatched trips / buses
+  if (centralTrips.length > 0) {
+    const centralTripsByBus = new Map();
+    centralTrips.forEach(t => {
+      const keys = [];
+      if (t.bus_id) keys.push(String(t.bus_id));
+      if (t.registration_number) keys.push(String(t.registration_number).trim().toUpperCase());
+      keys.forEach(k => {
+        if (!centralTripsByBus.has(k)) centralTripsByBus.set(k, []);
+        centralTripsByBus.get(k).push(t);
+      });
+    });
+
+    buses.forEach(b => {
+      const bKeys = getBusKeys(b);
+      let bCentralTrips = [];
+      for (const k of bKeys) {
+        if (centralTripsByBus.has(k)) {
+          bCentralTrips = centralTripsByBus.get(k);
+          break;
+        }
+      }
+      if (bCentralTrips.length > 0) {
+        const totalKm = bCentralTrips.reduce((sum, t) => sum + Number(t.km || 0), 0);
+        centralGroup.buses.push({
+          ...b,
+          allTrips: bCentralTrips,
+          total_km: totalKm,
+          total_trips: bCentralTrips.length,
+          routes: [...new Set(bCentralTrips.map(t => t.route_code).filter(Boolean))].join(', ') || '—',
+          drivers: [...new Set(bCentralTrips.map(t => t.driver_name).filter(Boolean))].join(', ') || b.drivers || '—'
+        });
+      }
+    });
+  }
 
   const result = [];
   for (const [id, inst] of instMap.entries()) {
     if (inst.buses.length > 0) {
-      // Calculate totals
       const totalKm = inst.buses.reduce((sum, b) => sum + Number(b.total_km || 0), 0);
       const totalTrips = inst.buses.reduce((sum, b) => sum + Number(b.total_trips || 0), 0);
       const avgKm = inst.buses.length > 0 ? (totalKm / inst.buses.length).toFixed(1) : 0;
-      
-      // Attach trips and substitutions to each bus
-      inst.buses.forEach(b => {
-        const bId = String(b.bus_id || b.id || '');
-        const reg = String(b.registration_number || '').trim().toUpperCase();
-        b.allTrips = tripsByBus[bId] || tripsByBus[reg] || [];
-        b.breakdownsList = getSubstitutionsForBus(b);
-        b.coversList = getCoversForBus(b);
-      });
 
       result.push({
         ...inst,
@@ -161,13 +333,6 @@ export function groupBusesByInstitution(buses = [], institutions = [], trips = [
     const totalKm = centralGroup.buses.reduce((sum, b) => sum + Number(b.total_km || 0), 0);
     const totalTrips = centralGroup.buses.reduce((sum, b) => sum + Number(b.total_trips || 0), 0);
     const avgKm = centralGroup.buses.length > 0 ? (totalKm / centralGroup.buses.length).toFixed(1) : 0;
-    centralGroup.buses.forEach(b => {
-      const bId = String(b.bus_id || b.id || '');
-      const reg = String(b.registration_number || '').trim().toUpperCase();
-      b.allTrips = tripsByBus[bId] || tripsByBus[reg] || [];
-      b.breakdownsList = getSubstitutionsForBus(b);
-      b.coversList = getCoversForBus(b);
-    });
     result.push({
       ...centralGroup,
       busesCount: centralGroup.buses.length,
@@ -235,7 +400,7 @@ function formatTripCellHtml(trips = [], fallbackRoutes = '', shiftType = 'mornin
     }).join('');
   }
 
-  if (fallbackRoutes && fallbackRoutes !== '—') {
+  if (trips.length === 0 && fallbackRoutes && fallbackRoutes !== '—') {
     const parts = fallbackRoutes.split(/[,;/]+/).map(p => p.trim()).filter(Boolean);
     if (parts.length > 0) {
       return parts.map((r, idx) => {
@@ -989,4 +1154,4 @@ export {
   downloadAllInstitutionsZip,
   downloadSingleInstitutionPdf,
   downloadAllInstitutionsConsolidatedPdf
-} from './busWisePdfGenerator';
+} from './busWisePdfGenerator.js';

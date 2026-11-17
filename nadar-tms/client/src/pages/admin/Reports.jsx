@@ -661,13 +661,17 @@ function BusWiseReportView({ data, selectedBusId, st, insts }) {
   });
 
   const getBusTrips = (b) => {
-    if (b.bus_id && tripsByBusId[b.bus_id]) return tripsByBusId[b.bus_id];
-    if (b.id && tripsByBusId[b.id]) return tripsByBusId[b.id];
-    if (b.registration_number) {
+    let list = [];
+    if (b.bus_id && tripsByBusId[b.bus_id]) list = tripsByBusId[b.bus_id];
+    else if (b.id && tripsByBusId[b.id]) list = tripsByBusId[b.id];
+    else if (b.registration_number) {
       const reg = String(b.registration_number).trim().toUpperCase();
-      if (tripsByRegNum[reg]) return tripsByRegNum[reg];
+      if (tripsByRegNum[reg]) list = tripsByRegNum[reg];
     }
-    return [];
+    if (st?.institutionId) {
+      return list.filter(t => String(t.institution_id) === String(st.institutionId));
+    }
+    return list;
   };
 
   const getBusBreakdowns = (b) => {

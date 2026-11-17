@@ -302,8 +302,8 @@ exports.distance = async (req, res) => {
     // Automatically trigger calculation & insertion of any missing assignment trips
     await autoLogTrips();
 
-    const cond = `tl.end_km IS NOT NULL AND tl.start_km IS NOT NULL AND tl.log_date BETWEEN ? AND ? AND (? IS NULL OR r.institution_id = ? OR b.institution_id = ?) AND (? IS NULL OR b.id = ?)`;
-    const params = [from, to, inst, inst, inst, busId, busId];
+    const cond = `tl.end_km IS NOT NULL AND tl.start_km IS NOT NULL AND tl.log_date BETWEEN ? AND ? AND (? IS NULL OR COALESCE(r.institution_id, b.institution_id) = ?) AND (? IS NULL OR b.id = ?)`;
+    const params = [from, to, inst, inst, busId, busId];
 
     const days = await query(
       `SELECT tl.log_date AS date, SUM(tl.end_km - tl.start_km) AS km, COUNT(tl.id) AS trips
@@ -411,10 +411,10 @@ exports.distance = async (req, res) => {
       LEFT JOIN drivers dr_orig ON dr_orig.id = ds.original_driver_id
       LEFT JOIN drivers dr_sub ON dr_sub.id = ds.substitute_driver_id
       WHERE (ds.sub_date BETWEEN ? AND ? OR ds.status = 'active')
-        AND (? IS NULL OR r.institution_id = ? OR b_orig.institution_id = ? OR b_sub.institution_id = ?)
+        AND (? IS NULL OR COALESCE(r.institution_id, b_orig.institution_id, b_sub.institution_id) = ?)
         AND (? IS NULL OR b_orig.id = ? OR b_sub.id = ?)
       ORDER BY ds.sub_date DESC, ds.id DESC
-    `, [from, to, inst, inst, inst, inst, busId, busId, busId]);
+    `, [from, to, inst, inst, busId, busId, busId]);
 
     // Attach breakdowns and cover duties to each bus in distance report
     byBus.forEach(b => {
@@ -449,9 +449,9 @@ exports.busWise = async (req, res) => {
 
     const cond = `tl.end_km IS NOT NULL AND tl.start_km IS NOT NULL 
       AND tl.log_date BETWEEN ? AND ? 
-      AND (? IS NULL OR r.institution_id = ? OR b.institution_id = ?)
+      AND (? IS NULL OR COALESCE(r.institution_id, b.institution_id) = ?)
       AND (? IS NULL OR b.id = ?)`;
-    const params = [from, to, inst, inst, inst, busId, busId];
+    const params = [from, to, inst, inst, busId, busId];
 
     const buses = await query(`
       SELECT b.id AS bus_id,
@@ -572,10 +572,10 @@ exports.busWise = async (req, res) => {
       LEFT JOIN drivers dr_orig ON dr_orig.id = ds.original_driver_id
       LEFT JOIN drivers dr_sub ON dr_sub.id = ds.substitute_driver_id
       WHERE (ds.sub_date BETWEEN ? AND ? OR ds.status = 'active')
-        AND (? IS NULL OR r.institution_id = ? OR b_orig.institution_id = ? OR b_sub.institution_id = ?)
+        AND (? IS NULL OR COALESCE(r.institution_id, b_orig.institution_id, b_sub.institution_id) = ?)
         AND (? IS NULL OR b_orig.id = ? OR b_sub.id = ?)
       ORDER BY ds.sub_date DESC, ds.id DESC
-    `, [from, to, inst, inst, inst, inst, busId, busId, busId]);
+    `, [from, to, inst, inst, busId, busId, busId]);
 
     // Ensure all buses involved in substitutions also exist in the buses list even if they logged 0 trips
     const busMap = new Map();
@@ -736,10 +736,10 @@ exports.substitutions = async (req, res) => {
       LEFT JOIN drivers dr_orig ON dr_orig.id = ds.original_driver_id
       LEFT JOIN drivers dr_sub ON dr_sub.id = ds.substitute_driver_id
       WHERE (ds.sub_date BETWEEN ? AND ? OR ds.status = 'active')
-        AND (? IS NULL OR r.institution_id = ? OR b_orig.institution_id = ? OR b_sub.institution_id = ?)
+        AND (? IS NULL OR COALESCE(r.institution_id, b_orig.institution_id, b_sub.institution_id) = ?)
         AND (? IS NULL OR b_orig.id = ? OR b_sub.id = ?)
       ORDER BY ds.sub_date DESC, ds.id DESC
-    `, [from, to, inst, inst, inst, inst, busId, busId, busId]);
+    `, [from, to, inst, inst, busId, busId, busId]);
 
     res.json({ from, to, substitutions });
   } catch (e) {
@@ -800,8 +800,8 @@ exports.driverTrips = async (req, res) => {
          (SELECT d2.id FROM drivers d2 WHERE d2.route_id = tl.route_id ORDER BY d2.id DESC LIMIT 1)
        )
        WHERE tl.log_date BETWEEN ? AND ?
-         AND (? IS NULL OR r.institution_id = ? OR b.institution_id = ?)
-       ORDER BY tl.log_date DESC, driver_name, tl.shift`, [from, to, inst, inst, inst]);
+         AND (? IS NULL OR COALESCE(r.institution_id, b.institution_id) = ?)
+       ORDER BY tl.log_date DESC, driver_name, tl.shift`, [from, to, inst, inst]);
 
     const byDriver = await query(
       `SELECT COALESCE(dr_direct.name, dr_assign.name, u.name, 'Unassigned') AS driver_name,
@@ -821,9 +821,9 @@ exports.driverTrips = async (req, res) => {
          (SELECT d2.id FROM drivers d2 WHERE d2.route_id = tl.route_id ORDER BY d2.id DESC LIMIT 1)
        )
        WHERE tl.log_date BETWEEN ? AND ?
-         AND (? IS NULL OR r.institution_id = ? OR b.institution_id = ?)
+         AND (? IS NULL OR COALESCE(r.institution_id, b.institution_id) = ?)
        GROUP BY driver_name
-       ORDER BY (driver_name = 'Unassigned') ASC, trips DESC, km DESC`, [from, to, inst, inst, inst]);
+       ORDER BY (driver_name = 'Unassigned') ASC, trips DESC, km DESC`, [from, to, inst, inst]);
 
     res.json({
       from,

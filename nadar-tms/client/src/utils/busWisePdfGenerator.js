@@ -208,7 +208,7 @@ function formatTripCell(trips = [], fallbackRoutes = '', shiftType = 'morning') 
     }).join('\n\n');
   }
 
-  if (fallbackRoutes && fallbackRoutes !== '—') {
+  if (trips.length === 0 && fallbackRoutes && fallbackRoutes !== '—') {
     const parts = fallbackRoutes.split(/[,;/]+/).map(p => p.trim()).filter(Boolean);
     if (parts.length > 0) {
       return parts.map((r, idx) => {
